@@ -1,0 +1,261 @@
+@import 'tailwindcss';
+
+/* ===========================================================================
+   THEME TOKENS
+   Every color in the app comes from these variables. A theme is just a new
+   block of values — components never hardcode a color, so adding a theme
+   means adding a block here plus an entry in src/config/themes.js.
+   The active theme is set as data-theme on <html> by ThemeProvider.
+   ======================================================================== */
+
+/* --- Homestead: the original soft daylight look ------------------------- */
+:root,
+[data-theme='home'] {
+  --canvas: #f1f5f9;
+  --surface: #ffffff;
+  --surface-2: #f1f5f9;
+  --line: #e2e8f0;
+
+  --ink: #0f172a;
+  --ink-2: #64748b;
+  --ink-3: #94a3b8;
+
+  --accent: #0f172a;
+  --accent-ink: #ffffff;
+
+  --good: #10b981;
+  --good-soft: #d1fae5;
+  --good-ink: #047857;
+  --good-line: #a7f3d0;
+
+  --alert: #f43f5e;
+  --alert-soft: #ffe4e6;
+  --alert-ink: #be123c;
+  --alert-line: #fecdd3;
+
+  --radius: 1rem;
+  --shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --toast-bg: #0f172a;
+  --toast-ink: #ffffff;
+}
+
+/* --- Starship: your house, in orbit ------------------------------------ */
+[data-theme='starship'] {
+  --canvas: #04070f;
+  --surface: rgba(12, 20, 38, 0.72);
+  --surface-2: rgba(30, 48, 80, 0.5);
+  --line: rgba(56, 189, 248, 0.2);
+
+  --ink: #e8f4ff;
+  --ink-2: #9db4cf;
+  --ink-3: #6b87a6;
+
+  --accent: #22d3ee;
+  --accent-ink: #03121a;
+
+  --good: #34d399;
+  --good-soft: rgba(52, 211, 153, 0.12);
+  --good-ink: #6ee7b7;
+  --good-line: rgba(52, 211, 153, 0.3);
+
+  --alert: #fb7185;
+  --alert-soft: rgba(251, 113, 133, 0.12);
+  --alert-ink: #fda4af;
+  --alert-line: rgba(251, 113, 133, 0.32);
+
+  --radius: 0.85rem;
+  --shadow: 0 10px 30px -12px rgb(2 6 23 / 0.9), inset 0 1px 0 rgb(186 240 255 / 0.07);
+  --toast-bg: rgba(8, 20, 38, 0.95);
+  --toast-ink: #e8f4ff;
+}
+
+/* ===========================================================================
+   BASE
+   ======================================================================== */
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--canvas);
+  color: var(--ink);
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  /* Respect the iPhone home indicator / notch when saved to the home screen. */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 0.4s ease, color 0.4s ease;
+}
+
+/* Buttons are tapped a lot on a phone; never let a double tap zoom the page. */
+button {
+  touch-action: manipulation;
+}
+
+/* ===========================================================================
+   THEMED PIECES
+   A handful of named classes so components stay readable and a theme can
+   restyle them wholesale.
+   ======================================================================== */
+
+/* A card. Area cards override --surface and --line inline to tint themselves. */
+.panel {
+  background-color: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+[data-theme='starship'] .panel {
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* Small heading above a group of cards. */
+.section-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+[data-theme='starship'] .section-title {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+/* Tiny caps label under a big number. */
+.label {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+[data-theme='starship'] .label {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.12em;
+}
+
+[data-theme='starship'] .numeral {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* The Log button and other primary actions. */
+.btn-primary {
+  background-color: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+  border-radius: calc(var(--radius) - 0.25rem);
+  transition: transform 0.12s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+
+.btn-primary:active {
+  transform: scale(0.95);
+}
+
+[data-theme='starship'] .btn-primary {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  box-shadow: 0 0 20px -6px var(--accent);
+}
+
+[data-theme='starship'] .btn-primary:hover {
+  filter: brightness(1.1);
+}
+
+/* ===========================================================================
+   STARSHIP SET DRESSING
+   Pure CSS and a handful of divs — no images, nothing to download.
+   ======================================================================== */
+
+/* Faint scan line across the whole viewport, like a screen you're looking at. */
+[data-theme='starship'] body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgb(186 240 255 / 0.025) 0px,
+    rgb(186 240 255 / 0.025) 1px,
+    transparent 1px,
+    transparent 4px
+  );
+}
+
+@keyframes star-drift {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(0, -50%, 0);
+  }
+}
+
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes nebula-breathe {
+  0%,
+  100% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.12);
+  }
+}
+
+.star-layer {
+  position: absolute;
+  inset: 0;
+  height: 200%;
+  animation: star-drift linear infinite;
+}
+
+.star {
+  position: absolute;
+  border-radius: 9999px;
+  background: #ffffff;
+}
+
+.star-twinkle {
+  animation: twinkle ease-in-out infinite;
+}
+
+.nebula {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(60px);
+  animation: nebula-breathe ease-in-out infinite;
+}
+
+/* Nobody should get motion sickness from a chore app. */
+@media (prefers-reduced-motion: reduce) {
+  .star-layer,
+  .star-twinkle,
+  .nebula {
+    animation: none !important;
+  }
+
+  * {
+    transition-duration: 0.01ms !important;
+  }
+}
