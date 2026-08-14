@@ -13,6 +13,24 @@ wall, the right list opens on your phone, you tap **Log**, and you're done.
 
 ---
 
+## Two looks
+
+Tap the 🎨 button in the top right to switch. Your tasks, history, streak, and
+points are identical in both — it's paint, not plumbing.
+
+| | |
+|---|---|
+| **Homestead** | Soft daylight. Calm and plain. |
+| **Starship** | Your house, in orbit. Deep space behind the glass, a drifting starfield, a planet turning below, cyan console panels. Areas become *decks*, points become *credits*, recent activity becomes the *ship's log*. |
+
+The starfield is drawn with plain `<div>`s and CSS — nothing to download, and it
+holds a steady 60fps on a phone. If your phone has **Reduce Motion** turned on,
+all of it sits still automatically.
+
+See [Adding your own theme](#adding-your-own-theme) below.
+
+---
+
 ## The areas
 
 | Area | Tag URL | Tasks |
@@ -97,6 +115,36 @@ over from scratch.
 
 ---
 
+## Adding your own theme
+
+No component hardcodes a color. Every one reads CSS variables, so a theme is
+three small edits:
+
+**1. The colors** — add a block to `src/index.css`:
+
+```css
+[data-theme='cabin'] {
+  --canvas: #1c1917;      /* page background */
+  --surface: #292524;     /* card background */
+  --line: #44403c;        /* card border */
+  --ink: #fafaf9;         /* main text */
+  --accent: #f97316;      /* buttons */
+  /* ...copy the rest of the keys from an existing block */
+}
+```
+
+**2. The words** — add an entry to `src/config/themes.js` with the same id. The
+`copy` object renames anything on screen, so a theme can call areas "cabins" or
+points "chores" if that's what makes you want to open it.
+
+**3. The area colors** — add a variant to `makePalette` in
+`src/config/areas.js` so the seven areas know how to look in your new theme.
+
+That's it — your theme shows up in the picker automatically. Set `flavor: 'space'`
+to reuse the starfield backdrop, or leave it `'plain'`.
+
+---
+
 ## How the statuses work
 
 | Status | Meaning |
@@ -139,8 +187,9 @@ at, not to nag. Logging still happens in the app.
 
 ## Your data
 
-Everything is stored in your browser's `localStorage` under the key
-`home-maintenance-dashboard/v1`. That means:
+Everything is stored in your browser's `localStorage` — your completions under
+`home-maintenance-dashboard/v1`, your chosen theme under
+`home-maintenance-dashboard/theme`. That means:
 
 - ✅ No account, no server, no one else can see it.
 - ⚠️ It's **per browser and per device.** Logging on your phone won't show up on
@@ -164,7 +213,10 @@ custom domain at it.
 ```
 src/
 ├── config/
-│   └── areas.js        ← YOUR HOME. Edit this to change rooms and chores.
+│   ├── areas.js        ← YOUR HOME. Edit this to change rooms and chores.
+│   └── themes.js       The looks you can switch between
+├── theme/
+│   └── ThemeProvider.jsx   Holds the current theme, remembers your choice
 ├── lib/
 │   ├── date.js         Date helpers (weeks, streak-safe day math)
 │   ├── schedule.js     Decides if a task is due, resting, overdue, done
@@ -172,10 +224,13 @@ src/
 │   ├── storage.js      Reads and writes localStorage
 │   └── calendar.js     Builds the .ics calendar file
 ├── components/
-│   ├── Dashboard.jsx   The master view: stats, what's due, area cards
-│   ├── AreaView.jsx    A single area, opened by an NFC tag
-│   ├── TaskCard.jsx    One task row with its Log button
+│   ├── Dashboard.jsx      The master view: stats, what's due, area cards
+│   ├── AreaView.jsx       A single area, opened by an NFC tag
+│   ├── TaskCard.jsx       One task row with its Log button
+│   ├── ThemePicker.jsx    The "choose a look" sheet
+│   ├── SpaceBackdrop.jsx  Starfield, nebulae and planet (CSS only)
 │   └── ProgressBar.jsx
+├── index.css           Theme color variables live here
 └── App.jsx             Routing (via the URL hash) and app state
 ```
 

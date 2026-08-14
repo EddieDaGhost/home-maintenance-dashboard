@@ -1,8 +1,9 @@
 import { ArrowLeft, History } from 'lucide-react'
-import { paletteFor } from '../config/areas.js'
+import { areaStyle, paletteFor } from '../config/areas.js'
 import { friendlyDate } from '../lib/date.js'
 import { STATUS, getTaskState, isActionable } from '../lib/schedule.js'
 import { progressFor } from '../lib/stats.js'
+import { useTheme } from '../theme/ThemeProvider.jsx'
 import ProgressBar from './ProgressBar.jsx'
 import TaskCard from './TaskCard.jsx'
 
@@ -15,7 +16,7 @@ const SORT_ORDER = {
   [STATUS.DONE]: 4,
 }
 
-function RecentActivity({ area, log }) {
+function RecentActivity({ area, log, title }) {
   const entries = area.tasks
     .flatMap((task) => (log.completions[task.id] ?? []).map((at) => ({ at, task })))
     .sort((a, b) => b.at - a.at)
@@ -24,16 +25,20 @@ function RecentActivity({ area, log }) {
   if (!entries.length) return null
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-slate-900">
-        <History className="h-4 w-4 text-slate-400" />
-        Recent activity
+    <section className="panel p-4">
+      <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+        <History className="h-4 w-4" style={{ color: 'var(--ink-3)' }} />
+        {title}
       </p>
       <ul className="space-y-1.5">
         {entries.map(({ at, task }) => (
           <li key={`${task.id}-${at}`} className="flex justify-between gap-3 text-xs">
-            <span className="truncate text-slate-600">{task.name}</span>
-            <span className="shrink-0 text-slate-400">{friendlyDate(at)}</span>
+            <span className="truncate" style={{ color: 'var(--ink-2)' }}>
+              {task.name}
+            </span>
+            <span className="shrink-0" style={{ color: 'var(--ink-3)' }}>
+              {friendlyDate(at)}
+            </span>
           </li>
         ))}
       </ul>
@@ -42,7 +47,8 @@ function RecentActivity({ area, log }) {
 }
 
 export default function AreaView({ area, log, now, onLog, onUndo, onBack }) {
-  const palette = paletteFor(area)
+  const { themeId, copy } = useTheme()
+  const palette = paletteFor(area, themeId)
   const Icon = area.icon
   const { percent, done, open } = progressFor(area.tasks, log, now)
 
@@ -58,36 +64,48 @@ export default function AreaView({ area, log, now, onLog, onUndo, onBack }) {
       <button
         type="button"
         onClick={onBack}
-        className="-ml-1 flex items-center gap-1 py-2 text-sm font-medium text-slate-500 transition active:scale-95"
+        className="-ml-1 flex items-center gap-1 py-2 text-sm font-medium transition active:scale-95"
+        style={{ color: 'var(--ink-2)' }}
       >
         <ArrowLeft className="h-4 w-4" />
-        All areas
+        {copy.backLabel}
       </button>
 
-      <header className={`rounded-3xl border ${palette.border} ${palette.soft} p-5 shadow-sm`}>
+      <header className="panel p-5" style={areaStyle(area, themeId)}>
         <div className="flex items-center gap-3">
-          <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${palette.solid} text-white shadow-sm`}>
+          <div
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-white"
+            style={{ background: 'var(--area)', boxShadow: `0 0 22px -4px ${palette.glow}` }}
+          >
             <Icon className="h-6 w-6" strokeWidth={2.2} />
           </div>
           <div className="min-w-0">
-            <h1 className="truncate text-xl font-bold tracking-tight text-slate-900">{area.name}</h1>
-            <p className="truncate text-sm text-slate-500">{area.subtitle}</p>
+            <h1 className="truncate text-xl font-bold tracking-tight" style={{ color: 'var(--ink)' }}>
+              {area.name}
+            </h1>
+            <p className="truncate text-sm" style={{ color: 'var(--ink-2)' }}>
+              {area.subtitle}
+            </p>
           </div>
         </div>
 
         <div className="mt-4">
-          <ProgressBar percent={percent} fillClass={palette.solid} trackClass="bg-white/70" height="h-2.5" />
-          <p className="mt-2 text-xs font-medium text-slate-600">
-            {open === 0
-              ? 'Nothing due here right now.'
-              : `${done} done · ${open} still to do`}
+          <ProgressBar
+            percent={percent}
+            fill="var(--area)"
+            track="var(--area-track)"
+            glow={palette.glow}
+            height="0.625rem"
+          />
+          <p className="mt-2 text-xs font-medium" style={{ color: 'var(--ink-2)' }}>
+            {open === 0 ? copy.areaClear : `${done} done · ${open} still to do`}
           </p>
         </div>
       </header>
 
       {openTasks.length > 0 ? (
         <section>
-          <h2 className="mb-2.5 px-1 text-sm font-semibold text-slate-900">To do</h2>
+          <h2 className="section-title mb-2.5 px-1">{copy.todoTitle}</h2>
           <div className="space-y-2.5">
             {openTasks.map(({ task, state }) => (
               <TaskCard key={task.id} task={task} state={state} onLog={onLog} onUndo={onUndo} />
@@ -98,8 +116,8 @@ export default function AreaView({ area, log, now, onLog, onUndo, onBack }) {
 
       {restTasks.length > 0 ? (
         <section>
-          <h2 className="mb-2.5 px-1 text-sm font-semibold text-slate-900">
-            {openTasks.length ? 'Everything else' : 'All tasks'}
+          <h2 className="section-title mb-2.5 px-1">
+            {openTasks.length ? copy.restTitle : copy.allTasksTitle}
           </h2>
           <div className="space-y-2.5">
             {restTasks.map(({ task, state }) => (
@@ -109,7 +127,7 @@ export default function AreaView({ area, log, now, onLog, onUndo, onBack }) {
         </section>
       ) : null}
 
-      <RecentActivity area={area} log={log} />
+      <RecentActivity area={area} log={log} title={copy.recentTitle} />
     </div>
   )
 }

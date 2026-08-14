@@ -2,8 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AREAS_BY_ID, ALL_TASKS } from './config/areas.js'
 import { downloadCalendar } from './lib/calendar.js'
 import { loadLog, logCompletion, saveLog, undoLastCompletion } from './lib/storage.js'
+import { ThemeProvider, useTheme } from './theme/ThemeProvider.jsx'
 import Dashboard from './components/Dashboard.jsx'
 import AreaView from './components/AreaView.jsx'
+import SpaceBackdrop from './components/SpaceBackdrop.jsx'
 
 const TASKS_BY_ID = Object.fromEntries(ALL_TASKS.map((task) => [task.id, task]))
 
@@ -14,9 +16,8 @@ function areaIdFromHash() {
   return AREAS_BY_ID[id] ? id : null
 }
 
-const CHEERS = ['Nice one', 'Done and dusted', 'That counts', 'Logged', 'Off the list']
-
-export default function App() {
+function AppShell() {
+  const { theme, copy } = useTheme()
   const [log, setLog] = useState(loadLog)
   const [areaId, setAreaId] = useState(areaIdFromHash)
   const [now, setNow] = useState(() => new Date())
@@ -66,19 +67,19 @@ export default function App() {
       const task = TASKS_BY_ID[taskId]
       setLog((current) => logCompletion(current, taskId))
       setNow(new Date())
-      const cheer = CHEERS[Math.floor(Math.random() * CHEERS.length)]
-      showToast(`${cheer} — +${task?.points ?? 1} pts`)
+      const cheer = copy.cheers[Math.floor(Math.random() * copy.cheers.length)]
+      showToast(`${cheer} — +${task?.points ?? 1} ${copy.pointsUnit}`)
     },
-    [showToast],
+    [copy, showToast],
   )
 
   const handleUndo = useCallback(
     (taskId) => {
       setLog((current) => undoLastCompletion(current, taskId))
       setNow(new Date())
-      showToast('Undone')
+      showToast(copy.undone)
     },
-    [showToast],
+    [copy, showToast],
   )
 
   const goToArea = useCallback((id) => {
@@ -96,44 +97,63 @@ export default function App() {
 
   const handleExport = useCallback(() => {
     downloadCalendar(log, new Date())
-    showToast('Calendar file downloaded')
-  }, [log, showToast])
+    showToast(copy.exported)
+  }, [log, copy, showToast])
 
   const area = useMemo(() => (areaId ? AREAS_BY_ID[areaId] : null), [areaId])
 
   return (
-    <div className="mx-auto min-h-screen w-full max-w-md px-4">
-      {area ? (
-        <AreaView
-          area={area}
-          log={log}
-          now={now}
-          onLog={handleLog}
-          onUndo={handleUndo}
-          onBack={goHome}
-        />
-      ) : (
-        <Dashboard
-          log={log}
-          now={now}
-          onLog={handleLog}
-          onUndo={handleUndo}
-          onOpenArea={goToArea}
-          onExport={handleExport}
-        />
-      )}
+    <>
+      {theme.flavor === 'space' ? <SpaceBackdrop /> : null}
 
-      {toast ? (
-        <div
-          key={toast.key}
-          role="status"
-          className="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex justify-center px-4"
-        >
-          <div className="rounded-full bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white shadow-lg">
-            {toast.message}
+      <div className="relative z-10 mx-auto min-h-screen w-full max-w-md px-4">
+        {area ? (
+          <AreaView
+            area={area}
+            log={log}
+            now={now}
+            onLog={handleLog}
+            onUndo={handleUndo}
+            onBack={goHome}
+          />
+        ) : (
+          <Dashboard
+            log={log}
+            now={now}
+            onLog={handleLog}
+            onUndo={handleUndo}
+            onOpenArea={goToArea}
+            onExport={handleExport}
+          />
+        )}
+
+        {toast ? (
+          <div
+            key={toast.key}
+            role="status"
+            className="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex justify-center px-4"
+          >
+            <div
+              className="rounded-full px-5 py-2.5 text-sm font-semibold shadow-lg"
+              style={{
+                background: 'var(--toast-bg)',
+                color: 'var(--toast-ink)',
+                border: '1px solid var(--line)',
+              }}
+            >
+              {toast.message}
+            </div>
           </div>
-        </div>
-      ) : null}
-    </div>
+        ) : null}
+      </div>
+    </>
+  )
+}
+
+export default function App() {
+  return (
+    <ThemeProvider>
+      <AppShell />
+    </ThemeProvider>
   )
 }

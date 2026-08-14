@@ -27,65 +27,42 @@
 
 import { Bath, Cat, ChefHat, Egg, WashingMachine } from 'lucide-react'
 
-// Tailwind class names are written out in full on purpose — Tailwind only keeps
-// classes it can literally see in the source, so "bg-" + color would break.
+// Each area's color, given once per theme. Components read these as CSS
+// variables (see areaStyle below), so a theme can repaint every area without
+// any component knowing about it.
+//
+//   base  - the solid accent: icon tile, progress fill
+//   ink   - text tinted with the area color
+//   tint  - the card background
+//   line  - the card border
+const rgba = (hex, alpha) => {
+  const value = parseInt(hex.slice(1), 16)
+  return `rgba(${(value >> 16) & 255}, ${(value >> 8) & 255}, ${value & 255}, ${alpha})`
+}
+
+function makePalette({ base, ink, tint, line, spaceBase, spaceInk }) {
+  return {
+    home: { base, ink, tint, line, track: 'rgba(255, 255, 255, 0.75)', glow: 'transparent' },
+    // In orbit the cards go dark and the color becomes a lit edge instead of a wash.
+    starship: {
+      base: spaceBase,
+      ink: spaceInk,
+      tint: rgba(spaceBase, 0.08),
+      line: rgba(spaceBase, 0.32),
+      track: 'rgba(148, 197, 255, 0.12)',
+      glow: rgba(spaceBase, 0.4),
+    },
+  }
+}
+
 export const PALETTES = {
-  amber: {
-    solid: 'bg-amber-500',
-    soft: 'bg-amber-50',
-    softer: 'bg-amber-100',
-    border: 'border-amber-200',
-    text: 'text-amber-700',
-    ring: 'focus-visible:outline-amber-500',
-  },
-  sky: {
-    solid: 'bg-sky-500',
-    soft: 'bg-sky-50',
-    softer: 'bg-sky-100',
-    border: 'border-sky-200',
-    text: 'text-sky-700',
-    ring: 'focus-visible:outline-sky-500',
-  },
-  cyan: {
-    solid: 'bg-cyan-500',
-    soft: 'bg-cyan-50',
-    softer: 'bg-cyan-100',
-    border: 'border-cyan-200',
-    text: 'text-cyan-700',
-    ring: 'focus-visible:outline-cyan-500',
-  },
-  teal: {
-    solid: 'bg-teal-500',
-    soft: 'bg-teal-50',
-    softer: 'bg-teal-100',
-    border: 'border-teal-200',
-    text: 'text-teal-700',
-    ring: 'focus-visible:outline-teal-500',
-  },
-  rose: {
-    solid: 'bg-rose-500',
-    soft: 'bg-rose-50',
-    softer: 'bg-rose-100',
-    border: 'border-rose-200',
-    text: 'text-rose-700',
-    ring: 'focus-visible:outline-rose-500',
-  },
-  violet: {
-    solid: 'bg-violet-500',
-    soft: 'bg-violet-50',
-    softer: 'bg-violet-100',
-    border: 'border-violet-200',
-    text: 'text-violet-700',
-    ring: 'focus-visible:outline-violet-500',
-  },
-  emerald: {
-    solid: 'bg-emerald-500',
-    soft: 'bg-emerald-50',
-    softer: 'bg-emerald-100',
-    border: 'border-emerald-200',
-    text: 'text-emerald-700',
-    ring: 'focus-visible:outline-emerald-500',
-  },
+  amber: makePalette({ base: '#f59e0b', ink: '#b45309', tint: '#fffbeb', line: '#fde68a', spaceBase: '#fbbf24', spaceInk: '#fcd34d' }),
+  sky: makePalette({ base: '#0ea5e9', ink: '#0369a1', tint: '#f0f9ff', line: '#bae6fd', spaceBase: '#38bdf8', spaceInk: '#7dd3fc' }),
+  cyan: makePalette({ base: '#06b6d4', ink: '#0e7490', tint: '#ecfeff', line: '#a5f3fc', spaceBase: '#22d3ee', spaceInk: '#67e8f9' }),
+  teal: makePalette({ base: '#14b8a6', ink: '#0f766e', tint: '#f0fdfa', line: '#99f6e4', spaceBase: '#2dd4bf', spaceInk: '#5eead4' }),
+  rose: makePalette({ base: '#f43f5e', ink: '#be123c', tint: '#fff1f2', line: '#fecdd3', spaceBase: '#fb7185', spaceInk: '#fda4af' }),
+  violet: makePalette({ base: '#8b5cf6', ink: '#6d28d9', tint: '#f5f3ff', line: '#ddd6fe', spaceBase: '#a78bfa', spaceInk: '#c4b5fd' }),
+  emerald: makePalette({ base: '#10b981', ink: '#047857', tint: '#ecfdf5', line: '#a7f3d0', spaceBase: '#34d399', spaceInk: '#6ee7b7' }),
 }
 
 export const AREAS = [
@@ -223,6 +200,24 @@ export const AREAS_BY_ID = Object.fromEntries(AREAS.map((area) => [area.id, area
 
 export const ALL_TASKS = AREAS.flatMap((area) => area.tasks.map((task) => ({ ...task, area })))
 
-export function paletteFor(area) {
-  return PALETTES[area.color] ?? PALETTES.sky
+export function paletteFor(area, themeId = 'home') {
+  const palette = PALETTES[area.color] ?? PALETTES.sky
+  return palette[themeId] ?? palette.home
+}
+
+/**
+ * The area's colors as CSS variables to spread onto an element's `style`.
+ * Overriding --surface and --line here is what makes a .panel tint itself in
+ * the area's color, in whichever theme is active.
+ */
+export function areaStyle(area, themeId = 'home') {
+  const palette = paletteFor(area, themeId)
+  return {
+    '--area': palette.base,
+    '--area-ink': palette.ink,
+    '--area-track': palette.track,
+    '--area-glow': palette.glow,
+    '--surface': palette.tint,
+    '--line': palette.line,
+  }
 }
