@@ -1,5 +1,14 @@
-import { useState } from 'react'
-import { CalendarPlus, ChevronRight, Flame, Nfc, Palette, PartyPopper, Trophy } from 'lucide-react'
+import { useRef, useState } from 'react'
+import {
+  CalendarPlus,
+  ChevronRight,
+  Download,
+  Flame,
+  Nfc,
+  PartyPopper,
+  Trophy,
+  Upload,
+} from 'lucide-react'
 import { AREAS, areaStyle, paletteFor } from '../config/areas.js'
 import {
   completedToday,
@@ -10,9 +19,11 @@ import {
   weeklyPointsGoal,
 } from '../lib/stats.js'
 import { useTheme } from '../theme/ThemeProvider.jsx'
+import { useNames } from '../state/NamesProvider.jsx'
 import ProgressBar from './ProgressBar.jsx'
 import TaskCard from './TaskCard.jsx'
 import ThemePicker from './ThemePicker.jsx'
+import TagSetup from './TagSetup.jsx'
 
 function greeting(now) {
   const hour = now.getHours()
@@ -33,7 +44,7 @@ function StatTile({ icon: Icon, label, value, tone }) {
   )
 }
 
-function AreaCard({ area, log, now, themeId, copy, onOpen }) {
+function AreaCard({ area, log, now, themeId, copy, nameFor, subtitleFor, onOpen }) {
   const palette = paletteFor(area, themeId)
   const { percent, open } = progressFor(area.tasks, log, now)
   const Icon = area.icon
@@ -55,14 +66,14 @@ function AreaCard({ area, log, now, themeId, copy, onOpen }) {
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-2">
           <p className="truncate font-semibold" style={{ color: 'var(--ink)' }}>
-            {area.name}
+            {nameFor(area)}
           </p>
           <span className="shrink-0 text-xs font-semibold" style={{ color: 'var(--area-ink)' }}>
             {open === 0 ? copy.allClearBadge : copy.toDoBadge(open)}
           </span>
         </div>
         <p className="mt-0.5 truncate text-xs" style={{ color: 'var(--ink-2)' }}>
-          {area.subtitle}
+          {subtitleFor(area)}
         </p>
         <div className="mt-2">
           <ProgressBar
@@ -79,9 +90,45 @@ function AreaCard({ area, log, now, themeId, copy, onOpen }) {
   )
 }
 
-export default function Dashboard({ log, now, onLog, onUndo, onOpenArea, onExport }) {
+/** One row in the setup list at the bottom of the dashboard. */
+function SettingsRow({ icon: Icon, label, detail, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition active:scale-[0.99]"
+    >
+      <Icon className="h-5 w-5 shrink-0" style={{ color: 'var(--ink-2)' }} />
+      <span className="min-w-0 flex-1">
+        <span className="block font-semibold" style={{ color: 'var(--ink)' }}>
+          {label}
+        </span>
+        {detail ? (
+          <span className="block text-xs" style={{ color: 'var(--ink-3)' }}>
+            {detail}
+          </span>
+        ) : null}
+      </span>
+      <ChevronRight className="h-4 w-4 shrink-0" style={{ color: 'var(--ink-3)' }} />
+    </button>
+  )
+}
+
+export default function Dashboard({
+  log,
+  now,
+  onLog,
+  onUndo,
+  onOpenArea,
+  onExport,
+  onBackup,
+  onRestore,
+}) {
   const { themeId, theme, copy } = useTheme()
+  const { nameFor, subtitleFor } = useNames()
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [tagsOpen, setTagsOpen] = useState(false)
+  const fileInput = useRef(null)
 
   const streak = currentStreak(log, now)
   const points = weeklyPoints(log, now)
@@ -113,7 +160,7 @@ export default function Dashboard({ log, now, onLog, onUndo, onOpenArea, onExpor
           className="panel flex h-11 w-11 shrink-0 items-center justify-center transition active:scale-95"
           style={{ color: 'var(--ink-2)' }}
         >
-          <Palette className="h-5 w-5" />
+          <ThemeIcon className="h-5 w-5" />
         </button>
       </header>
 
@@ -172,7 +219,7 @@ export default function Dashboard({ log, now, onLog, onUndo, onOpenArea, onExpor
                 key={task.id}
                 task={task}
                 state={state}
-                areaLabel={task.area.name}
+                areaLabel={nameFor(task.area)}
                 onLog={onLog}
                 onUndo={onUndo}
               />
@@ -192,47 +239,71 @@ export default function Dashboard({ log, now, onLog, onUndo, onOpenArea, onExpor
               now={now}
               themeId={themeId}
               copy={copy}
+              nameFor={nameFor}
+              subtitleFor={subtitleFor}
               onOpen={onOpenArea}
             />
           ))}
         </div>
       </section>
 
-      <section className="space-y-3">
-        <button
-          type="button"
-          onClick={onExport}
-          className="panel flex w-full items-center justify-center gap-2 p-4 font-semibold transition active:scale-[0.98]"
-          style={{ color: 'var(--ink)' }}
-        >
-          <CalendarPlus className="h-5 w-5" />
-          {copy.exportLabel}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setPickerOpen(true)}
-          className="panel flex w-full items-center justify-center gap-2 p-4 font-semibold transition active:scale-[0.98]"
-          style={{ color: 'var(--ink)' }}
-        >
-          <ThemeIcon className="h-5 w-5" />
-          Look: {theme.name}
-        </button>
-
-        <div
-          className="flex items-start gap-2.5 rounded-2xl p-4 text-xs"
-          style={{ background: 'var(--surface-2)', color: 'var(--ink-2)' }}
-        >
-          <Nfc className="mt-0.5 h-4 w-4 shrink-0" style={{ color: 'var(--ink-3)' }} />
-          <p>
-            {copy.nfcHint} Each tag holds this site&apos;s address plus{' '}
-            <span className="font-mono">#litter</span>, <span className="font-mono">#kitchen</span>,
-            and so on.
-          </p>
+      <section>
+        <h2 className="section-title mb-2.5 px-1">Setup</h2>
+        <div className="panel settings-list overflow-hidden">
+          <SettingsRow
+            icon={Nfc}
+            label="NFC tag setup"
+            detail="What to write on each tag"
+            onClick={() => setTagsOpen(true)}
+          />
+          <SettingsRow
+            icon={CalendarPlus}
+            label={copy.exportLabel}
+            detail="Repeating events, no alerts"
+            onClick={onExport}
+          />
+          <SettingsRow
+            icon={ThemeIcon}
+            label={`Look: ${theme.name}`}
+            detail={theme.tagline}
+            onClick={() => setPickerOpen(true)}
+          />
+          <SettingsRow
+            icon={Download}
+            label="Back up my data"
+            detail="Saves a file you can restore from"
+            onClick={onBackup}
+          />
+          <SettingsRow
+            icon={Upload}
+            label="Restore from a backup"
+            detail="Replaces what's on this device"
+            onClick={() => fileInput.current?.click()}
+          />
         </div>
+
+        <input
+          ref={fileInput}
+          type="file"
+          accept="application/json,.json"
+          className="hidden"
+          aria-label="Choose a backup file"
+          onChange={(event) => {
+            const file = event.target.files?.[0]
+            if (file) onRestore(file)
+            // Clear it so choosing the same file twice still fires.
+            event.target.value = ''
+          }}
+        />
+
+        <p className="mt-3 px-1 text-xs leading-relaxed" style={{ color: 'var(--ink-3)' }}>
+          Your history lives only in this browser. Backing up now and then is the only way to
+          survive clearing your Safari data or moving to a new phone.
+        </p>
       </section>
 
       <ThemePicker open={pickerOpen} onClose={() => setPickerOpen(false)} />
+      <TagSetup open={tagsOpen} onClose={() => setTagsOpen(false)} />
     </div>
   )
 }

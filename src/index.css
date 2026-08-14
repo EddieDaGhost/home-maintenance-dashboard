@@ -171,6 +171,46 @@ button {
   filter: brightness(1.1);
 }
 
+/* Cancel / Copy / Reset — quieter than the primary action. */
+.btn-secondary {
+  border: 1px solid var(--line);
+  background-color: transparent;
+  color: var(--ink);
+  font-weight: 600;
+  border-radius: calc(var(--radius) - 0.25rem);
+  transition: transform 0.12s ease;
+}
+
+.btn-secondary:active {
+  transform: scale(0.95);
+}
+
+/* Text inputs in the rename form. */
+.field {
+  width: 100%;
+  background-color: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius) - 0.25rem);
+  padding: 0.625rem 0.75rem;
+  color: var(--ink);
+  /* 16px keeps iOS Safari from zooming the page when the field is focused. */
+  font-size: 1rem;
+}
+
+/* Divider between rows in the setup list. */
+.settings-list > * + * {
+  border-top: 1px solid var(--line);
+}
+
+.field::placeholder {
+  color: var(--ink-3);
+}
+
+.field:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 /* ===========================================================================
    STARSHIP SET DRESSING
    Pure CSS and a handful of divs — no images, nothing to download.

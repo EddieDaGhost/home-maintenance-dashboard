@@ -6,6 +6,7 @@
 
 import { AREAS } from '../config/areas.js'
 import { addDays, startOfDay, toIcsDate, toIcsTimestamp } from './date.js'
+import { displayName } from './names.js'
 import { icsPreferredDays, nextOccurrence } from './schedule.js'
 
 const ICS_DAYS = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA']
@@ -84,7 +85,7 @@ function startDateFor(task, completions, now) {
   return startOfDay(start)
 }
 
-export function buildCalendar(log = { completions: {} }, now = new Date()) {
+export function buildCalendar(log = { completions: {} }, now = new Date(), names = {}) {
   const stamp = toIcsTimestamp(now)
   const lines = [
     'BEGIN:VCALENDAR',
@@ -100,6 +101,8 @@ export function buildCalendar(log = { completions: {} }, now = new Date()) {
     for (const task of area.tasks) {
       const completions = log.completions?.[task.id] ?? []
       const start = startDateFor(task, completions, now)
+      const areaName = displayName(area, names)
+      const taskName = displayName(task, names)
       const description = task.note
         ? `${task.note} — logged in your Home Maintenance dashboard.`
         : 'Logged in your Home Maintenance dashboard.'
@@ -111,9 +114,9 @@ export function buildCalendar(log = { completions: {} }, now = new Date()) {
         `DTSTART;VALUE=DATE:${toIcsDate(start)}`,
         `DTEND;VALUE=DATE:${toIcsDate(addDays(start, 1))}`,
         `RRULE:${rruleFor(task.schedule)}`,
-        `SUMMARY:${escapeText(`${area.name}: ${task.name}`)}`,
+        `SUMMARY:${escapeText(`${areaName}: ${taskName}`)}`,
         `DESCRIPTION:${escapeText(description)}`,
-        `CATEGORIES:${escapeText(area.name)}`,
+        `CATEGORIES:${escapeText(areaName)}`,
         'TRANSP:TRANSPARENT',
         'END:VEVENT',
       )
@@ -125,8 +128,8 @@ export function buildCalendar(log = { completions: {} }, now = new Date()) {
 }
 
 /** Trigger the browser download. On iPhone this opens straight into Calendar. */
-export function downloadCalendar(log, now = new Date()) {
-  const ics = buildCalendar(log, now)
+export function downloadCalendar(log, now = new Date(), names = {}) {
+  const ics = buildCalendar(log, now, names)
   const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')

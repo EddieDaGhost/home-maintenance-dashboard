@@ -1,9 +1,12 @@
-import { ArrowLeft, History } from 'lucide-react'
+import { useState } from 'react'
+import { ArrowLeft, History, Pencil } from 'lucide-react'
 import { areaStyle, paletteFor } from '../config/areas.js'
 import { friendlyDate } from '../lib/date.js'
 import { STATUS, getTaskState, isActionable } from '../lib/schedule.js'
 import { progressFor } from '../lib/stats.js'
 import { useTheme } from '../theme/ThemeProvider.jsx'
+import { useNames } from '../state/NamesProvider.jsx'
+import EditNamesSheet from './EditNamesSheet.jsx'
 import ProgressBar from './ProgressBar.jsx'
 import TaskCard from './TaskCard.jsx'
 
@@ -16,7 +19,7 @@ const SORT_ORDER = {
   [STATUS.DONE]: 4,
 }
 
-function RecentActivity({ area, log, title }) {
+function RecentActivity({ area, log, title, nameFor }) {
   const entries = area.tasks
     .flatMap((task) => (log.completions[task.id] ?? []).map((at) => ({ at, task })))
     .sort((a, b) => b.at - a.at)
@@ -34,7 +37,7 @@ function RecentActivity({ area, log, title }) {
         {entries.map(({ at, task }) => (
           <li key={`${task.id}-${at}`} className="flex justify-between gap-3 text-xs">
             <span className="truncate" style={{ color: 'var(--ink-2)' }}>
-              {task.name}
+              {nameFor(task)}
             </span>
             <span className="shrink-0" style={{ color: 'var(--ink-3)' }}>
               {friendlyDate(at)}
@@ -48,6 +51,8 @@ function RecentActivity({ area, log, title }) {
 
 export default function AreaView({ area, log, now, onLog, onUndo, onBack }) {
   const { themeId, copy } = useTheme()
+  const { nameFor, subtitleFor } = useNames()
+  const [editing, setEditing] = useState(false)
   const palette = paletteFor(area, themeId)
   const Icon = area.icon
   const { percent, done, open } = progressFor(area.tasks, log, now)
@@ -81,12 +86,21 @@ export default function AreaView({ area, log, now, onLog, onUndo, onBack }) {
           </div>
           <div className="min-w-0">
             <h1 className="truncate text-xl font-bold tracking-tight" style={{ color: 'var(--ink)' }}>
-              {area.name}
+              {nameFor(area)}
             </h1>
             <p className="truncate text-sm" style={{ color: 'var(--ink-2)' }}>
-              {area.subtitle}
+              {subtitleFor(area)}
             </p>
           </div>
+
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            aria-label="Edit names"
+            className="btn-secondary ml-auto flex h-10 w-10 shrink-0 items-center justify-center"
+          >
+            <Pencil className="h-4 w-4" />
+          </button>
         </div>
 
         <div className="mt-4">
@@ -127,7 +141,9 @@ export default function AreaView({ area, log, now, onLog, onUndo, onBack }) {
         </section>
       ) : null}
 
-      <RecentActivity area={area} log={log} title={copy.recentTitle} />
+      <RecentActivity area={area} log={log} title={copy.recentTitle} nameFor={nameFor} />
+
+      <EditNamesSheet area={area} open={editing} onClose={() => setEditing(false)} />
     </div>
   )
 }

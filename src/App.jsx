@@ -3,6 +3,8 @@ import { AREAS_BY_ID, ALL_TASKS } from './config/areas.js'
 import { downloadCalendar } from './lib/calendar.js'
 import { loadLog, logCompletion, saveLog, undoLastCompletion } from './lib/storage.js'
 import { ThemeProvider, useTheme } from './theme/ThemeProvider.jsx'
+import { NamesProvider, useNames } from './state/NamesProvider.jsx'
+import { downloadBackup, parseBackup } from './lib/backup.js'
 import Dashboard from './components/Dashboard.jsx'
 import AreaView from './components/AreaView.jsx'
 import SpaceBackdrop from './components/SpaceBackdrop.jsx'
@@ -18,6 +20,7 @@ function areaIdFromHash() {
 
 function AppShell() {
   const { theme, copy } = useTheme()
+  const { names, setNames } = useNames()
   const [log, setLog] = useState(loadLog)
   const [areaId, setAreaId] = useState(areaIdFromHash)
   const [now, setNow] = useState(() => new Date())
@@ -96,9 +99,34 @@ function AppShell() {
   }, [])
 
   const handleExport = useCallback(() => {
-    downloadCalendar(log, new Date())
+    downloadCalendar(log, new Date(), names)
     showToast(copy.exported)
-  }, [log, copy, showToast])
+  }, [log, names, copy, showToast])
+
+  const handleBackup = useCallback(() => {
+    downloadBackup(log, names)
+    showToast('Backup saved')
+  }, [log, names, showToast])
+
+  const handleRestore = useCallback(
+    async (file) => {
+      try {
+        const { log: restoredLog, names: restoredNames, total } = parseBackup(await file.text())
+        const ok = window.confirm(
+          `Restore ${total} logged ${total === 1 ? 'task' : 'tasks'}?\n\n` +
+            'This replaces the history and names on this device.',
+        )
+        if (!ok) return
+        setLog(restoredLog)
+        setNames(restoredNames)
+        setNow(new Date())
+        showToast('Backup restored')
+      } catch (error) {
+        showToast(error.message)
+      }
+    },
+    [setNames, showToast],
+  )
 
   const area = useMemo(() => (areaId ? AREAS_BY_ID[areaId] : null), [areaId])
 
@@ -124,6 +152,8 @@ function AppShell() {
             onUndo={handleUndo}
             onOpenArea={goToArea}
             onExport={handleExport}
+            onBackup={handleBackup}
+            onRestore={handleRestore}
           />
         )}
 
@@ -153,7 +183,9 @@ function AppShell() {
 export default function App() {
   return (
     <ThemeProvider>
-      <AppShell />
+      <NamesProvider>
+        <AppShell />
+      </NamesProvider>
     </ThemeProvider>
   )
 }

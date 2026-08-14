@@ -66,6 +66,22 @@ npm run preview   # preview that production build locally
 
 ---
 
+## Renaming rooms and tasks — no code needed
+
+Open any area and tap the **✏️ pencil** in its header. You can change the room
+name, its subtitle, and the name of every task in it. Leave a field blank to go
+back to the original, or use **Reset this room** to undo all of it.
+
+**Your NFC tags keep working.** A tag points at the room's *id* (`#bathroom-1`),
+never its name — so "Bathroom 1" can become "Kids' Bathroom" without touching a
+sticker, and your streak and history stay intact. The new name shows up
+everywhere: the dashboard, the tag setup list, and your calendar export.
+
+Renaming lives in your browser alongside your history. To change names for
+everyone, on every device, edit `src/config/areas.js` instead.
+
+---
+
 ## Changing your tasks
 
 **Everything you'd want to edit is in one file: [`src/config/areas.js`](src/config/areas.js).**
@@ -166,11 +182,15 @@ The weekly goal is just the total of everything scheduled that week — hitting
 
 ## NFC tags
 
-See **[NFC_TAGS.md](NFC_TAGS.md)** for what to buy, what to write on each tag,
-and where to stick them.
+**The app tells you what to write.** Tap **NFC tag setup** at the bottom of the
+dashboard: it lists the master tag plus every area, with a Copy button for each
+one. The addresses are built from whatever URL you're currently using, so they
+can't drift out of date — add an area to the config and its tag appears in the
+list automatically. Open the app on your real domain before copying, and the
+addresses are the ones you actually want on your tags.
 
-The short version: each tag holds a URL. The master tag is your site address;
-each area tag is your site address plus `#` and the area id.
+See **[NFC_TAGS.md](NFC_TAGS.md)** for what to buy, where to stick them, and the
+gotchas (metal surfaces, weatherproofing, locking a tag).
 
 ---
 
@@ -195,9 +215,15 @@ Everything is stored in your browser's `localStorage` — your completions under
 - ⚠️ It's **per browser and per device.** Logging on your phone won't show up on
   your laptop, and clearing your browser data erases your history.
 
+**So back it up.** The dashboard has **Back up my data**, which saves a small
+`.json` file with your whole history and your custom names, and **Restore from a
+backup**, which reads one back in. That file is the only thing standing between
+you and starting over, and it's how you move to a new phone. Worth doing once a
+month, or before you clear your browser.
+
 That's the tradeoff for having zero setup and zero hosting cost. If you later
-want history synced across devices, that's the point where a real backend
-(Supabase or Firebase) makes sense.
+want history synced across devices automatically, that's the point where a real
+backend (Supabase or Firebase) makes sense.
 
 ---
 
@@ -217,18 +243,25 @@ src/
 │   └── themes.js       The looks you can switch between
 ├── theme/
 │   └── ThemeProvider.jsx   Holds the current theme, remembers your choice
+├── state/
+│   └── NamesProvider.jsx   Your custom room and task names
 ├── lib/
 │   ├── date.js         Date helpers (weeks, streak-safe day math)
 │   ├── schedule.js     Decides if a task is due, resting, overdue, done
 │   ├── stats.js        Streaks, points, progress bars
 │   ├── storage.js      Reads and writes localStorage
+│   ├── names.js        Custom names (ids never change)
+│   ├── backup.js       Backup and restore files
 │   └── calendar.js     Builds the .ics calendar file
 ├── components/
 │   ├── Dashboard.jsx      The master view: stats, what's due, area cards
 │   ├── AreaView.jsx       A single area, opened by an NFC tag
 │   ├── TaskCard.jsx       One task row with its Log button
 │   ├── ThemePicker.jsx    The "choose a look" sheet
+│   ├── EditNamesSheet.jsx Rename a room and its tasks
+│   ├── TagSetup.jsx       What to write on each NFC tag
 │   ├── SpaceBackdrop.jsx  Starfield, nebulae and planet (CSS only)
+│   ├── Sheet.jsx          The shared pop-up panel
 │   └── ProgressBar.jsx
 ├── index.css           Theme color variables live here
 └── App.jsx             Routing (via the URL hash) and app state
