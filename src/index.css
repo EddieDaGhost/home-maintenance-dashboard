@@ -1,0 +1,22 @@
+@import 'tailwindcss';
+
+/* Base look: soft slate background, comfortable on a phone in any room. */
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: #f1f5f9; /* slate-100 */
+  color: #0f172a; /* slate-900 */
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  /* Respect the iPhone home indicator / notch when saved to the home screen. */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Buttons are tapped a lot on a phone; never let a double tap zoom the page. */
+button {
+  touch-action: manipulation;
+}
