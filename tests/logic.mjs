@@ -13,6 +13,25 @@ import {
 } from '../src/lib/stats.js'
 import { buildCalendar } from '../src/lib/calendar.js'
 import { weekIndex } from '../src/lib/date.js'
+import {
+  CATALOG,
+  COMPANION_COST,
+  MAX_COMPANIONS,
+  TREAT_COST,
+  TREAT_HOURS,
+  itemById,
+} from '../src/config/catalog.js'
+import { MOOD, creditsBalance, creditsEarned, owns, sceneMood } from '../src/lib/credits.js'
+import {
+  buyCompanion,
+  buyItem,
+  buyTreat,
+  entryFor,
+  equip,
+  normalizeEstate,
+} from '../src/lib/estate.js'
+import { buildBackup, parseBackup } from '../src/lib/backup.js'
+import { THEME_LIST } from '../src/config/themes.js'
 
 const ALL_TASKS = AREAS.flatMap((area) => area.tasks.map((task) => ({ ...task, area })))
 
@@ -110,4 +129,123 @@ export default async function run({ check }) {
   is('no alarms', ics.includes('VALARM'), false)
   is('no over-long lines', ics.split('\r\n').every((l) => new TextEncoder().encode(l).length <= 75), true)
   is('no empty lines', ics.split('\r\n').some((l) => l.trim() === ''), false)
+
+  // =========================================================================
+  // Credits, the shop and the estate
+  // =========================================================================
+
+  // --- the catalogue holds together ---
+  const ids = CATALOG.map((i) => i.id)
+  is('catalogue ids are unique', new Set(ids).size, ids.length)
+  is('every item costs something', CATALOG.every((i) => i.cost > 0), true)
+  is('every item has art', CATALOG.every((i) => typeof i.art === 'string' && i.art), true)
+  // The check that stops a half-added item: a missing label would render a blank
+  // row in one theme and nowhere else, which is exactly the bug nobody notices.
+  is(
+    'every item is named in all three looks',
+    CATALOG.every((i) => ['home', 'starship', 'cats'].every((t) => i.labels?.[t]?.name)),
+    true,
+  )
+  is('itemById finds one', itemById('vessel-fern')?.slot, 'vessel')
+  is('itemById shrugs at nonsense', itemById('nope'), null)
+  is(
+    'every look has the estate copy it needs',
+    THEME_LIST.every((t) => t.copy.estateTitle && t.copy.shopTitle && t.copy.creditsUnit),
+    true,
+  )
+  is(
+    'every look names a scene that exists',
+    THEME_LIST.every((t) => ['garden', 'ship', 'cats'].includes(t.progression?.sceneKind)),
+    true,
+  )
+  is('the catalogue names every look', new Set(CATALOG.flatMap((i) => Object.keys(i.labels))).size, THEME_LIST.length)
+
+  // --- earning ---
+  const ROSTER = [{ id: 'eddie', name: 'Eddie' }, { id: 'yas', name: 'Yasmine' }]
+  const shared = {
+    completions: {
+      'kitchen-dishes': [
+        { at: daysAgo(1), by: 'eddie' },
+        { at: daysAgo(2), by: 'yas' },
+        daysAgo(3), // logged before the household feature existed
+      ],
+    },
+  }
+  is('a person earns only their own logs', creditsEarned(shared, ALL_TASKS, 'yas', ROSTER), 4)
+  is('unattributed history goes to the first person', creditsEarned(shared, ALL_TASKS, 'eddie', ROSTER), 8)
+  is('nobody earns for nobody', creditsEarned(shared, ALL_TASKS, null, ROSTER), 0)
+
+  // --- spending ---
+  const fern = itemById('vessel-fern')
+  let estate = {}
+  estate = buyItem(estate, 'eddie', fern, 40)
+  is('a purchase you cannot afford is refused', Object.keys(estate).length, 0)
+
+  estate = buyItem(estate, 'eddie', fern, 200)
+  is('buying records the spend', entryFor(estate, 'eddie').spent, fern.cost)
+  is('buying wears it straight away', entryFor(estate, 'eddie').equipped.vessel, 'vessel-fern')
+  is('and it is owned', owns(entryFor(estate, 'eddie'), 'vessel-fern'), true)
+
+  estate = buyItem(estate, 'eddie', fern, 200)
+  is('buying the same thing twice charges once', entryFor(estate, 'eddie').spent, fern.cost)
+
+  estate = equip(estate, 'eddie', 'vessel-fern')
+  is('equipping what is worn takes it off', entryFor(estate, 'eddie').equipped.vessel, undefined)
+  estate = equip(estate, 'eddie', 'vessel-monstera')
+  is('you cannot wear what you do not own', entryFor(estate, 'eddie').equipped.vessel, undefined)
+
+  is("one person's spending is their own", entryFor(estate, 'yas').spent, 0)
+
+  const bigLog = { completions: { 'kitchen-dishes': Array.from({ length: 30 }, (_, i) => ({ at: daysAgo(i), by: 'eddie' })) } }
+  is('balance is earned minus spent', creditsBalance(bigLog, ALL_TASKS, 'eddie', ROSTER, entryFor(estate, 'eddie')), 120 - fern.cost)
+  is(
+    'balance never goes negative',
+    creditsBalance({ completions: {} }, ALL_TASKS, 'eddie', ROSTER, { spent: 9999 }),
+    0,
+  )
+
+  // --- companions and the consumable ---
+  let many = {}
+  for (let i = 0; i < MAX_COMPANIONS + 2; i += 1) many = buyCompanion(many, 'eddie', COMPANION_COST, 99999)
+  is('companions stop at the cap', entryFor(many, 'eddie').companions.length, MAX_COMPANIONS)
+  is('and only the ones bought were charged', entryFor(many, 'eddie').spent, MAX_COMPANIONS * COMPANION_COST)
+
+  const T0 = MON.getTime()
+  let treated = buyTreat({}, 'eddie', TREAT_COST, 10, T0)
+  is('a treat you cannot afford is refused', Object.keys(treated).length, 0)
+  treated = buyTreat({}, 'eddie', TREAT_COST, 500, T0)
+  is('a treat lasts its full run', entryFor(treated, 'eddie').boostUntil, T0 + TREAT_HOURS * 3600000)
+  treated = buyTreat(treated, 'eddie', TREAT_COST, 500, T0)
+  is('buying again extends rather than replaces', entryFor(treated, 'eddie').boostUntil, T0 + 2 * TREAT_HOURS * 3600000)
+
+  // --- how the scene feels ---
+  const behind = { completions: { 'chickens-checkin': [daysAgo(5)] } }
+  is('an overdue task makes the scene quiet', sceneMood(behind, MON, ALL_TASKS), MOOD.QUIET)
+  is(
+    'logging it brings the scene back',
+    sceneMood({ completions: { 'chickens-checkin': [daysAgo(0)] } }, MON, ALL_TASKS),
+    MOOD.LIVELY,
+  )
+  is('nothing due at all is lively', sceneMood({ completions: {} }, MON, []), MOOD.LIVELY)
+  is(
+    'a treat holds the scene lively regardless',
+    sceneMood(behind, MON, ALL_TASKS, entryFor(treated, 'eddie')),
+    MOOD.LIVELY,
+  )
+
+  // --- reading a stored estate back ---
+  is('rubbish normalises to nothing', Object.keys(normalizeEstate('nope')).length, 0)
+  is('an empty person is dropped', Object.keys(normalizeEstate({ eddie: {} })).length, 0)
+  const salvaged = normalizeEstate({
+    eddie: { owned: ['vessel-fern', 'not-a-thing'], equipped: { vessel: 'vessel-orchid', flair: 'vessel-fern' }, spent: 80 },
+  })
+  is('an unknown purchase is kept, not dropped', salvaged.eddie.owned.length, 2)
+  is('but something unowned is never worn', salvaged.eddie.equipped.vessel, undefined)
+  is('and nothing is worn in the wrong slot', salvaged.eddie.equipped.flair, undefined)
+
+  // --- backups carry it ---
+  const restored = parseBackup(JSON.stringify(buildBackup(shared, {}, null, null, estate)))
+  is('a backup restores the estate', restored.estate.eddie.spent, fern.cost)
+  const old = parseBackup(JSON.stringify({ app: 'home-maintenance-dashboard', version: 2, completions: {} }))
+  is('a backup from before the shop still reads', Object.keys(old.estate).length, 0)
 }

@@ -85,6 +85,48 @@
   --heat-4: #cde2fb;
 }
 
+/* --- Cats: a warm afternoon, four opinions ------------------------------ */
+[data-theme='cats'] {
+  --canvas: #fbf1e3;
+  --surface: #fffcf6;
+  --surface-2: #f5e7d4;
+  --line: #ead9c0;
+
+  --ink: #3a2c22;
+  --ink-2: #7b6857;
+  --ink-3: #a8927c;
+
+  --accent: #c2703d;
+  --accent-ink: #fffaf3;
+
+  --good: #6f9f5e;
+  --good-soft: #e7f0dc;
+  --good-ink: #4b7439;
+  --good-line: #c7ddb5;
+
+  --alert: #cf6a5a;
+  --alert-soft: #fbe6e0;
+  --alert-ink: #a24435;
+  --alert-line: #f2cbc0;
+
+  --radius: 1.35rem;
+  --shadow: 0 2px 10px -4px rgb(89 60 33 / 0.22);
+  --toast-bg: #3a2c22;
+  --toast-ink: #fffcf6;
+
+  /* Warm ramp, light -> dark as the day gets busier, on a cream surface. */
+  --heat-0: #ecdcc6;
+  --heat-1: #f0bd85;
+  --heat-2: #dd8f42;
+  --heat-3: #ab6021;
+  --heat-4: #6d3a10;
+}
+
+/* Everything is a little rounder here — it is a theme about cats. */
+[data-theme='cats'] .section-title {
+  letter-spacing: 0.01em;
+}
+
 /* ===========================================================================
    BASE
    ======================================================================== */

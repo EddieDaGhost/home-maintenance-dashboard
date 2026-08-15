@@ -30,6 +30,8 @@ export function useSync({
   setCustom,
   household,
   setHousehold,
+  estate,
+  setEstate,
 }) {
   const [link, setLink] = useState(loadLink)
   const [status, setStatus] = useState({ state: 'idle', error: null })
@@ -42,8 +44,8 @@ export function useSync({
 
   // Everything the sync needs, kept in a ref so the callback below doesn't have
   // to be rebuilt (and re-trigger effects) every time a task is logged.
-  const latest = useRef({ log, names, custom, household })
-  latest.current = { log, names, custom, household }
+  const latest = useRef({ log, names, custom, household, estate })
+  latest.current = { log, names, custom, household, estate }
 
   useEffect(() => {
     saveLink(link)
@@ -55,8 +57,13 @@ export function useSync({
     setStatus({ state: 'syncing', error: null })
 
     try {
-      const { log: currentLog, names: currentNames, custom: currentCustom, household: currentHousehold } =
-        latest.current
+      const {
+        log: currentLog,
+        names: currentNames,
+        custom: currentCustom,
+        household: currentHousehold,
+        estate: currentEstate,
+      } = latest.current
 
       // Offer settings only when this device edited them more recently than the
       // household's copy. A phone that has only ever read them stays quiet, so
@@ -73,6 +80,7 @@ export function useSync({
               names: currentNames,
               custom: currentCustom,
               household: currentHousehold,
+              estate: currentEstate,
             })
           : null,
         stateUpdatedAt: shouldPush ? editedAt : null,
@@ -93,6 +101,7 @@ export function useSync({
         if (doc.names && typeof doc.names === 'object') setNames(doc.names)
         if (doc.custom && typeof doc.custom === 'object') setCustom(doc.custom)
         if (doc.household && Array.isArray(doc.household?.people)) setHousehold(doc.household)
+        if (doc.estate && typeof doc.estate === 'object') setEstate(doc.estate)
       }
 
       const at = Date.now()
@@ -103,7 +112,7 @@ export function useSync({
     } finally {
       inFlight.current = false
     }
-  }, [link.householdId, link.key, setLog, setNames, setCustom, setHousehold])
+  }, [link.householdId, link.key, setLog, setNames, setCustom, setHousehold, setEstate])
 
   /** Start sharing: mint a household and put this device in it. */
   const startSharing = useCallback(async () => {
@@ -145,7 +154,7 @@ export function useSync({
     }
     const timer = setTimeout(syncNow, 2500)
     return () => clearTimeout(timer)
-  }, [log, names, custom, household, link.householdId, syncNow])
+  }, [log, names, custom, household, estate, link.householdId, syncNow])
 
   // Sync when the app opens or comes back to the front, then on a slow timer.
   useEffect(() => {

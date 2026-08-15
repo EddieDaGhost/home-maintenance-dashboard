@@ -16,19 +16,22 @@ wall, the right list opens on your phone, you tap **Log**, and you're done.
 
 ---
 
-## Two looks
+## Three looks
 
-Tap the 🎨 button in the top right to switch. Your tasks, history, streak, and
-points are identical in both — it's paint, not plumbing.
+Tap the button in the top right to switch. Your tasks, history, streak, and
+points are identical in all three — it's paint, not plumbing.
 
 | | |
 |---|---|
-| **Homestead** | Soft daylight. Calm and plain. |
-| **Starship** | Your house, in orbit. Deep space behind the glass, a drifting starfield, a planet turning below, cyan console panels. Areas become *decks*, points become *credits*, recent activity becomes the *ship's log*. |
+| **Homestead** | Soft daylight. Calm and plain. Credits build a windowsill garden. |
+| **Starship** | Your house, in orbit. Deep space behind the glass, a drifting starfield, a planet turning below, cyan console panels. Areas become *decks*, recent activity becomes the *ship's log*, and credits fit out a ship. |
+| **Cats** | A warm afternoon and four opinions. Credits buy cats, and things for cats. |
 
 The starfield is drawn with plain `<div>`s and CSS — nothing to download, and it
 holds a steady 60fps on a phone. If your phone has **Reduce Motion** turned on,
-all of it sits still automatically.
+all of it sits still automatically. The scenes are inline SVG for the same
+reason: there is no image to wait for, so they work with the phone in aeroplane
+mode like everything else.
 
 See [Adding your own theme](#adding-your-own-theme) below.
 
@@ -65,7 +68,7 @@ Other commands:
 ```bash
 npm run build     # build the production version into dist/
 npm run preview   # preview that production build locally
-npm run check     # run the tests (281 checks)
+npm run check     # run the tests (360 checks)
 ```
 
 `npm run check` drives a real browser through the app — logging, persistence,
@@ -186,7 +189,11 @@ points "chores" if that's what makes you want to open it.
 `src/config/areas.js` so the seven areas know how to look in your new theme.
 
 That's it — your theme shows up in the picker automatically. Set `flavor: 'space'`
-to reuse the starfield backdrop, or leave it `'plain'`.
+to reuse the starfield backdrop, or leave it `'plain'`, and point
+`progression.sceneKind` at whichever credits scene suits it. A brand new scene
+means a fourth component in `src/components/scenes/` and a `labels` entry for
+your theme on every item in `src/config/catalog.js` — the test suite fails an
+item that's missing one.
 
 ---
 
@@ -252,6 +259,31 @@ The heatmap uses one color in four steps — darker means a busier day in
 Homestead, brighter means a busier day in Starship — with a neutral square for
 "nothing logged". Both ramps were checked for monotone lightness, visible gaps
 between steps, and contrast against their own background.
+
+---
+
+## Credits and your windowsill
+
+Everything you log is worth points. Points measure the week and reset on Monday;
+**credits** are the same numbers kept forever, and they buy things.
+
+**Setup → Your windowsill** opens a scene that is yours to build. Credits buy a
+plant, a pot glaze, a view, and a few small joys — plus more plants, and plant
+food that perks everything up for a day. In Starship the same purchases are a
+hull, a livery, a dock and a decal; in Cats they're a cat, a coat, a room and a
+collar.
+
+Three things it deliberately does *not* do:
+
+- **Nothing is ever locked behind a purchase.** Every chore, every screen and
+  every number works exactly the same whether you own nothing or everything. It
+  is decoration, start to finish.
+- **Nothing decays.** If something is overdue the light goes low and the cat goes
+  to sleep — that's the whole range. Nothing dies, breaks or gets taken away, and
+  one log brings the sun back.
+- **Credits are per person, not per phone.** Yours are built from what *you*
+  logged, so you and your fiancée each build your own scene and it follows you to
+  whichever phone you pick up.
 
 ---
 
@@ -325,13 +357,15 @@ custom domain at it.
 src/
 ├── config/
 │   ├── areas.js        ← YOUR HOME. Edit this to change rooms and chores.
+│   ├── catalog.js      Everything credits can buy
 │   └── themes.js       The looks you can switch between
 ├── theme/
 │   └── ThemeProvider.jsx   Holds the current theme, remembers your choice
 ├── state/
 │   ├── NamesProvider.jsx   Your custom room and task names
 │   ├── AreasProvider.jsx   Built-in rooms + yours, merged into one list
-│   └── PeopleProvider.jsx  The household
+│   ├── PeopleProvider.jsx  The household
+│   └── EstateProvider.jsx  What each person has bought
 ├── lib/
 │   ├── date.js         Date helpers (weeks, streak-safe day math)
 │   ├── schedule.js     Decides if a task is due, resting, overdue, done
@@ -340,6 +374,8 @@ src/
 │   ├── names.js        Custom names (ids never change)
 │   ├── custom.js       Rooms and tasks you added, rooms you put away
 │   ├── people.js       The household and who's logging
+│   ├── credits.js      Credits earned and spent, and how lively the scene is
+│   ├── estate.js       Purchases, kept per person
 │   ├── backup.js       Backup and restore files
 │   └── calendar.js     Builds the .ics calendar file
 ├── components/
@@ -351,6 +387,8 @@ src/
 │   ├── ScheduleFields.jsx The "how often" picker
 │   ├── HistorySheet.jsx   Streaks, heatmap, every entry
 │   ├── HouseholdSheet.jsx Who's logging
+│   ├── EstateScreen.jsx   Credits, the shop and your scene
+│   ├── scenes/            The scene art, one component per look
 │   ├── TagSetup.jsx       What to write on each NFC tag
 │   ├── SpaceBackdrop.jsx  Starfield, nebulae and planet (CSS only)
 │   ├── Sheet.jsx          The shared pop-up panel

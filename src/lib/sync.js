@@ -147,8 +147,13 @@ export function mergeCompletions(localCompletions, remoteEvents) {
 }
 
 /** The settings that belong to the household rather than to one phone. */
-export function buildStateDoc({ names, custom, household }) {
-  return { names: names ?? {}, custom: custom ?? null, household: household ?? null }
+export function buildStateDoc({ names, custom, household, estate }) {
+  return {
+    names: names ?? {},
+    custom: custom ?? null,
+    household: household ?? null,
+    estate: estate ?? null,
+  }
 }
 
 // ---------------------------------------------------------------------------

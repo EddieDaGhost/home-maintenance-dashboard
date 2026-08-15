@@ -5,6 +5,7 @@ import { ThemeProvider, useTheme } from './theme/ThemeProvider.jsx'
 import { NamesProvider, useNames } from './state/NamesProvider.jsx'
 import { AreasProvider, useAreas } from './state/AreasProvider.jsx'
 import { PeopleProvider, usePeople } from './state/PeopleProvider.jsx'
+import { EstateProvider, useEstate } from './state/EstateProvider.jsx'
 import { downloadBackup, parseBackup } from './lib/backup.js'
 import { claimDevice, loadDevice, looksSetUp } from './lib/device.js'
 import { parseJoinHash } from './lib/sync.js'
@@ -12,6 +13,7 @@ import { useSync } from './state/useSync.js'
 import Welcome from './components/Welcome.jsx'
 import Dashboard from './components/Dashboard.jsx'
 import AreaView from './components/AreaView.jsx'
+import EstateScreen from './components/EstateScreen.jsx'
 import SpaceBackdrop from './components/SpaceBackdrop.jsx'
 
 /** The NFC tags point at "#litter", "#kitchen", etc. Anything else = home. */
@@ -25,10 +27,24 @@ function AppShell() {
   const { names, setNames } = useNames()
   const { areas, areasById, allTasks, custom, setCustom } = useAreas()
   const { activeId, household, setHousehold } = usePeople()
+  const { estate, setEstate } = useEstate()
   const [log, setLog] = useState(loadLog)
   const [device, setDevice] = useState(loadDevice)
-  const sync = useSync({ log, setLog, names, setNames, custom, setCustom, household, setHousehold })
+  const sync = useSync({
+    log,
+    setLog,
+    names,
+    setNames,
+    custom,
+    setCustom,
+    household,
+    setHousehold,
+    estate,
+    setEstate,
+  })
   const [previewing, setPreviewing] = useState(false)
+  // Not a URL hash: hashes are NFC area ids, and #join= is already taken.
+  const [estateOpen, setEstateOpen] = useState(false)
   const [areaId, setAreaId] = useState(hashAreaId)
   const [now, setNow] = useState(() => new Date())
   const [toast, setToast] = useState(null)
@@ -122,6 +138,9 @@ function AppShell() {
   const goToArea = useCallback((id) => {
     window.location.hash = id
     setAreaId(id)
+    // Leaving for a room ends the visit to the estate screen, so coming back
+    // from that room lands on the dashboard rather than somewhere unexpected.
+    setEstateOpen(false)
     window.scrollTo({ top: 0 })
   }, [])
 
@@ -138,9 +157,9 @@ function AppShell() {
   }, [log, names, areas, copy, showToast])
 
   const handleBackup = useCallback(() => {
-    downloadBackup(log, names, household, custom)
+    downloadBackup(log, names, household, custom, estate)
     showToast('Backup saved')
-  }, [log, names, household, custom, showToast])
+  }, [log, names, household, custom, estate, showToast])
 
   const handleRestore = useCallback(
     async (file) => {
@@ -156,13 +175,14 @@ function AppShell() {
         setNames(restoredNames)
         setHousehold(restored.household)
         setCustom(restored.custom)
+        setEstate(restored.estate)
         setNow(new Date())
         showToast('Backup restored')
       } catch (error) {
         showToast(error.message)
       }
     },
-    [setNames, setHousehold, setCustom, showToast],
+    [setNames, setHousehold, setCustom, setEstate, showToast],
   )
 
   const area = useMemo(() => (areaId ? (areasById[areaId] ?? null) : null), [areaId, areasById])
@@ -210,7 +230,15 @@ function AppShell() {
           </div>
         ) : null}
 
-        {area ? (
+        {estateOpen && !area ? (
+          <EstateScreen
+            log={log}
+            now={now}
+            onBack={() => setEstateOpen(false)}
+            onToast={showToast}
+            readOnly={readOnly}
+          />
+        ) : area ? (
           <AreaView
             area={area}
             log={log}
@@ -230,6 +258,10 @@ function AppShell() {
             onExport={handleExport}
             onBackup={handleBackup}
             onRestore={handleRestore}
+            onOpenEstate={() => {
+              setEstateOpen(true)
+              window.scrollTo({ top: 0 })
+            }}
             sync={sync}
             readOnly={readOnly}
           />
@@ -264,7 +296,9 @@ export default function App() {
       <NamesProvider>
         <AreasProvider>
           <PeopleProvider>
-            <AppShell />
+            <EstateProvider>
+              <AppShell />
+            </EstateProvider>
           </PeopleProvider>
         </AreasProvider>
       </NamesProvider>

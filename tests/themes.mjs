@@ -12,7 +12,7 @@ export default async function run({ browser, page, check, errors, URL, tmp }) {
   await page.waitForTimeout(300)
   check('picker opens', await page.getByRole('dialog', { name: 'Choose a look' }).isVisible())
   const dialog = page.getByRole('dialog', { name: 'Choose a look' })
-  check('both themes offered', (await dialog.getByRole('button', { name: /Homestead|Starship/ }).count()) === 2)
+  check('all three looks offered', (await dialog.getByRole('button', { name: /Homestead|Starship|Cats/ }).count()) === 3)
 
   await dialog.getByRole('button', { name: /Starship/ }).click()
   await page.waitForTimeout(600)
@@ -23,7 +23,8 @@ export default async function run({ browser, page, check, errors, URL, tmp }) {
   check('planet + nebulae present', (await page.locator('.nebula').count()) === 2)
   check('title uses theme copy', (await page.getByRole('heading', { level: 1 }).innerText()) === 'Home Base One')
   check('stat labels renamed', (await page.getByText('Days online').count()) > 0)
-  check('credits label', (await page.getByText('Credits').count()) > 0)
+  // "Credits" is the spendable currency now, so the weekly tally is "Output".
+  check('weekly tally label', (await page.getByText('Output').count()) > 0)
   check('section title renamed', (await page.getByText('Priority queue').count()) > 0)
   check('decks heading', (await page.getByText('Decks', { exact: true }).count()) > 0)
 
@@ -47,7 +48,7 @@ export default async function run({ browser, page, check, errors, URL, tmp }) {
   await page.getByRole('button', { name: /^Log / }).first().click()
   await page.waitForTimeout(400)
   const toast = await page.getByRole('status').innerText()
-  check('space-flavored toast', /cr$/.test(toast), `("${toast}")`)
+  check('space-flavored toast', /^(Logged to the record|Deck secured|Systems green|Task complete|Noted, Captain) — \+\d+ pts$/.test(toast), `("${toast}")`)
   const after = await page.evaluate(() => localStorage.getItem('home-maintenance-dashboard/v1'))
   check('log recorded', before !== after)
 
@@ -78,8 +79,23 @@ export default async function run({ browser, page, check, errors, URL, tmp }) {
   check('Escape closes the picker', (await page.getByRole('dialog').count()) === 0)
   check('theme unchanged after dismiss', await page.evaluate(() => document.documentElement.dataset.theme) === 'home')
 
-  // --- no overflow in either theme ---
-  for (const themeId of ['home', 'starship']) {
+  // --- the Cats look ---
+  await page.getByRole('button', { name: 'Change look' }).first().click()
+  await page.waitForTimeout(250)
+  await page.getByRole('dialog').getByRole('button', { name: /Cats/ }).click()
+  await page.waitForTimeout(500)
+  check('switched to Cats', await page.evaluate(() => document.documentElement.dataset.theme) === 'cats')
+  check('no starfield in Cats', (await page.locator('.star-layer').count()) === 0)
+  check('Cats copy applied', (await page.getByRole('heading', { level: 1 }).innerText()) === 'The Cat House')
+  check('Cats renames the queue', (await page.getByText('Wants doing').count()) > 0)
+  const catsBg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor)
+  check('Cats has its own canvas', catsBg === 'rgb(251, 241, 227)', catsBg)
+  const catsBar = await page.evaluate(() => document.querySelector('meta[name="theme-color"]').content)
+  check('Cats sets its own status bar', catsBar === '#fbf1e3', catsBar)
+  check('area cards are tinted in Cats', (await page.locator('.panel').count()) > 5)
+
+  // --- no overflow in any look ---
+  for (const themeId of ['home', 'starship', 'cats']) {
     await page.evaluate((id) => { localStorage.setItem('home-maintenance-dashboard/theme', id) }, themeId)
     await page.reload({ waitUntil: 'networkidle' })
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
