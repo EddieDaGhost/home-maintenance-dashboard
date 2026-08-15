@@ -1,6 +1,6 @@
 # 🏠 Home Maintenance Dashboard
 
-An ADHD-friendly home maintenance and cleaning tracker. Tap an NFC tag on the
+A low-friction home maintenance and cleaning tracker. Tap an NFC tag on the
 wall, the right list opens on your phone, you tap **Log**, and you're done.
 
 **Built around a few rules:**
@@ -62,7 +62,19 @@ Other commands:
 ```bash
 npm run build     # build the production version into dist/
 npm run preview   # preview that production build locally
+npm run check     # run the tests (209 checks)
 ```
+
+`npm run check` drives a real browser through the app — logging, persistence,
+NFC routing, themes, renaming, backups, the lot. It needs Google Chrome
+installed; no browser is downloaded during `npm install`. If it can't find one:
+
+```bash
+CHROME_PATH="/path/to/chrome" npm run check
+```
+
+Run it before pushing — there's no CI on this repo, so it's the safety net.
+See [CLAUDE.md](CLAUDE.md) for how the code is organised.
 
 ---
 
