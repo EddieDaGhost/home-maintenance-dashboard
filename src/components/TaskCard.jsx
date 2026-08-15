@@ -50,7 +50,7 @@ function CountDots({ done, target }) {
   )
 }
 
-export default function TaskCard({ task, state, areaLabel, onLog, onUndo }) {
+export default function TaskCard({ task, state, areaLabel, onLog, onUndo, readOnly = false }) {
   const { copy } = useTheme()
   const { nameFor } = useNames()
   const name = nameFor(task)
@@ -93,7 +93,7 @@ export default function TaskCard({ task, state, areaLabel, onLog, onUndo }) {
         ) : null}
       </div>
 
-      {isDone ? (
+      {readOnly ? null : isDone ? (
         <button
           type="button"
           onClick={() => onUndo(task.id)}

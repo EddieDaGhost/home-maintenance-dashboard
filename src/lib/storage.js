@@ -51,6 +51,12 @@ export function loadLog() {
 export function saveLog(log) {
   if (typeof window === 'undefined') return
   try {
+    // Nothing logged yet? Leave the browser alone rather than writing an empty
+    // shell — a visitor who never sets up should end up with no trace of us.
+    if (Object.keys(log.completions ?? {}).length === 0) {
+      window.localStorage.removeItem(STORAGE_KEY)
+      return
+    }
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(log))
   } catch {
     // Private browsing or a full disk. The app keeps working for this session.

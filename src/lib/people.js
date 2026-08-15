@@ -37,6 +37,11 @@ export function normalizePeople(data) {
 export function savePeople(household) {
   if (typeof window === 'undefined') return
   try {
+    // The default one-person household isn't worth a key.
+    if (household.people.length === 1 && household.people[0].id === 'me') {
+      window.localStorage.removeItem(STORAGE_KEY)
+      return
+    }
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(household))
   } catch {
     // Private browsing — the household just won't persist.

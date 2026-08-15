@@ -5,6 +5,7 @@ import {
   Download,
   Flame,
   History,
+  Info,
   Nfc,
   PartyPopper,
   Plus,
@@ -29,6 +30,7 @@ import { usePeople } from '../state/PeopleProvider.jsx'
 import ProgressBar from './ProgressBar.jsx'
 import TaskCard from './TaskCard.jsx'
 import ThemePicker from './ThemePicker.jsx'
+import AboutSheet from './AboutSheet.jsx'
 import TagSetup from './TagSetup.jsx'
 import EditAreaSheet from './EditAreaSheet.jsx'
 import HistorySheet from './HistorySheet.jsx'
@@ -136,6 +138,7 @@ export default function Dashboard({
   onExport,
   onBackup,
   onRestore,
+  readOnly = false,
 }) {
   const { themeId, theme, copy } = useTheme()
   const { nameFor, subtitleFor } = useNames()
@@ -147,6 +150,7 @@ export default function Dashboard({
   const [addRoomOpen, setAddRoomOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [householdOpen, setHouseholdOpen] = useState(false)
+  const [aboutOpen, setAboutOpen] = useState(false)
   const fileInput = useRef(null)
 
   const streak = currentStreak(log, now)
@@ -255,6 +259,7 @@ export default function Dashboard({
                 areaLabel={nameFor(task.area)}
                 onLog={onLog}
                 onUndo={onUndo}
+                readOnly={readOnly}
               />
             ))}
           </div>
@@ -278,17 +283,19 @@ export default function Dashboard({
             />
           ))}
 
-          <button
-            type="button"
-            onClick={() => setAddRoomOpen(true)}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed p-4 font-semibold transition active:scale-[0.98]"
-            style={{ borderColor: 'var(--line)', color: 'var(--ink-2)' }}
-          >
-            <Plus className="h-5 w-5" />
-            Add a room
-          </button>
+          {readOnly ? null : (
+            <button
+              type="button"
+              onClick={() => setAddRoomOpen(true)}
+              className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed p-4 font-semibold transition active:scale-[0.98]"
+              style={{ borderColor: 'var(--line)', color: 'var(--ink-2)' }}
+            >
+              <Plus className="h-5 w-5" />
+              Add a room
+            </button>
+          )}
 
-          {hiddenAreas.length > 0 ? (
+          {!readOnly && hiddenAreas.length > 0 ? (
             <div className="panel p-3">
               <p className="label mb-2">Put away</p>
               <div className="space-y-1.5">
@@ -313,6 +320,19 @@ export default function Dashboard({
         </div>
       </section>
 
+      {readOnly ? (
+        <section>
+          <button
+            type="button"
+            onClick={() => setAboutOpen(true)}
+            className="panel flex w-full items-center justify-center gap-2 p-4 font-semibold transition active:scale-[0.98]"
+            style={{ color: 'var(--ink)' }}
+          >
+            <Info className="h-5 w-5" />
+            What is this?
+          </button>
+        </section>
+      ) : (
       <section>
         <h2 className="section-title mb-2.5 px-1">Setup</h2>
         <div className="panel settings-list overflow-hidden">
@@ -333,6 +353,12 @@ export default function Dashboard({
             label="NFC tag setup"
             detail="What to write on each tag"
             onClick={() => setTagsOpen(true)}
+          />
+          <SettingsRow
+            icon={Info}
+            label="What this app is"
+            detail="The overview a visitor sees"
+            onClick={() => setAboutOpen(true)}
           />
           <SettingsRow
             icon={CalendarPlus}
@@ -379,8 +405,10 @@ export default function Dashboard({
           survive clearing your Safari data or moving to a new phone.
         </p>
       </section>
+      )}
 
       <ThemePicker open={pickerOpen} onClose={() => setPickerOpen(false)} />
+      <AboutSheet open={aboutOpen} onClose={() => setAboutOpen(false)} />
       <TagSetup open={tagsOpen} onClose={() => setTagsOpen(false)} />
       <HistorySheet open={historyOpen} onClose={() => setHistoryOpen(false)} log={log} now={now} />
       <HouseholdSheet
