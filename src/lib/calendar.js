@@ -4,11 +4,39 @@
 // On purpose: no VALARM anywhere. These are quiet entries you can glance at,
 // not alerts that buzz at you. Logging still happens in the app.
 
-import { AREAS } from '../config/areas.js'
 import { addDays, startOfDay, toIcsDate, toIcsTimestamp } from './date.js'
+import { displayName } from './names.js'
 import { icsPreferredDays, nextOccurrence } from './schedule.js'
 
 const ICS_DAYS = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA']
+
+// Remembering what the last export contained is what makes re-exporting safe:
+// every event keeps its UID and gets a higher SEQUENCE, so a calendar updates
+// the entry it already has instead of adding a second copy. Tasks that have
+// since disappeared are re-sent as cancellations so they clear out too.
+const EXPORT_KEY = 'home-maintenance-dashboard/export/v1'
+
+export function loadExportState() {
+  if (typeof window === 'undefined') return { sequence: 0, taskIds: [] }
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(EXPORT_KEY) ?? 'null')
+    return {
+      sequence: Number.isFinite(parsed?.sequence) ? parsed.sequence : 0,
+      taskIds: Array.isArray(parsed?.taskIds) ? parsed.taskIds : [],
+    }
+  } catch {
+    return { sequence: 0, taskIds: [] }
+  }
+}
+
+export function saveExportState(state) {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(EXPORT_KEY, JSON.stringify(state))
+  } catch {
+    // Not fatal — the next export just starts its sequence over.
+  }
+}
 
 function escapeText(value) {
   return String(value)
@@ -84,8 +112,15 @@ function startDateFor(task, completions, now) {
   return startOfDay(start)
 }
 
-export function buildCalendar(log = { completions: {} }, now = new Date()) {
+export function buildCalendar(
+  log = { completions: {} },
+  now = new Date(),
+  names = {},
+  areas = [],
+  previous = { sequence: 0, taskIds: [] },
+) {
   const stamp = toIcsTimestamp(now)
+  const sequence = (previous.sequence ?? 0) + 1
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
@@ -96,10 +131,12 @@ export function buildCalendar(log = { completions: {} }, now = new Date()) {
     'X-WR-TIMEZONE:America/Chicago',
   ]
 
-  for (const area of AREAS) {
+  for (const area of areas) {
     for (const task of area.tasks) {
       const completions = log.completions?.[task.id] ?? []
       const start = startDateFor(task, completions, now)
+      const areaName = displayName(area, names)
+      const taskName = displayName(task, names)
       const description = task.note
         ? `${task.note} — logged in your Home Maintenance dashboard.`
         : 'Logged in your Home Maintenance dashboard.'
@@ -108,25 +145,51 @@ export function buildCalendar(log = { completions: {} }, now = new Date()) {
         'BEGIN:VEVENT',
         `UID:${task.id}@home-maintenance-dashboard`,
         `DTSTAMP:${stamp}`,
+        `SEQUENCE:${sequence}`,
         `DTSTART;VALUE=DATE:${toIcsDate(start)}`,
         `DTEND;VALUE=DATE:${toIcsDate(addDays(start, 1))}`,
         `RRULE:${rruleFor(task.schedule)}`,
-        `SUMMARY:${escapeText(`${area.name}: ${task.name}`)}`,
+        `SUMMARY:${escapeText(`${areaName}: ${taskName}`)}`,
         `DESCRIPTION:${escapeText(description)}`,
-        `CATEGORIES:${escapeText(area.name)}`,
+        `CATEGORIES:${escapeText(areaName)}`,
         'TRANSP:TRANSPARENT',
         'END:VEVENT',
       )
     }
   }
 
+  // Anything that was in the last export but is gone now gets cancelled, so a
+  // room you deleted stops haunting your calendar.
+  const currentIds = areas.flatMap((area) => area.tasks.map((task) => task.id))
+  const removed = (previous.taskIds ?? []).filter((id) => !currentIds.includes(id))
+  const todayDate = startOfDay(now)
+  for (const taskId of removed) {
+    lines.push(
+      'BEGIN:VEVENT',
+      `UID:${taskId}@home-maintenance-dashboard`,
+      `DTSTAMP:${stamp}`,
+      `SEQUENCE:${sequence}`,
+      'STATUS:CANCELLED',
+      `DTSTART;VALUE=DATE:${toIcsDate(todayDate)}`,
+      `DTEND;VALUE=DATE:${toIcsDate(addDays(todayDate, 1))}`,
+      'SUMMARY:Removed from Home Maintenance',
+      'TRANSP:TRANSPARENT',
+      'END:VEVENT',
+    )
+  }
+
   lines.push('END:VCALENDAR')
-  return lines.map(foldLine).join('\r\n')
+  return {
+    ics: lines.map(foldLine).join('\r\n'),
+    state: { sequence, taskIds: currentIds },
+    removedCount: removed.length,
+  }
 }
 
 /** Trigger the browser download. On iPhone this opens straight into Calendar. */
-export function downloadCalendar(log, now = new Date()) {
-  const ics = buildCalendar(log, now)
+export function downloadCalendar(log, now = new Date(), names = {}, areas = []) {
+  const { ics, state } = buildCalendar(log, now, names, areas, loadExportState())
+  saveExportState(state)
   const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')

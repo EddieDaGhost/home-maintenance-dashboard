@@ -1,6 +1,19 @@
-import { useState } from 'react'
-import { CalendarPlus, ChevronRight, Flame, Nfc, Palette, PartyPopper, Trophy } from 'lucide-react'
-import { AREAS, areaStyle, paletteFor } from '../config/areas.js'
+import { useRef, useState } from 'react'
+import {
+  CalendarPlus,
+  ChevronRight,
+  Download,
+  Flame,
+  History,
+  Nfc,
+  PartyPopper,
+  Plus,
+  RotateCcw,
+  Trophy,
+  Upload,
+  Users,
+} from 'lucide-react'
+import { areaStyle, paletteFor } from '../config/areas.js'
 import {
   completedToday,
   currentStreak,
@@ -10,9 +23,16 @@ import {
   weeklyPointsGoal,
 } from '../lib/stats.js'
 import { useTheme } from '../theme/ThemeProvider.jsx'
+import { useNames } from '../state/NamesProvider.jsx'
+import { useAreas } from '../state/AreasProvider.jsx'
+import { usePeople } from '../state/PeopleProvider.jsx'
 import ProgressBar from './ProgressBar.jsx'
 import TaskCard from './TaskCard.jsx'
 import ThemePicker from './ThemePicker.jsx'
+import TagSetup from './TagSetup.jsx'
+import EditAreaSheet from './EditAreaSheet.jsx'
+import HistorySheet from './HistorySheet.jsx'
+import HouseholdSheet, { PersonAvatar } from './HouseholdSheet.jsx'
 
 function greeting(now) {
   const hour = now.getHours()
@@ -33,7 +53,7 @@ function StatTile({ icon: Icon, label, value, tone }) {
   )
 }
 
-function AreaCard({ area, log, now, themeId, copy, onOpen }) {
+function AreaCard({ area, log, now, themeId, copy, nameFor, subtitleFor, onOpen }) {
   const palette = paletteFor(area, themeId)
   const { percent, open } = progressFor(area.tasks, log, now)
   const Icon = area.icon
@@ -55,14 +75,18 @@ function AreaCard({ area, log, now, themeId, copy, onOpen }) {
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-2">
           <p className="truncate font-semibold" style={{ color: 'var(--ink)' }}>
-            {area.name}
+            {nameFor(area)}
           </p>
           <span className="shrink-0 text-xs font-semibold" style={{ color: 'var(--area-ink)' }}>
-            {open === 0 ? copy.allClearBadge : copy.toDoBadge(open)}
+            {area.tasks.length === 0
+              ? 'No tasks yet'
+              : open === 0
+                ? copy.allClearBadge
+                : copy.toDoBadge(open)}
           </span>
         </div>
         <p className="mt-0.5 truncate text-xs" style={{ color: 'var(--ink-2)' }}>
-          {area.subtitle}
+          {subtitleFor(area)}
         </p>
         <div className="mt-2">
           <ProgressBar
@@ -79,15 +103,57 @@ function AreaCard({ area, log, now, themeId, copy, onOpen }) {
   )
 }
 
-export default function Dashboard({ log, now, onLog, onUndo, onOpenArea, onExport }) {
+/** One row in the setup list at the bottom of the dashboard. */
+function SettingsRow({ icon: Icon, label, detail, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition active:scale-[0.99]"
+    >
+      <Icon className="h-5 w-5 shrink-0" style={{ color: 'var(--ink-2)' }} />
+      <span className="min-w-0 flex-1">
+        <span className="block font-semibold" style={{ color: 'var(--ink)' }}>
+          {label}
+        </span>
+        {detail ? (
+          <span className="block text-xs" style={{ color: 'var(--ink-3)' }}>
+            {detail}
+          </span>
+        ) : null}
+      </span>
+      <ChevronRight className="h-4 w-4 shrink-0" style={{ color: 'var(--ink-3)' }} />
+    </button>
+  )
+}
+
+export default function Dashboard({
+  log,
+  now,
+  onLog,
+  onUndo,
+  onOpenArea,
+  onExport,
+  onBackup,
+  onRestore,
+}) {
   const { themeId, theme, copy } = useTheme()
+  const { nameFor, subtitleFor } = useNames()
+  const { areas, allTasks, hiddenAreas, restoreArea } = useAreas()
+  const { activePerson, isShared } = usePeople()
+
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [tagsOpen, setTagsOpen] = useState(false)
+  const [addRoomOpen, setAddRoomOpen] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [householdOpen, setHouseholdOpen] = useState(false)
+  const fileInput = useRef(null)
 
   const streak = currentStreak(log, now)
-  const points = weeklyPoints(log, now)
-  const goal = weeklyPointsGoal(now)
+  const points = weeklyPoints(log, now, allTasks)
+  const goal = weeklyPointsGoal(now, allTasks)
   const today = completedToday(log, now)
-  const attention = tasksNeedingAttention(log, now)
+  const attention = tasksNeedingAttention(log, now, allTasks)
   const shortlist = attention.slice(0, 5)
   const ThemeIcon = theme.icon
 
@@ -106,15 +172,29 @@ export default function Dashboard({ log, now, onLog, onUndo, onOpenArea, onExpor
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setPickerOpen(true)}
-          aria-label={copy.themeButtonLabel}
-          className="panel flex h-11 w-11 shrink-0 items-center justify-center transition active:scale-95"
-          style={{ color: 'var(--ink-2)' }}
-        >
-          <Palette className="h-5 w-5" />
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          {/* The "who's logging" chip only earns its space once someone else exists. */}
+          {isShared ? (
+            <button
+              type="button"
+              onClick={() => setHouseholdOpen(true)}
+              aria-label={`Logging as ${activePerson.name}. Change who's logging`}
+              className="transition active:scale-95"
+            >
+              <PersonAvatar name={activePerson.name} active size="h-11 w-11" />
+            </button>
+          ) : null}
+
+          <button
+            type="button"
+            onClick={() => setPickerOpen(true)}
+            aria-label={copy.themeButtonLabel}
+            className="panel flex h-11 w-11 items-center justify-center transition active:scale-95"
+            style={{ color: 'var(--ink-2)' }}
+          >
+            <ThemeIcon className="h-5 w-5" />
+          </button>
+        </div>
       </header>
 
       <section className="flex gap-2.5">
@@ -172,7 +252,7 @@ export default function Dashboard({ log, now, onLog, onUndo, onOpenArea, onExpor
                 key={task.id}
                 task={task}
                 state={state}
-                areaLabel={task.area.name}
+                areaLabel={nameFor(task.area)}
                 onLog={onLog}
                 onUndo={onUndo}
               />
@@ -184,7 +264,7 @@ export default function Dashboard({ log, now, onLog, onUndo, onOpenArea, onExpor
       <section>
         <h2 className="section-title mb-2.5 px-1">{copy.areasTitle}</h2>
         <div className="space-y-2.5">
-          {AREAS.map((area) => (
+          {areas.map((area) => (
             <AreaCard
               key={area.id}
               area={area}
@@ -192,47 +272,129 @@ export default function Dashboard({ log, now, onLog, onUndo, onOpenArea, onExpor
               now={now}
               themeId={themeId}
               copy={copy}
+              nameFor={nameFor}
+              subtitleFor={subtitleFor}
               onOpen={onOpenArea}
             />
           ))}
+
+          <button
+            type="button"
+            onClick={() => setAddRoomOpen(true)}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed p-4 font-semibold transition active:scale-[0.98]"
+            style={{ borderColor: 'var(--line)', color: 'var(--ink-2)' }}
+          >
+            <Plus className="h-5 w-5" />
+            Add a room
+          </button>
+
+          {hiddenAreas.length > 0 ? (
+            <div className="panel p-3">
+              <p className="label mb-2">Put away</p>
+              <div className="space-y-1.5">
+                {hiddenAreas.map((area) => (
+                  <div key={area.id} className="flex items-center gap-2">
+                    <span className="min-w-0 flex-1 truncate text-sm" style={{ color: 'var(--ink-2)' }}>
+                      {nameFor(area)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => restoreArea(area.id)}
+                      className="btn-secondary flex h-8 items-center gap-1.5 px-2.5 text-xs"
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" />
+                      Bring back
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
       </section>
 
-      <section className="space-y-3">
-        <button
-          type="button"
-          onClick={onExport}
-          className="panel flex w-full items-center justify-center gap-2 p-4 font-semibold transition active:scale-[0.98]"
-          style={{ color: 'var(--ink)' }}
-        >
-          <CalendarPlus className="h-5 w-5" />
-          {copy.exportLabel}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setPickerOpen(true)}
-          className="panel flex w-full items-center justify-center gap-2 p-4 font-semibold transition active:scale-[0.98]"
-          style={{ color: 'var(--ink)' }}
-        >
-          <ThemeIcon className="h-5 w-5" />
-          Look: {theme.name}
-        </button>
-
-        <div
-          className="flex items-start gap-2.5 rounded-2xl p-4 text-xs"
-          style={{ background: 'var(--surface-2)', color: 'var(--ink-2)' }}
-        >
-          <Nfc className="mt-0.5 h-4 w-4 shrink-0" style={{ color: 'var(--ink-3)' }} />
-          <p>
-            {copy.nfcHint} Each tag holds this site&apos;s address plus{' '}
-            <span className="font-mono">#litter</span>, <span className="font-mono">#kitchen</span>,
-            and so on.
-          </p>
+      <section>
+        <h2 className="section-title mb-2.5 px-1">Setup</h2>
+        <div className="panel settings-list overflow-hidden">
+          <SettingsRow
+            icon={History}
+            label="History"
+            detail="Streaks, heatmap, every entry"
+            onClick={() => setHistoryOpen(true)}
+          />
+          <SettingsRow
+            icon={Users}
+            label="Who's logging"
+            detail={isShared ? `Currently ${activePerson.name}` : 'Add the rest of the household'}
+            onClick={() => setHouseholdOpen(true)}
+          />
+          <SettingsRow
+            icon={Nfc}
+            label="NFC tag setup"
+            detail="What to write on each tag"
+            onClick={() => setTagsOpen(true)}
+          />
+          <SettingsRow
+            icon={CalendarPlus}
+            label={copy.exportLabel}
+            detail="Re-export any time — events update in place"
+            onClick={onExport}
+          />
+          <SettingsRow
+            icon={ThemeIcon}
+            label={`Look: ${theme.name}`}
+            detail={theme.tagline}
+            onClick={() => setPickerOpen(true)}
+          />
+          <SettingsRow
+            icon={Download}
+            label="Back up my data"
+            detail="Saves a file you can restore from"
+            onClick={onBackup}
+          />
+          <SettingsRow
+            icon={Upload}
+            label="Restore from a backup"
+            detail="Replaces what's on this device"
+            onClick={() => fileInput.current?.click()}
+          />
         </div>
+
+        <input
+          ref={fileInput}
+          type="file"
+          accept="application/json,.json"
+          className="hidden"
+          aria-label="Choose a backup file"
+          onChange={(event) => {
+            const file = event.target.files?.[0]
+            if (file) onRestore(file)
+            // Clear it so choosing the same file twice still fires.
+            event.target.value = ''
+          }}
+        />
+
+        <p className="mt-3 px-1 text-xs leading-relaxed" style={{ color: 'var(--ink-3)' }}>
+          Your history lives only in this browser. Backing up now and then is the only way to
+          survive clearing your Safari data or moving to a new phone.
+        </p>
       </section>
 
       <ThemePicker open={pickerOpen} onClose={() => setPickerOpen(false)} />
+      <TagSetup open={tagsOpen} onClose={() => setTagsOpen(false)} />
+      <HistorySheet open={historyOpen} onClose={() => setHistoryOpen(false)} log={log} now={now} />
+      <HouseholdSheet
+        open={householdOpen}
+        onClose={() => setHouseholdOpen(false)}
+        log={log}
+        now={now}
+      />
+      <EditAreaSheet
+        mode="create"
+        area={null}
+        open={addRoomOpen}
+        onClose={() => setAddRoomOpen(false)}
+      />
     </div>
   )
 }

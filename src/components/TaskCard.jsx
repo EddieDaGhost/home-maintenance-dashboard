@@ -2,6 +2,7 @@ import { AlertCircle, Check, Circle, Clock, Moon, Undo2 } from 'lucide-react'
 import { STATUS, scheduleLabel } from '../lib/schedule.js'
 import { friendlyDate } from '../lib/date.js'
 import { useTheme } from '../theme/ThemeProvider.jsx'
+import { useNames } from '../state/NamesProvider.jsx'
 
 // Each status recolors the card by overriding the surface and border variables
 // that .panel reads — so it lands correctly in whichever theme is active.
@@ -51,6 +52,8 @@ function CountDots({ done, target }) {
 
 export default function TaskCard({ task, state, areaLabel, onLog, onUndo }) {
   const { copy } = useTheme()
+  const { nameFor } = useNames()
+  const name = nameFor(task)
   const style = STATUS_STYLES[state.status] ?? STATUS_STYLES[STATUS.DUE]
   const { Icon } = style
   const isDone = state.status === STATUS.DONE
@@ -69,7 +72,7 @@ export default function TaskCard({ task, state, areaLabel, onLog, onUndo }) {
           className={`text-[15px] leading-snug font-semibold ${isDone ? 'line-through' : ''}`}
           style={{ color: isDone ? 'var(--ink-2)' : 'var(--ink)' }}
         >
-          {task.name}
+          {name}
           <CountDots done={state.done} target={state.target} />
         </p>
         {/* Status first — it is the part worth reading at a glance. */}
@@ -96,7 +99,7 @@ export default function TaskCard({ task, state, areaLabel, onLog, onUndo }) {
           onClick={() => onUndo(task.id)}
           className="flex h-10 shrink-0 items-center gap-1 rounded-xl px-3 text-xs font-semibold transition active:scale-95"
           style={{ color: 'var(--ink-2)' }}
-          aria-label={`Undo ${task.name}`}
+          aria-label={`Undo ${name}`}
         >
           <Undo2 className="h-4 w-4" />
           Undo
@@ -106,7 +109,7 @@ export default function TaskCard({ task, state, areaLabel, onLog, onUndo }) {
           type="button"
           onClick={() => onLog(task.id)}
           className="btn-primary h-10 shrink-0 px-4 text-sm"
-          aria-label={`Log ${task.name} as done`}
+          aria-label={`Log ${name} as done`}
         >
           {copy.logButton ?? 'Log'}
         </button>

@@ -66,6 +66,34 @@ npm run preview   # preview that production build locally
 
 ---
 
+## Rooms and tasks — no code needed
+
+Open any room and tap the **✏️ pencil** in its header, or use **Add a room** at
+the bottom of the room list. From there you can:
+
+- **Rename** the room, its subtitle, and every task in it
+- **Change its icon and color** from a picker
+- **Add a task**, with any of the schedules below and its own point value
+- **Remove a task**, or **remove the room itself**
+- **Reset this room** to undo all your renaming
+
+**Nothing is ever really deleted.** A room you created is removed outright; a
+built-in room is only *put away* and reappears under "Put away" at the bottom of
+the room list, with its history intact. Task history is kept either way, so
+bringing something back brings its streak back too.
+
+**Your NFC tags keep working.** A tag points at the room's *id* (`#bathroom-1`),
+never its name — so "Bathroom 1" can become "Kids' Bathroom" without touching a
+sticker, and your streak and history stay intact. A room you add gets its own id
+and its own address (`#garage`) the moment you create it; check **NFC tag setup**
+for the exact URL.
+
+All of this lives in your browser alongside your history. To change the rooms for
+everyone, on every device, edit `src/config/areas.js` instead — that file is
+still the starting point every browser sees.
+
+---
+
 ## Changing your tasks
 
 **Everything you'd want to edit is in one file: [`src/config/areas.js`](src/config/areas.js).**
@@ -92,9 +120,11 @@ updates instantly while `npm run dev` is running.
 it. `everyNDays` counts from the last time you actually logged it — better for
 things like litter changes, where what matters is how long it's been.
 
-### Adding a new area
+### Adding a new area in code
 
-Add a block to the `AREAS` list in `src/config/areas.js`:
+You can add rooms from inside the app (above) — this is for changing the
+defaults that every browser starts from. Add a block to the `AREAS` list in
+`src/config/areas.js`:
 
 ```js
 {
@@ -166,11 +196,15 @@ The weekly goal is just the total of everything scheduled that week — hitting
 
 ## NFC tags
 
-See **[NFC_TAGS.md](NFC_TAGS.md)** for what to buy, what to write on each tag,
-and where to stick them.
+**The app tells you what to write.** Tap **NFC tag setup** at the bottom of the
+dashboard: it lists the master tag plus every area, with a Copy button for each
+one. The addresses are built from whatever URL you're currently using, so they
+can't drift out of date — add an area to the config and its tag appears in the
+list automatically. Open the app on your real domain before copying, and the
+addresses are the ones you actually want on your tags.
 
-The short version: each tag holds a URL. The master tag is your site address;
-each area tag is your site address plus `#` and the area id.
+See **[NFC_TAGS.md](NFC_TAGS.md)** for what to buy, where to stick them, and the
+gotchas (metal surfaces, weatherproofing, locking a tag).
 
 ---
 
@@ -182,6 +216,41 @@ everything as repeating all-day events.
 
 Deliberately, these events have **no alerts attached**. They're there to glance
 at, not to nag. Logging still happens in the app.
+
+**Re-exporting is safe.** Every event keeps the same UID for the life of the
+task and each export bumps its `SEQUENCE`, which is the iCalendar way of saying
+"this is a newer version of an event you already have" — so a calendar updates
+what it has rather than stacking a second copy. Tasks you've deleted since the
+last export are re-sent as cancellations so they clear out too. (How thoroughly
+that happens is up to the calendar app; Apple Calendar and Google Calendar both
+honour UID + SEQUENCE.) So: change your schedule, re-export, open the file.
+
+---
+
+## History
+
+**History** in the setup list shows your current and best streak, a heatmap of
+the last 12 weeks, and every entry grouped by day. Tap any square to see that
+day's count.
+
+The heatmap uses one color in four steps — darker means a busier day in
+Homestead, brighter means a busier day in Starship — with a neutral square for
+"nothing logged". Both ramps were checked for monotone lightness, visible gaps
+between steps, and contrast against their own background.
+
+---
+
+## Who's logging
+
+With one person, nothing changes. Add someone under **Who's logging** and:
+
+- A initials chip appears in the header showing who gets credit right now
+- Each completion records who did it
+- Recent activity and History show the name next to each entry
+- The household screen shows each person's points for the week
+
+It's about credit, not accounts — everyone shares the same device and the same
+history. Removing someone leaves their past entries in place.
 
 ---
 
@@ -195,9 +264,15 @@ Everything is stored in your browser's `localStorage` — your completions under
 - ⚠️ It's **per browser and per device.** Logging on your phone won't show up on
   your laptop, and clearing your browser data erases your history.
 
+**So back it up.** The dashboard has **Back up my data**, which saves a small
+`.json` file with your whole history and your custom names, and **Restore from a
+backup**, which reads one back in. That file is the only thing standing between
+you and starting over, and it's how you move to a new phone. Worth doing once a
+month, or before you clear your browser.
+
 That's the tradeoff for having zero setup and zero hosting cost. If you later
-want history synced across devices, that's the point where a real backend
-(Supabase or Firebase) makes sense.
+want history synced across devices automatically, that's the point where a real
+backend (Supabase or Firebase) makes sense.
 
 ---
 
@@ -217,18 +292,32 @@ src/
 │   └── themes.js       The looks you can switch between
 ├── theme/
 │   └── ThemeProvider.jsx   Holds the current theme, remembers your choice
+├── state/
+│   ├── NamesProvider.jsx   Your custom room and task names
+│   ├── AreasProvider.jsx   Built-in rooms + yours, merged into one list
+│   └── PeopleProvider.jsx  The household
 ├── lib/
 │   ├── date.js         Date helpers (weeks, streak-safe day math)
 │   ├── schedule.js     Decides if a task is due, resting, overdue, done
 │   ├── stats.js        Streaks, points, progress bars
 │   ├── storage.js      Reads and writes localStorage
+│   ├── names.js        Custom names (ids never change)
+│   ├── custom.js       Rooms and tasks you added, rooms you put away
+│   ├── people.js       The household and who's logging
+│   ├── backup.js       Backup and restore files
 │   └── calendar.js     Builds the .ics calendar file
 ├── components/
 │   ├── Dashboard.jsx      The master view: stats, what's due, area cards
 │   ├── AreaView.jsx       A single area, opened by an NFC tag
 │   ├── TaskCard.jsx       One task row with its Log button
 │   ├── ThemePicker.jsx    The "choose a look" sheet
+│   ├── EditAreaSheet.jsx  Rename / restyle / add tasks / remove a room
+│   ├── ScheduleFields.jsx The "how often" picker
+│   ├── HistorySheet.jsx   Streaks, heatmap, every entry
+│   ├── HouseholdSheet.jsx Who's logging
+│   ├── TagSetup.jsx       What to write on each NFC tag
 │   ├── SpaceBackdrop.jsx  Starfield, nebulae and planet (CSS only)
+│   ├── Sheet.jsx          The shared pop-up panel
 │   └── ProgressBar.jsx
 ├── index.css           Theme color variables live here
 └── App.jsx             Routing (via the URL hash) and app state

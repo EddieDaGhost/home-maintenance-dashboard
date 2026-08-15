@@ -37,6 +37,15 @@
   --shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
   --toast-bg: #0f172a;
   --toast-ink: #ffffff;
+
+  /* History heatmap: one hue, light -> dark for rising activity. Validated
+     against this surface (lightness monotone, visible step gaps, light end
+     clears 2:1). Level 0 is "nothing logged" and stays neutral. */
+  --heat-0: #e2e8f0;
+  --heat-1: #86b6ef;
+  --heat-2: #3987e5;
+  --heat-3: #1c5cab;
+  --heat-4: #0d366b;
 }
 
 /* --- Starship: your house, in orbit ------------------------------------ */
@@ -67,6 +76,13 @@
   --shadow: 0 10px 30px -12px rgb(2 6 23 / 0.9), inset 0 1px 0 rgb(186 240 255 / 0.07);
   --toast-bg: rgba(8, 20, 38, 0.95);
   --toast-ink: #e8f4ff;
+
+  /* Same hue, anchor flipped for a dark surface: rising activity gets lighter. */
+  --heat-0: rgba(148, 197, 255, 0.09);
+  --heat-1: #1c5cab;
+  --heat-2: #3987e5;
+  --heat-3: #86b6ef;
+  --heat-4: #cde2fb;
 }
 
 /* ===========================================================================
@@ -169,6 +185,51 @@ button {
 
 [data-theme='starship'] .btn-primary:hover {
   filter: brightness(1.1);
+}
+
+/* Cancel / Copy / Reset — quieter than the primary action. */
+.btn-secondary {
+  border: 1px solid var(--line);
+  background-color: transparent;
+  color: var(--ink);
+  font-weight: 600;
+  border-radius: calc(var(--radius) - 0.25rem);
+  transition: transform 0.12s ease;
+}
+
+.btn-secondary:active {
+  transform: scale(0.95);
+}
+
+/* Text inputs in the rename form. */
+.field {
+  width: 100%;
+  background-color: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius) - 0.25rem);
+  padding: 0.625rem 0.75rem;
+  color: var(--ink);
+  /* 16px keeps iOS Safari from zooming the page when the field is focused. */
+  font-size: 1rem;
+}
+
+select.field {
+  appearance: none;
+  background-image: none;
+}
+
+/* Divider between rows in the setup list. */
+.settings-list > * + * {
+  border-top: 1px solid var(--line);
+}
+
+.field::placeholder {
+  color: var(--ink-3);
+}
+
+.field:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 /* ===========================================================================
