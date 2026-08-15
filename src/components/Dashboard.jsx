@@ -4,12 +4,16 @@ import {
   ChevronRight,
   Download,
   Flame,
+  History,
   Nfc,
   PartyPopper,
+  Plus,
+  RotateCcw,
   Trophy,
   Upload,
+  Users,
 } from 'lucide-react'
-import { AREAS, areaStyle, paletteFor } from '../config/areas.js'
+import { areaStyle, paletteFor } from '../config/areas.js'
 import {
   completedToday,
   currentStreak,
@@ -20,10 +24,15 @@ import {
 } from '../lib/stats.js'
 import { useTheme } from '../theme/ThemeProvider.jsx'
 import { useNames } from '../state/NamesProvider.jsx'
+import { useAreas } from '../state/AreasProvider.jsx'
+import { usePeople } from '../state/PeopleProvider.jsx'
 import ProgressBar from './ProgressBar.jsx'
 import TaskCard from './TaskCard.jsx'
 import ThemePicker from './ThemePicker.jsx'
 import TagSetup from './TagSetup.jsx'
+import EditAreaSheet from './EditAreaSheet.jsx'
+import HistorySheet from './HistorySheet.jsx'
+import HouseholdSheet, { PersonAvatar } from './HouseholdSheet.jsx'
 
 function greeting(now) {
   const hour = now.getHours()
@@ -69,7 +78,11 @@ function AreaCard({ area, log, now, themeId, copy, nameFor, subtitleFor, onOpen 
             {nameFor(area)}
           </p>
           <span className="shrink-0 text-xs font-semibold" style={{ color: 'var(--area-ink)' }}>
-            {open === 0 ? copy.allClearBadge : copy.toDoBadge(open)}
+            {area.tasks.length === 0
+              ? 'No tasks yet'
+              : open === 0
+                ? copy.allClearBadge
+                : copy.toDoBadge(open)}
           </span>
         </div>
         <p className="mt-0.5 truncate text-xs" style={{ color: 'var(--ink-2)' }}>
@@ -126,15 +139,21 @@ export default function Dashboard({
 }) {
   const { themeId, theme, copy } = useTheme()
   const { nameFor, subtitleFor } = useNames()
+  const { areas, allTasks, hiddenAreas, restoreArea } = useAreas()
+  const { activePerson, isShared } = usePeople()
+
   const [pickerOpen, setPickerOpen] = useState(false)
   const [tagsOpen, setTagsOpen] = useState(false)
+  const [addRoomOpen, setAddRoomOpen] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [householdOpen, setHouseholdOpen] = useState(false)
   const fileInput = useRef(null)
 
   const streak = currentStreak(log, now)
-  const points = weeklyPoints(log, now)
-  const goal = weeklyPointsGoal(now)
+  const points = weeklyPoints(log, now, allTasks)
+  const goal = weeklyPointsGoal(now, allTasks)
   const today = completedToday(log, now)
-  const attention = tasksNeedingAttention(log, now)
+  const attention = tasksNeedingAttention(log, now, allTasks)
   const shortlist = attention.slice(0, 5)
   const ThemeIcon = theme.icon
 
@@ -153,15 +172,29 @@ export default function Dashboard({
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setPickerOpen(true)}
-          aria-label={copy.themeButtonLabel}
-          className="panel flex h-11 w-11 shrink-0 items-center justify-center transition active:scale-95"
-          style={{ color: 'var(--ink-2)' }}
-        >
-          <ThemeIcon className="h-5 w-5" />
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          {/* The "who's logging" chip only earns its space once someone else exists. */}
+          {isShared ? (
+            <button
+              type="button"
+              onClick={() => setHouseholdOpen(true)}
+              aria-label={`Logging as ${activePerson.name}. Change who's logging`}
+              className="transition active:scale-95"
+            >
+              <PersonAvatar name={activePerson.name} active size="h-11 w-11" />
+            </button>
+          ) : null}
+
+          <button
+            type="button"
+            onClick={() => setPickerOpen(true)}
+            aria-label={copy.themeButtonLabel}
+            className="panel flex h-11 w-11 items-center justify-center transition active:scale-95"
+            style={{ color: 'var(--ink-2)' }}
+          >
+            <ThemeIcon className="h-5 w-5" />
+          </button>
+        </div>
       </header>
 
       <section className="flex gap-2.5">
@@ -231,7 +264,7 @@ export default function Dashboard({
       <section>
         <h2 className="section-title mb-2.5 px-1">{copy.areasTitle}</h2>
         <div className="space-y-2.5">
-          {AREAS.map((area) => (
+          {areas.map((area) => (
             <AreaCard
               key={area.id}
               area={area}
@@ -244,12 +277,57 @@ export default function Dashboard({
               onOpen={onOpenArea}
             />
           ))}
+
+          <button
+            type="button"
+            onClick={() => setAddRoomOpen(true)}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed p-4 font-semibold transition active:scale-[0.98]"
+            style={{ borderColor: 'var(--line)', color: 'var(--ink-2)' }}
+          >
+            <Plus className="h-5 w-5" />
+            Add a room
+          </button>
+
+          {hiddenAreas.length > 0 ? (
+            <div className="panel p-3">
+              <p className="label mb-2">Put away</p>
+              <div className="space-y-1.5">
+                {hiddenAreas.map((area) => (
+                  <div key={area.id} className="flex items-center gap-2">
+                    <span className="min-w-0 flex-1 truncate text-sm" style={{ color: 'var(--ink-2)' }}>
+                      {nameFor(area)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => restoreArea(area.id)}
+                      className="btn-secondary flex h-8 items-center gap-1.5 px-2.5 text-xs"
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" />
+                      Bring back
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
       </section>
 
       <section>
         <h2 className="section-title mb-2.5 px-1">Setup</h2>
         <div className="panel settings-list overflow-hidden">
+          <SettingsRow
+            icon={History}
+            label="History"
+            detail="Streaks, heatmap, every entry"
+            onClick={() => setHistoryOpen(true)}
+          />
+          <SettingsRow
+            icon={Users}
+            label="Who's logging"
+            detail={isShared ? `Currently ${activePerson.name}` : 'Add the rest of the household'}
+            onClick={() => setHouseholdOpen(true)}
+          />
           <SettingsRow
             icon={Nfc}
             label="NFC tag setup"
@@ -259,7 +337,7 @@ export default function Dashboard({
           <SettingsRow
             icon={CalendarPlus}
             label={copy.exportLabel}
-            detail="Repeating events, no alerts"
+            detail="Re-export any time — events update in place"
             onClick={onExport}
           />
           <SettingsRow
@@ -304,6 +382,19 @@ export default function Dashboard({
 
       <ThemePicker open={pickerOpen} onClose={() => setPickerOpen(false)} />
       <TagSetup open={tagsOpen} onClose={() => setTagsOpen(false)} />
+      <HistorySheet open={historyOpen} onClose={() => setHistoryOpen(false)} log={log} now={now} />
+      <HouseholdSheet
+        open={householdOpen}
+        onClose={() => setHouseholdOpen(false)}
+        log={log}
+        now={now}
+      />
+      <EditAreaSheet
+        mode="create"
+        area={null}
+        open={addRoomOpen}
+        onClose={() => setAddRoomOpen(false)}
+      />
     </div>
   )
 }

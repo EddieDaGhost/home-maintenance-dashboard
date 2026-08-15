@@ -71,6 +71,7 @@ export const AREAS = [
     name: 'Litter Boxes',
     subtitle: '3 boxes · 4 cats',
     icon: Cat,
+    iconName: 'cat',
     color: 'amber',
     tasks: [
       {
@@ -93,6 +94,7 @@ export const AREAS = [
     name: 'Bathroom 1',
     subtitle: 'Deep clean week 1 of 3',
     icon: Bath,
+    iconName: 'bath',
     color: 'sky',
     tasks: [
       {
@@ -111,6 +113,7 @@ export const AREAS = [
     name: 'Bathroom 2',
     subtitle: 'Deep clean week 2 of 3',
     icon: Bath,
+    iconName: 'bath',
     color: 'cyan',
     tasks: [
       {
@@ -129,6 +132,7 @@ export const AREAS = [
     name: 'Bathroom 3',
     subtitle: 'Deep clean week 3 of 3',
     icon: Bath,
+    iconName: 'bath',
     color: 'teal',
     tasks: [
       {
@@ -147,6 +151,7 @@ export const AREAS = [
     name: 'Kitchen',
     subtitle: 'Dishes & fridge',
     icon: ChefHat,
+    iconName: 'kitchen',
     color: 'rose',
     tasks: [
       { id: 'kitchen-dishes', name: 'Dishes', note: 'Sink empty before bed.', schedule: { kind: 'daily' }, points: 4 },
@@ -164,6 +169,7 @@ export const AREAS = [
     name: 'Laundry',
     subtitle: 'Weekend reset',
     icon: WashingMachine,
+    iconName: 'laundry',
     color: 'violet',
     tasks: [
       { id: 'laundry-wash', name: 'Wash & dry', schedule: { kind: 'weekend' }, points: 8 },
@@ -175,6 +181,7 @@ export const AREAS = [
     name: 'Chickens',
     subtitle: 'Coop & flock',
     icon: Egg,
+    iconName: 'egg',
     color: 'emerald',
     tasks: [
       { id: 'chickens-food-water', name: 'Food & water top-up', schedule: { kind: 'weekly' }, points: 5 },
@@ -196,9 +203,11 @@ export const AREAS = [
   },
 ]
 
-export const AREAS_BY_ID = Object.fromEntries(AREAS.map((area) => [area.id, area]))
-
-export const ALL_TASKS = AREAS.flatMap((area) => area.tasks.map((task) => ({ ...task, area })))
+/** Ids that already exist, so a room you add can't collide with a built-in one. */
+export const BUILT_IN_IDS = [
+  ...AREAS.map((area) => area.id),
+  ...AREAS.flatMap((area) => area.tasks.map((task) => task.id)),
+]
 
 export function paletteFor(area, themeId = 'home') {
   const palette = PALETTES[area.color] ?? PALETTES.sky

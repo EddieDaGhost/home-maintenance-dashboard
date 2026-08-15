@@ -1,28 +1,28 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AREAS_BY_ID, ALL_TASKS } from './config/areas.js'
 import { downloadCalendar } from './lib/calendar.js'
 import { loadLog, logCompletion, saveLog, undoLastCompletion } from './lib/storage.js'
 import { ThemeProvider, useTheme } from './theme/ThemeProvider.jsx'
 import { NamesProvider, useNames } from './state/NamesProvider.jsx'
+import { AreasProvider, useAreas } from './state/AreasProvider.jsx'
+import { PeopleProvider, usePeople } from './state/PeopleProvider.jsx'
 import { downloadBackup, parseBackup } from './lib/backup.js'
 import Dashboard from './components/Dashboard.jsx'
 import AreaView from './components/AreaView.jsx'
 import SpaceBackdrop from './components/SpaceBackdrop.jsx'
 
-const TASKS_BY_ID = Object.fromEntries(ALL_TASKS.map((task) => [task.id, task]))
-
 /** The NFC tags point at "#litter", "#kitchen", etc. Anything else = home. */
-function areaIdFromHash() {
+function hashAreaId() {
   if (typeof window === 'undefined') return null
-  const id = window.location.hash.replace(/^#\/?/, '').trim().toLowerCase()
-  return AREAS_BY_ID[id] ? id : null
+  return window.location.hash.replace(/^#\/?/, '').trim().toLowerCase() || null
 }
 
 function AppShell() {
   const { theme, copy } = useTheme()
   const { names, setNames } = useNames()
+  const { areas, areasById, allTasks, custom, setCustom } = useAreas()
+  const { activeId, household, setHousehold } = usePeople()
   const [log, setLog] = useState(loadLog)
-  const [areaId, setAreaId] = useState(areaIdFromHash)
+  const [areaId, setAreaId] = useState(hashAreaId)
   const [now, setNow] = useState(() => new Date())
   const [toast, setToast] = useState(null)
   const toastTimer = useRef(null)
@@ -30,7 +30,7 @@ function AppShell() {
   // Follow the URL hash, which is how an NFC tap lands on a specific area.
   useEffect(() => {
     const onHashChange = () => {
-      setAreaId(areaIdFromHash())
+      setAreaId(hashAreaId())
       window.scrollTo({ top: 0 })
     }
     window.addEventListener('hashchange', onHashChange)
@@ -67,13 +67,13 @@ function AppShell() {
 
   const handleLog = useCallback(
     (taskId) => {
-      const task = TASKS_BY_ID[taskId]
-      setLog((current) => logCompletion(current, taskId))
+      const task = allTasks.find((t) => t.id === taskId)
+      setLog((current) => logCompletion(current, taskId, { by: activeId }))
       setNow(new Date())
       const cheer = copy.cheers[Math.floor(Math.random() * copy.cheers.length)]
       showToast(`${cheer} — +${task?.points ?? 1} ${copy.pointsUnit}`)
     },
-    [copy, showToast],
+    [allTasks, activeId, copy, showToast],
   )
 
   const handleUndo = useCallback(
@@ -99,19 +99,20 @@ function AppShell() {
   }, [])
 
   const handleExport = useCallback(() => {
-    downloadCalendar(log, new Date(), names)
+    downloadCalendar(log, new Date(), names, areas)
     showToast(copy.exported)
-  }, [log, names, copy, showToast])
+  }, [log, names, areas, copy, showToast])
 
   const handleBackup = useCallback(() => {
-    downloadBackup(log, names)
+    downloadBackup(log, names, household, custom)
     showToast('Backup saved')
-  }, [log, names, showToast])
+  }, [log, names, household, custom, showToast])
 
   const handleRestore = useCallback(
     async (file) => {
       try {
-        const { log: restoredLog, names: restoredNames, total } = parseBackup(await file.text())
+        const restored = parseBackup(await file.text())
+        const { log: restoredLog, names: restoredNames, total } = restored
         const ok = window.confirm(
           `Restore ${total} logged ${total === 1 ? 'task' : 'tasks'}?\n\n` +
             'This replaces the history and names on this device.',
@@ -119,16 +120,18 @@ function AppShell() {
         if (!ok) return
         setLog(restoredLog)
         setNames(restoredNames)
+        setHousehold(restored.household)
+        setCustom(restored.custom)
         setNow(new Date())
         showToast('Backup restored')
       } catch (error) {
         showToast(error.message)
       }
     },
-    [setNames, showToast],
+    [setNames, setHousehold, setCustom, showToast],
   )
 
-  const area = useMemo(() => (areaId ? AREAS_BY_ID[areaId] : null), [areaId])
+  const area = useMemo(() => (areaId ? (areasById[areaId] ?? null) : null), [areaId, areasById])
 
   return (
     <>
@@ -184,7 +187,11 @@ export default function App() {
   return (
     <ThemeProvider>
       <NamesProvider>
-        <AppShell />
+        <AreasProvider>
+          <PeopleProvider>
+            <AppShell />
+          </PeopleProvider>
+        </AreasProvider>
       </NamesProvider>
     </ThemeProvider>
   )

@@ -2,11 +2,13 @@ import { useState } from 'react'
 import { ArrowLeft, History, Pencil } from 'lucide-react'
 import { areaStyle, paletteFor } from '../config/areas.js'
 import { friendlyDate } from '../lib/date.js'
+import { timeOf } from '../lib/storage.js'
 import { STATUS, getTaskState, isActionable } from '../lib/schedule.js'
 import { progressFor } from '../lib/stats.js'
 import { useTheme } from '../theme/ThemeProvider.jsx'
 import { useNames } from '../state/NamesProvider.jsx'
-import EditNamesSheet from './EditNamesSheet.jsx'
+import { usePeople } from '../state/PeopleProvider.jsx'
+import EditAreaSheet from './EditAreaSheet.jsx'
 import ProgressBar from './ProgressBar.jsx'
 import TaskCard from './TaskCard.jsx'
 
@@ -19,9 +21,11 @@ const SORT_ORDER = {
   [STATUS.DONE]: 4,
 }
 
-function RecentActivity({ area, log, title, nameFor }) {
+function RecentActivity({ area, log, title, nameFor, nameOf, isShared }) {
   const entries = area.tasks
-    .flatMap((task) => (log.completions[task.id] ?? []).map((at) => ({ at, task })))
+    .flatMap((task) =>
+      (log.completions[task.id] ?? []).map((entry) => ({ at: timeOf(entry), by: entry.by, task })),
+    )
     .sort((a, b) => b.at - a.at)
     .slice(0, 5)
 
@@ -34,12 +38,13 @@ function RecentActivity({ area, log, title, nameFor }) {
         {title}
       </p>
       <ul className="space-y-1.5">
-        {entries.map(({ at, task }) => (
+        {entries.map(({ at, by, task }) => (
           <li key={`${task.id}-${at}`} className="flex justify-between gap-3 text-xs">
             <span className="truncate" style={{ color: 'var(--ink-2)' }}>
               {nameFor(task)}
             </span>
             <span className="shrink-0" style={{ color: 'var(--ink-3)' }}>
+              {isShared && by ? `${nameOf(by)} · ` : ''}
               {friendlyDate(at)}
             </span>
           </li>
@@ -52,6 +57,7 @@ function RecentActivity({ area, log, title, nameFor }) {
 export default function AreaView({ area, log, now, onLog, onUndo, onBack }) {
   const { themeId, copy } = useTheme()
   const { nameFor, subtitleFor } = useNames()
+  const { nameOf, isShared } = usePeople()
   const [editing, setEditing] = useState(false)
   const palette = paletteFor(area, themeId)
   const Icon = area.icon
@@ -96,7 +102,7 @@ export default function AreaView({ area, log, now, onLog, onUndo, onBack }) {
           <button
             type="button"
             onClick={() => setEditing(true)}
-            aria-label="Edit names"
+            aria-label="Edit room"
             className="btn-secondary ml-auto flex h-10 w-10 shrink-0 items-center justify-center"
           >
             <Pencil className="h-4 w-4" />
@@ -128,6 +134,17 @@ export default function AreaView({ area, log, now, onLog, onUndo, onBack }) {
         </section>
       ) : null}
 
+      {area.tasks.length === 0 ? (
+        <div className="panel p-5 text-center">
+          <p className="font-semibold" style={{ color: 'var(--ink)' }}>
+            No tasks in here yet
+          </p>
+          <p className="mt-1 text-sm" style={{ color: 'var(--ink-2)' }}>
+            Tap the pencil above to add the first one.
+          </p>
+        </div>
+      ) : null}
+
       {restTasks.length > 0 ? (
         <section>
           <h2 className="section-title mb-2.5 px-1">
@@ -141,9 +158,21 @@ export default function AreaView({ area, log, now, onLog, onUndo, onBack }) {
         </section>
       ) : null}
 
-      <RecentActivity area={area} log={log} title={copy.recentTitle} nameFor={nameFor} />
+      <RecentActivity
+        area={area}
+        log={log}
+        title={copy.recentTitle}
+        nameFor={nameFor}
+        nameOf={nameOf}
+        isShared={isShared}
+      />
 
-      <EditNamesSheet area={area} open={editing} onClose={() => setEditing(false)} />
+      <EditAreaSheet
+        area={area}
+        open={editing}
+        onClose={() => setEditing(false)}
+        onDeleted={onBack}
+      />
     </div>
   )
 }

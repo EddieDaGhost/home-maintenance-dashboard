@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Check, Copy, TriangleAlert } from 'lucide-react'
-import { AREAS } from '../config/areas.js'
 import { useNames } from '../state/NamesProvider.jsx'
+import { useAreas } from '../state/AreasProvider.jsx'
 import Sheet from './Sheet.jsx'
 
 async function copyText(text) {
@@ -74,6 +74,7 @@ function TagRow({ label, url, hint }) {
  */
 export default function TagSetup({ open, onClose }) {
   const { nameFor } = useNames()
+  const { areas } = useAreas()
   const origin = typeof window === 'undefined' ? '' : window.location.origin
   const onVercelUrl = /\.vercel\.app$/.test(
     typeof window === 'undefined' ? '' : window.location.hostname,
@@ -112,7 +113,7 @@ export default function TagSetup({ open, onClose }) {
 
         <TagRow label="Master tag" url={`${origin}/`} hint="Fridge, or by the front door" />
 
-        {AREAS.map((area) => (
+        {areas.map((area) => (
           <TagRow key={area.id} label={nameFor(area)} url={`${origin}/#${area.id}`} />
         ))}
 

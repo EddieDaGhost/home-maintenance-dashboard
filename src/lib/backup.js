@@ -4,20 +4,26 @@
 // Data" tap wipes your streak with no warning and no undo. A backup file is
 // the only safety net, and it's also how you move to a new phone.
 
+import { normalizeCompletions } from './storage.js'
+import { normalizePeople, DEFAULT_PEOPLE } from './people.js'
+import { normalizeCustom, emptyCustom } from './custom.js'
+
 const APP_ID = 'home-maintenance-dashboard'
 
-export function buildBackup(log, names) {
+export function buildBackup(log, names, household, custom) {
   return {
     app: APP_ID,
-    version: 1,
+    version: 2,
     exportedAt: new Date().toISOString(),
     completions: log?.completions ?? {},
     names: names ?? {},
+    household: household ?? DEFAULT_PEOPLE,
+    custom: custom ?? emptyCustom,
   }
 }
 
-export function downloadBackup(log, names, now = new Date()) {
-  const json = JSON.stringify(buildBackup(log, names), null, 2)
+export function downloadBackup(log, names, household, custom, now = new Date()) {
+  const json = JSON.stringify(buildBackup(log, names, household, custom), null, 2)
   const blob = new Blob([json], { type: 'application/json' })
   const url = URL.createObjectURL(blob)
   const date = now.toISOString().slice(0, 10)
@@ -46,13 +52,8 @@ export function parseBackup(text) {
     throw new Error("That doesn't look like a Home Maintenance backup.")
   }
 
-  const completions = {}
-  for (const [taskId, stamps] of Object.entries(data.completions ?? {})) {
-    if (!Array.isArray(stamps)) continue
-    completions[taskId] = stamps
-      .filter((t) => typeof t === 'number' && Number.isFinite(t))
-      .sort((a, b) => b - a)
-  }
+  // Version 1 backups hold plain timestamps; normalizeCompletions upgrades them.
+  const completions = normalizeCompletions(data.completions)
 
   const names = {}
   for (const [id, value] of Object.entries(data.names ?? {})) {
@@ -64,5 +65,11 @@ export function parseBackup(text) {
   }
 
   const total = Object.values(completions).reduce((sum, list) => sum + list.length, 0)
-  return { log: { version: 1, completions }, names, total }
+  return {
+    log: { version: 2, completions },
+    names,
+    household: data.household ? normalizePeople(data.household) : DEFAULT_PEOPLE,
+    custom: data.custom ? normalizeCustom(data.custom) : emptyCustom,
+    total,
+  }
 }

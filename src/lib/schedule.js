@@ -14,6 +14,7 @@
 //   resting  - not your turn today (e.g. Tuesday for a Mon/Wed/Fri task)
 //   upcoming - scheduled, but not yet
 
+import { timeOf } from './storage.js'
 import {
   DAY_NAMES,
   DAY_SHORT,
@@ -82,12 +83,12 @@ function windowTarget(schedule) {
 
 /**
  * @param {object} task        a task from src/config/areas.js
- * @param {number[]} completions timestamps, newest first
+ * @param {Array} completions  entries {at, by}, newest first
  * @param {Date} now
  */
 export function getTaskState(task, completions = [], now = new Date()) {
   const schedule = task.schedule
-  const lastDone = completions.length ? completions[0] : null
+  const lastDone = completions.length ? timeOf(completions[0]) : null
 
   if (INTERVAL_KINDS.has(schedule.kind)) {
     const interval = intervalLength(schedule)
@@ -127,7 +128,10 @@ export function getTaskState(task, completions = [], now = new Date()) {
   // ---- window schedules ----
   const { start, end } = currentWindow(schedule, now)
   const target = windowTarget(schedule)
-  const done = completions.filter((t) => t >= start.getTime() && t < end.getTime()).length
+  const done = completions.filter((e) => {
+    const at = timeOf(e)
+    return at >= start.getTime() && at < end.getTime()
+  }).length
 
   if (done >= target) {
     return {
@@ -214,7 +218,7 @@ export function nextOccurrence(task, completions = [], now = new Date()) {
 
   if (INTERVAL_KINDS.has(schedule.kind)) {
     if (!completions.length) return today
-    const next = addDays(startOfDay(completions[0]), intervalLength(schedule))
+    const next = addDays(startOfDay(timeOf(completions[0])), intervalLength(schedule))
     return next < today ? today : next
   }
 

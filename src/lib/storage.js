@@ -1,10 +1,37 @@
 // Everything lives in the browser's localStorage — no account, no server,
 // no one else's copy of your data. It stays on the phone or laptop you use.
+//
+// A completion is an entry: { at: <timestamp>, by: <person id> }.
+// Version 1 of this app stored plain timestamps, so anything numeric that
+// turns up is quietly upgraded on load and old backups keep working.
 
 const STORAGE_KEY = 'home-maintenance-dashboard/v1'
 const MAX_HISTORY_PER_TASK = 400
 
-export const emptyLog = { version: 1, completions: {} }
+export const emptyLog = { version: 2, completions: {} }
+
+/** Accepts either shape and returns a timestamp. */
+export function timeOf(entry) {
+  return typeof entry === 'number' ? entry : entry?.at
+}
+
+export function normalizeEntry(entry) {
+  if (typeof entry === 'number') return { at: entry }
+  if (!entry || typeof entry !== 'object') return null
+  if (!Number.isFinite(entry.at)) return null
+  return typeof entry.by === 'string' ? { at: entry.at, by: entry.by } : { at: entry.at }
+}
+
+/** Clean up a stored map of taskId -> entries, newest first. */
+export function normalizeCompletions(raw) {
+  const completions = {}
+  for (const [taskId, entries] of Object.entries(raw ?? {})) {
+    if (!Array.isArray(entries)) continue
+    const clean = entries.map(normalizeEntry).filter(Boolean).sort((a, b) => b.at - a.at)
+    if (clean.length) completions[taskId] = clean
+  }
+  return completions
+}
 
 export function loadLog() {
   if (typeof window === 'undefined') return emptyLog
@@ -15,15 +42,7 @@ export function loadLog() {
     if (!parsed || typeof parsed !== 'object' || typeof parsed.completions !== 'object') {
       return emptyLog
     }
-    // Guard against hand-edited or corrupted data.
-    const completions = {}
-    for (const [taskId, stamps] of Object.entries(parsed.completions)) {
-      if (!Array.isArray(stamps)) continue
-      completions[taskId] = stamps
-        .filter((t) => typeof t === 'number' && Number.isFinite(t))
-        .sort((a, b) => b - a)
-    }
-    return { version: 1, completions }
+    return { version: 2, completions: normalizeCompletions(parsed.completions) }
   } catch {
     return emptyLog
   }
@@ -39,9 +58,10 @@ export function saveLog(log) {
 }
 
 /** Add a completion for a task, newest first. */
-export function logCompletion(log, taskId, at = Date.now()) {
+export function logCompletion(log, taskId, { at = Date.now(), by } = {}) {
+  const entry = by ? { at, by } : { at }
   const existing = log.completions[taskId] ?? []
-  const updated = [at, ...existing].slice(0, MAX_HISTORY_PER_TASK)
+  const updated = [entry, ...existing].slice(0, MAX_HISTORY_PER_TASK)
   return { ...log, completions: { ...log.completions, [taskId]: updated } }
 }
 
@@ -50,6 +70,14 @@ export function undoLastCompletion(log, taskId) {
   const existing = log.completions[taskId] ?? []
   if (!existing.length) return log
   return { ...log, completions: { ...log.completions, [taskId]: existing.slice(1) } }
+}
+
+/** Drop the history of tasks that no longer exist anywhere. */
+export function forgetTask(log, taskId) {
+  if (!log.completions[taskId]) return log
+  const completions = { ...log.completions }
+  delete completions[taskId]
+  return { ...log, completions }
 }
 
 export function clearAll() {
