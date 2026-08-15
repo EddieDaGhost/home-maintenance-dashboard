@@ -30,7 +30,7 @@ async function seed(page, URL, completions, people = null) {
 }
 
 const openEstate = async (page) => {
-  await page.getByRole('button', { name: /Your windowsill|Your ship/ }).click()
+  await page.getByRole('button', { name: /Your windowsill|Your ship|Your cats/ }).click()
   await page.waitForTimeout(300)
 }
 
@@ -137,13 +137,20 @@ export default async function run({ page, check, errors, URL }) {
     (await page.getByRole('button', { name: /Put .* away/ }).count()) === 0,
   )
 
-  // ---- the other look wears the same purchases ----
+  // ---- the other looks wear the same purchases ----
   await page.evaluate(([key]) => localStorage.setItem(key, 'starship'), [THEME_KEY])
   await page.reload({ waitUntil: 'networkidle' })
   await openEstate(page)
   check('the same screen renames itself', (await page.getByRole('heading', { level: 1 }).innerText()) === 'The ship')
   check('and so does the catalogue', (await page.getByText('Scout hull').count()) === 1)
   check('the scene still draws', (await page.locator('svg[role="img"]').count()) === 1)
+
+  await page.evaluate(([key]) => localStorage.setItem(key, 'cats'), [THEME_KEY])
+  await page.reload({ waitUntil: 'networkidle' })
+  await openEstate(page)
+  check('and again for the cats', (await page.getByRole('heading', { level: 1 }).innerText()) === 'The cats')
+  check('with the cats catalogue', (await page.getByText('Maine Coon').count()) === 1)
+  check('and a scene of its own', (await page.locator('svg[role="img"]').count()) === 1)
 
   // ---- an estate written by a newer version doesn't break this one ----
   await page.evaluate(

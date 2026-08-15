@@ -13,7 +13,7 @@
 // an entry here with the same id, and add a matching palette variant to each
 // palette in src/config/areas.js.
 
-import { Home, Rocket } from 'lucide-react'
+import { Cat, Home, Rocket } from 'lucide-react'
 
 export const THEMES = {
   home: {
@@ -23,6 +23,8 @@ export const THEMES = {
     icon: Home,
     /** 'space' turns on the starfield backdrop. */
     flavor: 'plain',
+    /** Which scene the credits screen draws. See src/components/scenes/. */
+    progression: { sceneKind: 'garden' },
     copy: {
       appTitle: 'Home Maintenance',
       streakLabel: 'Day streak',
@@ -72,6 +74,7 @@ export const THEMES = {
     tagline: 'Your house, in orbit. You have the conn.',
     icon: Rocket,
     flavor: 'space',
+    progression: { sceneKind: 'ship' },
     copy: {
       appTitle: 'Home Base One',
       streakLabel: 'Days online',
@@ -112,6 +115,55 @@ export const THEMES = {
       estateQuiet: 'Running dark on standby.',
       shopTitle: 'Requisitions',
       shelfTitle: 'Fitted',
+      creditsLabel: 'Credits',
+      creditsUnit: 'cr',
+    },
+  },
+
+  cats: {
+    id: 'cats',
+    name: 'Cats',
+    tagline: 'A warm afternoon and four opinions.',
+    icon: Cat,
+    flavor: 'plain',
+    progression: { sceneKind: 'cats' },
+    copy: {
+      appTitle: 'The Cat House',
+      streakLabel: 'Day streak',
+      pointsLabel: 'Points',
+      todayLabel: 'Today',
+      pointsUnit: 'pts',
+      weekTitle: 'This week',
+      weekNote: 'Every log counts. Nobody here is keeping score but you.',
+      queueTitle: 'Wants doing',
+      areasTitle: 'Rooms',
+      allClearTitle: 'Nothing is due right now',
+      allClearBody: 'The house is handled. Go and sit down.',
+      exportLabel: 'Export to iPhone Calendar',
+      nfcHint: 'Tap a tag to jump straight to its room.',
+      backLabel: 'All rooms',
+      todoTitle: 'To do',
+      restTitle: 'Everything else',
+      allTasksTitle: 'All tasks',
+      recentTitle: 'Recently done',
+      areaClear: 'Nothing due here right now.',
+      allClearBadge: 'All clear',
+      toDoBadge: (n) => `${n} to do`,
+      logButton: 'Log',
+      cheers: ['Good', 'Noted', 'That counts', 'Logged', 'Well done you'],
+      undone: 'Undone',
+      exported: 'Calendar file downloaded',
+      themeButtonLabel: 'Change look',
+
+      estateNav: 'Your cats',
+      estateNavDetail: 'Spend credits on the cats',
+      estateTitle: 'The cats',
+      estateBlurb:
+        'Everything you log earns credits. They buy cats and things for cats and nothing else — no chore is ever locked behind one.',
+      estateLively: 'Wide awake and causing problems.',
+      estateQuiet: 'Everyone is asleep in the warm patch.',
+      shopTitle: 'The shop',
+      shelfTitle: 'The household',
       creditsLabel: 'Credits',
       creditsUnit: 'cr',
     },

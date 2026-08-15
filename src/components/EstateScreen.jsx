@@ -25,6 +25,11 @@ import { useAreas } from '../state/AreasProvider.jsx'
 import { usePeople } from '../state/PeopleProvider.jsx'
 import { useEstate } from '../state/EstateProvider.jsx'
 import Windowsill from './scenes/Windowsill.jsx'
+import Ship from './scenes/Ship.jsx'
+import Cats from './scenes/Cats.jsx'
+
+/** Chosen by `progression.sceneKind` on the theme — see src/config/themes.js. */
+const SCENES = { garden: Windowsill, ship: Ship, cats: Cats }
 
 const SLOT_TITLES = {
   vessel: { home: 'The plant', starship: 'The hull', cats: 'The cat' },
@@ -104,7 +109,7 @@ function ShopRow({ item, themeId, balance, unit, owned, equipped, onBuy, onEquip
 }
 
 export default function EstateScreen({ log, now, onBack, onToast, readOnly = false }) {
-  const { themeId, copy } = useTheme()
+  const { themeId, theme, copy } = useTheme()
   const { allTasks } = useAreas()
   const { activePerson, activeId, people, isShared } = usePeople()
   const { entry, buyItem, equip, buyCompanion, buyTreat } = useEstate()
@@ -114,6 +119,7 @@ export default function EstateScreen({ log, now, onBack, onToast, readOnly = fal
   const unit = copy.creditsUnit
   const mood = sceneMood(log, now, allTasks, entry)
   const boosted = boostActive(entry, now.getTime())
+  const Scene = SCENES[theme.progression?.sceneKind] ?? Windowsill
 
   const buy = (item) => {
     buyItem(item, balance)
@@ -162,7 +168,7 @@ export default function EstateScreen({ log, now, onBack, onToast, readOnly = fal
       </header>
 
       <section className="panel overflow-hidden">
-        <Windowsill equipped={equippedItems(entry)} companions={entry.companions} mood={mood} />
+        <Scene equipped={equippedItems(entry)} companions={entry.companions} mood={mood} />
         <p className="px-4 py-3 text-sm" style={{ color: 'var(--ink-2)' }}>
           {mood === MOOD.QUIET ? copy.estateQuiet : copy.estateLively}
         </p>
@@ -201,9 +207,7 @@ export default function EstateScreen({ log, now, onBack, onToast, readOnly = fal
                 {companionLabel.name}
               </span>
               <span className="block truncate text-xs" style={{ color: 'var(--ink-3)' }}>
-                {roomForMore
-                  ? companionLabel.note
-                  : `That's all ${MAX_COMPANIONS} — the sill is full.`}
+                {roomForMore ? companionLabel.note : `That's all ${MAX_COMPANIONS}. That's plenty.`}
               </span>
             </span>
             {roomForMore ? (

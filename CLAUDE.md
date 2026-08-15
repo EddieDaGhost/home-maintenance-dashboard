@@ -116,7 +116,15 @@ breaks. Area colors come from `areaStyle()`, which sets `--surface`/`--line`
 inline so `.panel` tints itself.
 
 **Adding a theme = 3 edits** (color block in `index.css`, entry in `themes.js`,
-palette variant in `areas.js`). No component changes. Keep it that way.
+palette variant in `areas.js`). No component changes. Keep it that way. A theme
+also names its credits scene through `progression.sceneKind`; reusing an existing
+one costs nothing, and a new one is a component in `src/components/scenes/` plus
+a `labels` entry per item in `catalog.js`.
+
+**Scenes are inline SVG, never image files.** `SpaceBackdrop.jsx` is the
+precedent: the service worker precaches the shell, and anything that waits on a
+download breaks the tap that matters most. Flat colour at low opacity over a dark
+background goes muddy — use a gradient that actually fades to zero for any glow.
 
 **User-facing strings live in the theme's `copy` object**, so a theme can rename
 "areas" to "decks". Don't hardcode a label a theme might want to change.
@@ -135,7 +143,7 @@ and no horizontal overflow — the tests assert that last one.
 ## Testing
 
 ```bash
-npm run check              # everything: 347 checks
+npm run check              # everything: 360 checks
 npm run check -- logic     # just the fast pure-logic suite (no browser)
 ```
 

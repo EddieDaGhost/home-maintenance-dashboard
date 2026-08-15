@@ -52,6 +52,16 @@ function makePalette({ base, ink, tint, line, spaceBase, spaceInk }) {
       track: 'rgba(148, 197, 255, 0.12)',
       glow: rgba(spaceBase, 0.4),
     },
+    // On the cream canvas the tints are translucent rather than pastel, so the
+    // warmth of the page shows through every card.
+    cats: {
+      base,
+      ink,
+      tint: rgba(base, 0.1),
+      line: rgba(base, 0.28),
+      track: 'rgba(255, 252, 246, 0.8)',
+      glow: 'transparent',
+    },
   }
 }
 

@@ -4,7 +4,7 @@ import { DEFAULT_THEME_ID, THEMES, THEME_LIST } from '../config/themes.js'
 const STORAGE_KEY = 'home-maintenance-dashboard/theme'
 
 // The color the iPhone paints behind the status bar, per theme.
-const STATUS_BAR_COLOR = { home: '#f1f5f9', starship: '#04070f' }
+const STATUS_BAR_COLOR = { home: '#f1f5f9', starship: '#04070f', cats: '#fbf1e3' }
 
 const ThemeContext = createContext(null)
 

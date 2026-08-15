@@ -153,6 +153,12 @@ export default async function run({ check }) {
     THEME_LIST.every((t) => t.copy.estateTitle && t.copy.shopTitle && t.copy.creditsUnit),
     true,
   )
+  is(
+    'every look names a scene that exists',
+    THEME_LIST.every((t) => ['garden', 'ship', 'cats'].includes(t.progression?.sceneKind)),
+    true,
+  )
+  is('the catalogue names every look', new Set(CATALOG.flatMap((i) => Object.keys(i.labels))).size, THEME_LIST.length)
 
   // --- earning ---
   const ROSTER = [{ id: 'eddie', name: 'Eddie' }, { id: 'yas', name: 'Yasmine' }]
