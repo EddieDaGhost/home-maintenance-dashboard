@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { AREAS as BUILT_IN_AREAS, BUILT_IN_IDS } from '../config/areas.js'
 import { iconFor } from '../config/icons.js'
 import * as customStore from '../lib/custom.js'
+import { touching } from '../lib/settingsClock.js'
 
 const AreasContext = createContext(null)
 
@@ -69,14 +70,16 @@ export function AreasProvider({ children }) {
       setCustom,
       hiddenTaskIds: custom.hidden,
 
-      addArea: (draft) => setCustom((c) => customStore.addArea(c, draft, BUILT_IN_IDS)),
-      updateArea: (areaId, patch) => setCustom((c) => customStore.updateArea(c, areaId, patch)),
-      removeArea: (areaId) => setCustom((c) => customStore.removeArea(c, areaId)),
-      restoreArea: (areaId) => setCustom((c) => customStore.restoreArea(c, areaId)),
+      ...touching({
+        addArea: (draft) => setCustom((c) => customStore.addArea(c, draft, BUILT_IN_IDS)),
+        updateArea: (areaId, patch) => setCustom((c) => customStore.updateArea(c, areaId, patch)),
+        removeArea: (areaId) => setCustom((c) => customStore.removeArea(c, areaId)),
+        restoreArea: (areaId) => setCustom((c) => customStore.restoreArea(c, areaId)),
 
-      addTask: (areaId, task) => setCustom((c) => customStore.addTask(c, areaId, task, BUILT_IN_IDS)),
-      removeTask: (areaId, taskId) => setCustom((c) => customStore.removeTask(c, areaId, taskId)),
-      restoreTask: (taskId) => setCustom((c) => customStore.restoreTask(c, taskId)),
+        addTask: (areaId, task) => setCustom((c) => customStore.addTask(c, areaId, task, BUILT_IN_IDS)),
+        removeTask: (areaId, taskId) => setCustom((c) => customStore.removeTask(c, areaId, taskId)),
+        restoreTask: (taskId) => setCustom((c) => customStore.restoreTask(c, taskId)),
+      }),
     }
   }, [areas, custom])
 

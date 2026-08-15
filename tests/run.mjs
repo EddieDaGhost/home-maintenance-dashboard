@@ -20,6 +20,8 @@ const SUITES = [
   { name: 'themes', file: './themes.mjs', browser: true },
   { name: 'naming', file: './naming.mjs', browser: true, clipboard: true },
   { name: 'rooms', file: './rooms.mjs', browser: true },
+  { name: 'offline', file: './offline.mjs', browser: true },
+  { name: 'sync', file: './sync.mjs', browser: true, ownContexts: true },
 ]
 
 function run(command, args) {
@@ -86,11 +88,15 @@ async function main() {
           ...(suite.clipboard ? { permissions: ['clipboard-read', 'clipboard-write'] } : {}),
           ...(suite.virgin ? { virgin: true } : {}),
         }
-        const { context, page, errors } = await newPhonePage(browser, options)
-        try {
-          await runSuite({ browser, context, page, check, errors, URL: BASE_URL, tmp })
-        } finally {
-          await context.close()
+        if (suite.ownContexts) {
+          await runSuite({ browser, check, URL: BASE_URL, tmp })
+        } else {
+          const { context, page, errors } = await newPhonePage(browser, options)
+          try {
+            await runSuite({ browser, context, page, check, errors, URL: BASE_URL, tmp })
+          } finally {
+            await context.close()
+          }
         }
       }
 

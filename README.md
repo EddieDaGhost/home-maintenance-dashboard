@@ -8,8 +8,11 @@ wall, the right list opens on your phone, you tap **Log**, and you're done.
 - **No notifications.** Nothing buzzes at you. You log things when you do them.
 - **No guilt.** Tasks that aren't your problem today say "resting," not "late."
   A quiet day reads as 100%, not 0%.
-- **Nothing to sign into.** Your data lives in your browser, not on a server.
+- **Nothing to sign into.** No accounts, ever. Your data lives on your phone;
+  sharing it with someone is a private link, not a login.
 - **One tap to log.** Tap the tag, tap Log. That's the whole ritual.
+- **Works with no signal.** The whole app is cached on your phone after the
+  first visit, so a tag still opens instantly at the coop or in the basement.
 
 ---
 
@@ -62,7 +65,7 @@ Other commands:
 ```bash
 npm run build     # build the production version into dist/
 npm run preview   # preview that production build locally
-npm run check     # run the tests (209 checks)
+npm run check     # run the tests (281 checks)
 ```
 
 `npm run check` drives a real browser through the app — logging, persistence,
@@ -263,6 +266,27 @@ With one person, nothing changes. Add someone under **Who's logging** and:
 
 It's about credit, not accounts — everyone shares the same device and the same
 history. Removing someone leaves their past entries in place.
+
+---
+
+## Sharing with the rest of the household
+
+**Setup → Share with another device.** One tap turns on a shared household and
+gives you an invite link; anyone who opens it joins. From then on every phone
+sees the same rooms, the same history and the same streak, and anyone can log.
+
+- **Your existing history comes with you** — it uploads on the first sync.
+- **Logging still works with no signal.** Every tap saves locally first; the
+  phone catches up when it can. Two people logging offline both arrive, because
+  completions merge rather than overwrite.
+- **No accounts and no passwords.** A household is an unguessable id plus a key,
+  and the invite link carries both — so treat it like a house key and send it to
+  the people who live here, not a group chat.
+- **Turning it off** on a device leaves that device's history intact.
+
+The backend is your own Supabase project (free tier, and this uses kilobytes of
+it). `supabase/schema.sql` sets it up in one paste — see the comments at the top
+for how the security model works.
 
 ---
 

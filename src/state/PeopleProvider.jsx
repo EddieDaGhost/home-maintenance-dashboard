@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import * as peopleStore from '../lib/people.js'
+import { touching } from '../lib/settingsClock.js'
 
 const PeopleContext = createContext(null)
 
@@ -21,10 +22,12 @@ export function PeopleProvider({ children }) {
       isShared: household.people.length > 1,
       nameOf: (id) => peopleStore.personName(household, id),
 
-      addPerson: (name) => setHousehold((h) => peopleStore.addPerson(h, name)),
-      renamePerson: (id, name) => setHousehold((h) => peopleStore.renamePerson(h, id, name)),
-      removePerson: (id) => setHousehold((h) => peopleStore.removePerson(h, id)),
-      setActivePerson: (id) => setHousehold((h) => peopleStore.setActivePerson(h, id)),
+      ...touching({
+        addPerson: (name) => setHousehold((h) => peopleStore.addPerson(h, name)),
+        renamePerson: (id, name) => setHousehold((h) => peopleStore.renamePerson(h, id, name)),
+        removePerson: (id) => setHousehold((h) => peopleStore.removePerson(h, id)),
+        setActivePerson: (id) => setHousehold((h) => peopleStore.setActivePerson(h, id)),
+      }),
     }),
     [household],
   )

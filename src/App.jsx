@@ -7,6 +7,8 @@ import { AreasProvider, useAreas } from './state/AreasProvider.jsx'
 import { PeopleProvider, usePeople } from './state/PeopleProvider.jsx'
 import { downloadBackup, parseBackup } from './lib/backup.js'
 import { claimDevice, loadDevice, looksSetUp } from './lib/device.js'
+import { parseJoinHash } from './lib/sync.js'
+import { useSync } from './state/useSync.js'
 import Welcome from './components/Welcome.jsx'
 import Dashboard from './components/Dashboard.jsx'
 import AreaView from './components/AreaView.jsx'
@@ -25,15 +27,36 @@ function AppShell() {
   const { activeId, household, setHousehold } = usePeople()
   const [log, setLog] = useState(loadLog)
   const [device, setDevice] = useState(loadDevice)
+  const sync = useSync({ log, setLog, names, setNames, custom, setCustom, household, setHousehold })
   const [previewing, setPreviewing] = useState(false)
   const [areaId, setAreaId] = useState(hashAreaId)
   const [now, setNow] = useState(() => new Date())
   const [toast, setToast] = useState(null)
   const toastTimer = useRef(null)
 
+  // An invite link from the other phone: join, then get out of the URL so the
+  // key isn't sitting in the address bar or the back button.
+  useEffect(() => {
+    const claimJoinLink = () => {
+      const invite = parseJoinHash(window.location.hash)
+      if (!invite) return false
+      sync.joinHousehold(invite.householdId, invite.key)
+      setDevice(claimDevice())
+      window.history.replaceState(null, '', window.location.pathname + window.location.search)
+      setAreaId(null)
+      showToast('Joined the household')
+      return true
+    }
+    claimJoinLink()
+    window.addEventListener('hashchange', claimJoinLink)
+    return () => window.removeEventListener('hashchange', claimJoinLink)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sync.joinHousehold])
+
   // Follow the URL hash, which is how an NFC tap lands on a specific area.
   useEffect(() => {
     const onHashChange = () => {
+      if (parseJoinHash(window.location.hash)) return
       setAreaId(hashAreaId())
       window.scrollTo({ top: 0 })
     }
@@ -207,6 +230,7 @@ function AppShell() {
             onExport={handleExport}
             onBackup={handleBackup}
             onRestore={handleRestore}
+            sync={sync}
             readOnly={readOnly}
           />
         )}

@@ -6,6 +6,7 @@ import {
   Flame,
   History,
   Info,
+  Link2,
   Nfc,
   PartyPopper,
   Plus,
@@ -31,6 +32,7 @@ import ProgressBar from './ProgressBar.jsx'
 import TaskCard from './TaskCard.jsx'
 import ThemePicker from './ThemePicker.jsx'
 import AboutSheet from './AboutSheet.jsx'
+import ShareSheet from './ShareSheet.jsx'
 import TagSetup from './TagSetup.jsx'
 import EditAreaSheet from './EditAreaSheet.jsx'
 import HistorySheet from './HistorySheet.jsx'
@@ -138,6 +140,7 @@ export default function Dashboard({
   onExport,
   onBackup,
   onRestore,
+  sync,
   readOnly = false,
 }) {
   const { themeId, theme, copy } = useTheme()
@@ -151,6 +154,7 @@ export default function Dashboard({
   const [historyOpen, setHistoryOpen] = useState(false)
   const [householdOpen, setHouseholdOpen] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
   const fileInput = useRef(null)
 
   const streak = currentStreak(log, now)
@@ -349,6 +353,18 @@ export default function Dashboard({
             onClick={() => setHouseholdOpen(true)}
           />
           <SettingsRow
+            icon={Link2}
+            label={sync?.isSharing ? 'Shared with your household' : 'Share with another device'}
+            detail={
+              sync?.isSharing
+                ? sync.status.state === 'error'
+                  ? "Sharing on — couldn't reach the server"
+                  : 'Everyone sees the same history'
+                : 'One household across two phones'
+            }
+            onClick={() => setShareOpen(true)}
+          />
+          <SettingsRow
             icon={Nfc}
             label="NFC tag setup"
             detail="What to write on each tag"
@@ -409,6 +425,7 @@ export default function Dashboard({
 
       <ThemePicker open={pickerOpen} onClose={() => setPickerOpen(false)} />
       <AboutSheet open={aboutOpen} onClose={() => setAboutOpen(false)} />
+      {sync ? <ShareSheet open={shareOpen} onClose={() => setShareOpen(false)} sync={sync} /> : null}
       <TagSetup open={tagsOpen} onClose={() => setTagsOpen(false)} />
       <HistorySheet open={historyOpen} onClose={() => setHistoryOpen(false)} log={log} now={now} />
       <HouseholdSheet
