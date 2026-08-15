@@ -4,6 +4,7 @@ import {
   ChevronRight,
   Download,
   Flame,
+  Flower2,
   History,
   Info,
   Link2,
@@ -28,6 +29,8 @@ import { useTheme } from '../theme/ThemeProvider.jsx'
 import { useNames } from '../state/NamesProvider.jsx'
 import { useAreas } from '../state/AreasProvider.jsx'
 import { usePeople } from '../state/PeopleProvider.jsx'
+import { useEstate } from '../state/EstateProvider.jsx'
+import { creditsBalance } from '../lib/credits.js'
 import ProgressBar from './ProgressBar.jsx'
 import TaskCard from './TaskCard.jsx'
 import ThemePicker from './ThemePicker.jsx'
@@ -140,13 +143,15 @@ export default function Dashboard({
   onExport,
   onBackup,
   onRestore,
+  onOpenEstate,
   sync,
   readOnly = false,
 }) {
   const { themeId, theme, copy } = useTheme()
   const { nameFor, subtitleFor } = useNames()
   const { areas, allTasks, hiddenAreas, restoreArea } = useAreas()
-  const { activePerson, isShared } = usePeople()
+  const { activePerson, activeId, people, isShared } = usePeople()
+  const { entry } = useEstate()
 
   const [pickerOpen, setPickerOpen] = useState(false)
   const [tagsOpen, setTagsOpen] = useState(false)
@@ -162,6 +167,7 @@ export default function Dashboard({
   const goal = weeklyPointsGoal(now, allTasks)
   const today = completedToday(log, now)
   const attention = tasksNeedingAttention(log, now, allTasks)
+  const credits = creditsBalance(log, allTasks, activeId, people, entry)
   const shortlist = attention.slice(0, 5)
   const ThemeIcon = theme.icon
 
@@ -345,6 +351,12 @@ export default function Dashboard({
             label="History"
             detail="Streaks, heatmap, every entry"
             onClick={() => setHistoryOpen(true)}
+          />
+          <SettingsRow
+            icon={Flower2}
+            label={copy.estateNav}
+            detail={`${credits} ${copy.creditsUnit} to spend`}
+            onClick={onOpenEstate}
           />
           <SettingsRow
             icon={Users}

@@ -27,12 +27,20 @@ so and ask rather than "improving" it:
 2. **Never guilt-trip.** A task that isn't due today reads "resting," not
    "late." An area with nothing due shows **100%**, not 0%. There is no "you
    missed 4 tasks" anywhere and there shouldn't be.
+   The credits scene has exactly **two** states — lively and quiet — and quiet
+   means dimmer light and a sleeping cat, nothing more. Decay, damage, dying
+   plants and "out of commission" were considered and deliberately rejected:
+   one log flips the scene straight back, and nothing you own is ever taken
+   away or degraded.
 3. **Streaks are generous.** The streak anchors to today *or yesterday*, so
    logging at 12:30am doesn't break it. Nothing can make a streak count down.
 4. **One tap to log.** Tapping a tag and tapping Log is the whole ritual. Any
    feature that adds a step to that path needs a very good reason.
 5. **Points are encouragement, never a target.** Hitting the weekly goal is not
-   the point; the copy says so, and it should keep saying so.
+   the point; the copy says so, and it should keep saying so. Credits are the
+   same rule with a shop attached: they buy **decoration only**. Nothing the app
+   already does may end up behind a purchase, and no purchase may ever change
+   what's due, what's worth what, or what the history says.
 6. **The user's data is theirs.** It stays in their browser unless they turn on
    sharing, and even then it goes only to their own Supabase project. Don't add
    analytics, telemetry, or third-party scripts.
@@ -68,6 +76,7 @@ src/
 │   ├── areas.js     The default home: 7 rooms, 18 tasks. Edit this to change
 │   │                what a NEW browser sees. Users override it at runtime.
 │   ├── themes.js    Theme definitions + every user-facing string per theme
+│   ├── catalog.js   The shop: every item credits can buy, named per theme
 │   └── icons.js     Icons offerable in the room picker
 ├── lib/             Pure functions, no React. Test these in tests/logic.mjs.
 │   ├── date.js      Week math (Monday-first), DST-safe day differences
@@ -77,11 +86,14 @@ src/
 │   ├── names.js     Display-name overrides
 │   ├── custom.js    User-added rooms/tasks, hidden built-ins
 │   ├── people.js    Household, who's logging
+│   ├── credits.js   Credits earned/spent, and how lively the scene is
+│   ├── estate.js    What each person has bought, keyed by person id
 │   ├── backup.js    Export/import JSON
 │   └── calendar.js  .ics builder
-├── state/           React context providers (Names, Areas, People)
+├── state/           React context providers (Names, Areas, People, Estate)
 ├── theme/           ThemeProvider
 ├── components/      All UI
+│   └── scenes/      The credits scene, one component per look
 └── index.css        Every color in the app, as CSS variables per theme
 ```
 
@@ -91,6 +103,7 @@ src/
 - Changing when it's due → `src/lib/schedule.js`
 - Changing how it looks → `src/index.css` (tokens) or the component
 - Changing wording → `src/config/themes.js` (`copy` object, per theme)
+- Changing what credits buy → `src/config/catalog.js`
 
 ---
 
@@ -122,7 +135,7 @@ and no horizontal overflow — the tests assert that last one.
 ## Testing
 
 ```bash
-npm run check              # everything: 281 checks
+npm run check              # everything: 347 checks
 npm run check -- logic     # just the fast pure-logic suite (no browser)
 ```
 
@@ -170,6 +183,35 @@ TEST_URL=https://homemaintenance.app npm run check
 
 ---
 
+## Credits and the scene
+
+Weekly points measure this week and reset on Monday. **Credits are the same
+numbers with a different lifetime** — they accumulate forever and buy decoration
+on the estate screen.
+
+- **Credits are derived, never stored.** `creditsEarned()` sums `task.points`
+  over the completions a person logged; `spent` is the only thing on disk. That
+  means credits inherit sync and backup for free — completions already merge
+  across phones and already travel in backup files, so there is no second ledger
+  to keep in step. Don't add one.
+- **They belong to a person, not a device.** Completions already carry `by`, so
+  Eddie and Yasmine each build their own scene and it follows them to any phone.
+  Entries logged before the household feature existed have no `by` and are
+  credited to the **first person on the roster**, which makes a long solo history
+  count as that person's rather than nobody's.
+- **One catalogue, three costumes.** An item is the same purchase in every look;
+  only its name and its drawing change. `labels` in `src/config/catalog.js` must
+  cover **all three** themes — the logic suite fails a half-added item.
+- **Item ids are permanent**, for the same reason area and task ids are:
+  ownership is recorded by id, so renaming one un-buys it for everybody.
+- **Liveliness is computed, never stored.** `sceneMood()` reads `STATUS.OVERDUE`
+  from the existing schedule logic. Don't invent a second definition of "behind"
+  — the scene and the task list must not be able to disagree.
+- **Removing a person leaves their estate in the map**, unreachable but intact,
+  matching how a removed room keeps its history.
+
+---
+
 ## Things that will bite you
 
 - **`.ics` line folding is measured in bytes, not characters.** An em dash in a
@@ -211,6 +253,11 @@ therefore grants nothing by itself.
   key order, the diff sees a change that never happened, and a device that only
   *read* the settings overwrites the other phone's edits. That bug was built,
   found by the two-phone test, and replaced with the explicit clock.
+- **Purchases ride in the settings document**, so they are last-write-wins too.
+  Two phones buying in the same few seconds can cost one of them a purchase —
+  worst case a refunded credit, never corruption. Making it merge properly would
+  mean an event log per purchase, which is not worth it for a shop full of
+  decoration. If it ever is, model it the way completions are modelled.
 - The client talks to PostgREST over plain `fetch` — no Supabase SDK — so
   `tests/fake-supabase.mjs` can stand in for the real thing and the request
   shapes get exercised for real.

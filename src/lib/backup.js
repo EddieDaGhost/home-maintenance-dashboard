@@ -7,23 +7,25 @@
 import { normalizeCompletions } from './storage.js'
 import { normalizePeople, DEFAULT_PEOPLE } from './people.js'
 import { normalizeCustom, emptyCustom } from './custom.js'
+import { normalizeEstate, emptyEstate } from './estate.js'
 
 const APP_ID = 'home-maintenance-dashboard'
 
-export function buildBackup(log, names, household, custom) {
+export function buildBackup(log, names, household, custom, estate) {
   return {
     app: APP_ID,
-    version: 2,
+    version: 3,
     exportedAt: new Date().toISOString(),
     completions: log?.completions ?? {},
     names: names ?? {},
     household: household ?? DEFAULT_PEOPLE,
     custom: custom ?? emptyCustom,
+    estate: estate ?? emptyEstate,
   }
 }
 
-export function downloadBackup(log, names, household, custom, now = new Date()) {
-  const json = JSON.stringify(buildBackup(log, names, household, custom), null, 2)
+export function downloadBackup(log, names, household, custom, estate, now = new Date()) {
+  const json = JSON.stringify(buildBackup(log, names, household, custom, estate), null, 2)
   const blob = new Blob([json], { type: 'application/json' })
   const url = URL.createObjectURL(blob)
   const date = now.toISOString().slice(0, 10)
@@ -70,6 +72,8 @@ export function parseBackup(text) {
     names,
     household: data.household ? normalizePeople(data.household) : DEFAULT_PEOPLE,
     custom: data.custom ? normalizeCustom(data.custom) : emptyCustom,
+    // Version 1 and 2 files predate the estate; an empty one is the right answer.
+    estate: data.estate ? normalizeEstate(data.estate) : emptyEstate,
     total,
   }
 }

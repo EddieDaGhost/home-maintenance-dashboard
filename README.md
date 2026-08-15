@@ -65,7 +65,7 @@ Other commands:
 ```bash
 npm run build     # build the production version into dist/
 npm run preview   # preview that production build locally
-npm run check     # run the tests (281 checks)
+npm run check     # run the tests (347 checks)
 ```
 
 `npm run check` drives a real browser through the app — logging, persistence,
@@ -255,6 +255,30 @@ between steps, and contrast against their own background.
 
 ---
 
+## Credits and your windowsill
+
+Everything you log is worth points. Points measure the week and reset on Monday;
+**credits** are the same numbers kept forever, and they buy things.
+
+**Setup → Your windowsill** opens a scene that is yours to build. Credits buy a
+plant, a pot glaze, a view, and a few small joys — plus more plants, and plant
+food that perks everything up for a day. In Starship the same purchases are a
+hull, a livery, a dock and a decal.
+
+Three things it deliberately does *not* do:
+
+- **Nothing is ever locked behind a purchase.** Every chore, every screen and
+  every number works exactly the same whether you own nothing or everything. It
+  is decoration, start to finish.
+- **Nothing decays.** If something is overdue the light goes low and the cat goes
+  to sleep — that's the whole range. Nothing dies, breaks or gets taken away, and
+  one log brings the sun back.
+- **Credits are per person, not per phone.** Yours are built from what *you*
+  logged, so you and your fiancée each build your own scene and it follows you to
+  whichever phone you pick up.
+
+---
+
 ## Who's logging
 
 With one person, nothing changes. Add someone under **Who's logging** and:
@@ -325,13 +349,15 @@ custom domain at it.
 src/
 ├── config/
 │   ├── areas.js        ← YOUR HOME. Edit this to change rooms and chores.
+│   ├── catalog.js      Everything credits can buy
 │   └── themes.js       The looks you can switch between
 ├── theme/
 │   └── ThemeProvider.jsx   Holds the current theme, remembers your choice
 ├── state/
 │   ├── NamesProvider.jsx   Your custom room and task names
 │   ├── AreasProvider.jsx   Built-in rooms + yours, merged into one list
-│   └── PeopleProvider.jsx  The household
+│   ├── PeopleProvider.jsx  The household
+│   └── EstateProvider.jsx  What each person has bought
 ├── lib/
 │   ├── date.js         Date helpers (weeks, streak-safe day math)
 │   ├── schedule.js     Decides if a task is due, resting, overdue, done
@@ -340,6 +366,8 @@ src/
 │   ├── names.js        Custom names (ids never change)
 │   ├── custom.js       Rooms and tasks you added, rooms you put away
 │   ├── people.js       The household and who's logging
+│   ├── credits.js      Credits earned and spent, and how lively the scene is
+│   ├── estate.js       Purchases, kept per person
 │   ├── backup.js       Backup and restore files
 │   └── calendar.js     Builds the .ics calendar file
 ├── components/
@@ -351,6 +379,8 @@ src/
 │   ├── ScheduleFields.jsx The "how often" picker
 │   ├── HistorySheet.jsx   Streaks, heatmap, every entry
 │   ├── HouseholdSheet.jsx Who's logging
+│   ├── EstateScreen.jsx   Credits, the shop and your scene
+│   ├── scenes/            The scene art, one component per look
 │   ├── TagSetup.jsx       What to write on each NFC tag
 │   ├── SpaceBackdrop.jsx  Starfield, nebulae and planet (CSS only)
 │   ├── Sheet.jsx          The shared pop-up panel

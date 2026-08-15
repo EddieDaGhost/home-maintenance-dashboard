@@ -23,7 +23,8 @@ export default async function run({ browser, page, check, errors, URL, tmp }) {
   check('planet + nebulae present', (await page.locator('.nebula').count()) === 2)
   check('title uses theme copy', (await page.getByRole('heading', { level: 1 }).innerText()) === 'Home Base One')
   check('stat labels renamed', (await page.getByText('Days online').count()) > 0)
-  check('credits label', (await page.getByText('Credits').count()) > 0)
+  // "Credits" is the spendable currency now, so the weekly tally is "Output".
+  check('weekly tally label', (await page.getByText('Output').count()) > 0)
   check('section title renamed', (await page.getByText('Priority queue').count()) > 0)
   check('decks heading', (await page.getByText('Decks', { exact: true }).count()) > 0)
 
@@ -47,7 +48,7 @@ export default async function run({ browser, page, check, errors, URL, tmp }) {
   await page.getByRole('button', { name: /^Log / }).first().click()
   await page.waitForTimeout(400)
   const toast = await page.getByRole('status').innerText()
-  check('space-flavored toast', /cr$/.test(toast), `("${toast}")`)
+  check('space-flavored toast', /^(Logged to the record|Deck secured|Systems green|Task complete|Noted, Captain) — \+\d+ pts$/.test(toast), `("${toast}")`)
   const after = await page.evaluate(() => localStorage.getItem('home-maintenance-dashboard/v1'))
   check('log recorded', before !== after)
 

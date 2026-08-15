@@ -50,6 +50,19 @@ export const THEMES = {
       undone: 'Undone',
       exported: 'Calendar file downloaded',
       themeButtonLabel: 'Change look',
+
+      // --- the credits screen ---
+      estateNav: 'Your windowsill',
+      estateNavDetail: 'Spend credits on something nice',
+      estateTitle: 'The windowsill',
+      estateBlurb:
+        'Everything you log earns credits. They buy decoration and nothing else — no chore is ever locked behind one.',
+      estateLively: 'Full sun. Everything is showing off.',
+      estateQuiet: 'Low evening light. Everything is resting.',
+      shopTitle: 'The shop',
+      shelfTitle: 'On the sill',
+      creditsLabel: 'Credits',
+      creditsUnit: 'cr',
     },
   },
 
@@ -62,9 +75,12 @@ export const THEMES = {
     copy: {
       appTitle: 'Home Base One',
       streakLabel: 'Days online',
-      pointsLabel: 'Credits',
+      // "Credits" is the spendable currency on the estate screen, so the weekly
+      // tally needs its own word — two meanings for one label is worse flavour
+      // than either name on its own.
+      pointsLabel: 'Output',
       todayLabel: 'Logged',
-      pointsUnit: 'cr',
+      pointsUnit: 'pts',
       weekTitle: 'Weekly mission',
       weekNote: 'Every log counts. A partial cycle is still a good cycle.',
       queueTitle: 'Priority queue',
@@ -86,6 +102,18 @@ export const THEMES = {
       undone: 'Entry retracted',
       exported: 'Mission log exported',
       themeButtonLabel: 'Change look',
+
+      estateNav: 'Your ship',
+      estateNavDetail: 'Spend credits on the hull',
+      estateTitle: 'The ship',
+      estateBlurb:
+        'Every log earns credits. They buy paint and fittings and nothing else — no system is ever locked behind one.',
+      estateLively: 'All lit up and under way.',
+      estateQuiet: 'Running dark on standby.',
+      shopTitle: 'Requisitions',
+      shelfTitle: 'Fitted',
+      creditsLabel: 'Credits',
+      creditsUnit: 'cr',
     },
   },
 }
