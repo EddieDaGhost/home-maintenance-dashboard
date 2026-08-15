@@ -57,13 +57,32 @@ export function createChecker(suiteName) {
   return check
 }
 
-/** An iPhone-sized page that records console errors for the suite to assert on. */
-export async function newPhonePage(browser, options = {}) {
+/**
+ * An iPhone-sized page that records console errors for the suite to assert on.
+ *
+ * By default the device is pre-claimed, so suites land on the dashboard the way
+ * an owner's phone does. Pass `virgin: true` to test what a visitor sees.
+ */
+export async function newPhonePage(browser, { virgin = false, ...options } = {}) {
   const context = await browser.newContext({
     viewport: { width: 390, height: 844 },
     deviceScaleFactor: 2,
     ...options,
   })
+
+  if (!virgin) {
+    await context.addInitScript(() => {
+      try {
+        window.localStorage.setItem(
+          'home-maintenance-dashboard/device/v1',
+          JSON.stringify({ claimed: true, claimedAt: 0 }),
+        )
+      } catch {
+        // nothing to do
+      }
+    })
+  }
+
   const page = await context.newPage()
   const errors = []
   page.on('pageerror', (error) => errors.push(String(error)))

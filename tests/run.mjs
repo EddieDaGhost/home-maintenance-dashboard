@@ -15,6 +15,7 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url))
 
 const SUITES = [
   { name: 'logic', file: './logic.mjs', browser: false },
+  { name: 'welcome', file: './welcome.mjs', browser: true, virgin: true },
   { name: 'walkthrough', file: './walkthrough.mjs', browser: true },
   { name: 'themes', file: './themes.mjs', browser: true },
   { name: 'naming', file: './naming.mjs', browser: true, clipboard: true },
@@ -81,9 +82,10 @@ async function main() {
       if (!suite.browser) {
         await runSuite({ check })
       } else {
-        const options = suite.clipboard
-          ? { permissions: ['clipboard-read', 'clipboard-write'] }
-          : {}
+        const options = {
+          ...(suite.clipboard ? { permissions: ['clipboard-read', 'clipboard-write'] } : {}),
+          ...(suite.virgin ? { virgin: true } : {}),
+        }
         const { context, page, errors } = await newPhonePage(browser, options)
         try {
           await runSuite({ browser, context, page, check, errors, URL: BASE_URL, tmp })

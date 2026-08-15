@@ -50,9 +50,22 @@ export function normalizeCustom(data) {
   }
 }
 
+function isEmptyCustom(custom) {
+  return (
+    custom.areas.length === 0 &&
+    custom.hidden.length === 0 &&
+    Object.keys(custom.tasks).length === 0 &&
+    Object.keys(custom.appearance).length === 0
+  )
+}
+
 export function saveCustom(custom) {
   if (typeof window === 'undefined') return
   try {
+    if (isEmptyCustom(custom)) {
+      window.localStorage.removeItem(STORAGE_KEY)
+      return
+    }
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(custom))
   } catch {
     // Private browsing — custom rooms just won't persist.

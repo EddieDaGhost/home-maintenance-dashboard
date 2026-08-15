@@ -54,7 +54,7 @@ function RecentActivity({ area, log, title, nameFor, nameOf, isShared }) {
   )
 }
 
-export default function AreaView({ area, log, now, onLog, onUndo, onBack }) {
+export default function AreaView({ area, log, now, onLog, onUndo, onBack, readOnly = false }) {
   const { themeId, copy } = useTheme()
   const { nameFor, subtitleFor } = useNames()
   const { nameOf, isShared } = usePeople()
@@ -99,14 +99,16 @@ export default function AreaView({ area, log, now, onLog, onUndo, onBack }) {
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setEditing(true)}
-            aria-label="Edit room"
-            className="btn-secondary ml-auto flex h-10 w-10 shrink-0 items-center justify-center"
-          >
-            <Pencil className="h-4 w-4" />
-          </button>
+          {readOnly ? null : (
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              aria-label="Edit room"
+              className="btn-secondary ml-auto flex h-10 w-10 shrink-0 items-center justify-center"
+            >
+              <Pencil className="h-4 w-4" />
+            </button>
+          )}
         </div>
 
         <div className="mt-4">
@@ -128,7 +130,7 @@ export default function AreaView({ area, log, now, onLog, onUndo, onBack }) {
           <h2 className="section-title mb-2.5 px-1">{copy.todoTitle}</h2>
           <div className="space-y-2.5">
             {openTasks.map(({ task, state }) => (
-              <TaskCard key={task.id} task={task} state={state} onLog={onLog} onUndo={onUndo} />
+              <TaskCard key={task.id} task={task} state={state} onLog={onLog} onUndo={onUndo} readOnly={readOnly} />
             ))}
           </div>
         </section>
@@ -152,7 +154,7 @@ export default function AreaView({ area, log, now, onLog, onUndo, onBack }) {
           </h2>
           <div className="space-y-2.5">
             {restTasks.map(({ task, state }) => (
-              <TaskCard key={task.id} task={task} state={state} onLog={onLog} onUndo={onUndo} />
+              <TaskCard key={task.id} task={task} state={state} onLog={onLog} onUndo={onUndo} readOnly={readOnly} />
             ))}
           </div>
         </section>

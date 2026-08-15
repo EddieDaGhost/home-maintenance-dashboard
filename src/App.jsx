@@ -6,6 +6,8 @@ import { NamesProvider, useNames } from './state/NamesProvider.jsx'
 import { AreasProvider, useAreas } from './state/AreasProvider.jsx'
 import { PeopleProvider, usePeople } from './state/PeopleProvider.jsx'
 import { downloadBackup, parseBackup } from './lib/backup.js'
+import { claimDevice, loadDevice, looksSetUp } from './lib/device.js'
+import Welcome from './components/Welcome.jsx'
 import Dashboard from './components/Dashboard.jsx'
 import AreaView from './components/AreaView.jsx'
 import SpaceBackdrop from './components/SpaceBackdrop.jsx'
@@ -22,6 +24,8 @@ function AppShell() {
   const { areas, areasById, allTasks, custom, setCustom } = useAreas()
   const { activeId, household, setHousehold } = usePeople()
   const [log, setLog] = useState(loadLog)
+  const [device, setDevice] = useState(loadDevice)
+  const [previewing, setPreviewing] = useState(false)
   const [areaId, setAreaId] = useState(hashAreaId)
   const [now, setNow] = useState(() => new Date())
   const [toast, setToast] = useState(null)
@@ -56,6 +60,13 @@ function AppShell() {
   useEffect(() => {
     saveLog(log)
   }, [log])
+
+  // A device with data on it already belongs to someone — never greet them as a
+  // visitor just because the welcome screen didn't exist when they set up.
+  useEffect(() => {
+    if (device.claimed) return
+    if (looksSetUp({ log, names, custom, household })) setDevice(claimDevice())
+  }, [device.claimed, log, names, custom, household])
 
   useEffect(() => () => clearTimeout(toastTimer.current), [])
 
@@ -133,11 +144,49 @@ function AppShell() {
 
   const area = useMemo(() => (areaId ? (areasById[areaId] ?? null) : null), [areaId, areasById])
 
+  const handleClaim = useCallback(() => {
+    setDevice(claimDevice())
+    setPreviewing(false)
+  }, [])
+
+  // An unclaimed device gets an explanation, not somebody else's chore list.
+  if (!device.claimed && !previewing) {
+    return (
+      <>
+        {theme.flavor === 'space' ? <SpaceBackdrop /> : null}
+        <div className="relative z-10 mx-auto w-full max-w-md px-4">
+          <Welcome
+            tappedArea={area}
+            onClaim={handleClaim}
+            onPreview={() => setPreviewing(true)}
+          />
+        </div>
+      </>
+    )
+  }
+
+  const readOnly = previewing
+
   return (
     <>
       {theme.flavor === 'space' ? <SpaceBackdrop /> : null}
 
       <div className="relative z-10 mx-auto min-h-screen w-full max-w-md px-4">
+        {readOnly ? (
+          <div
+            className="sticky top-0 z-30 -mx-4 mb-3 flex items-center gap-3 px-4 py-2.5"
+            style={{ background: 'var(--surface-2)', borderBottom: '1px solid var(--line)' }}
+          >
+            <p className="min-w-0 flex-1 text-xs leading-snug" style={{ color: 'var(--ink-2)' }}>
+              <strong style={{ color: 'var(--ink)' }}>Just looking.</strong> Nothing here is saved,
+              and this isn&apos;t anyone&apos;s real history.
+            </p>
+            <button type="button" onClick={handleClaim} className="btn-primary h-9 shrink-0 px-3 text-xs">
+              Set up
+            </button>
+          </div>
+        ) : null}
+
         {area ? (
           <AreaView
             area={area}
@@ -146,6 +195,7 @@ function AppShell() {
             onLog={handleLog}
             onUndo={handleUndo}
             onBack={goHome}
+            readOnly={readOnly}
           />
         ) : (
           <Dashboard
@@ -157,6 +207,7 @@ function AppShell() {
             onExport={handleExport}
             onBackup={handleBackup}
             onRestore={handleRestore}
+            readOnly={readOnly}
           />
         )}
 

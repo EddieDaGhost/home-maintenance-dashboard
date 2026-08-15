@@ -35,6 +35,10 @@ export function loadNames() {
 export function saveNames(names) {
   if (typeof window === 'undefined') return
   try {
+    if (Object.keys(names).length === 0) {
+      window.localStorage.removeItem(STORAGE_KEY)
+      return
+    }
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(names))
   } catch {
     // Private browsing or a full disk — names just won't persist.
