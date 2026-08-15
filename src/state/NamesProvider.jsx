@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { touching } from '../lib/settingsClock.js'
 import {
   displayName,
   displaySubtitle,
@@ -43,8 +44,7 @@ export function NamesProvider({ children }) {
       nameFor: (entity) => displayName(entity, names),
       subtitleFor: (area) => displaySubtitle(area, names),
       isRenamed: (area) => hasCustomNames(area, names),
-      saveArea,
-      resetArea,
+      ...touching({ saveArea, resetArea }),
     }),
     [names, saveArea, resetArea],
   )

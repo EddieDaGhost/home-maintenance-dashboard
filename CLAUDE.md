@@ -7,10 +7,12 @@ what the app *is* — this file is about how to change it without breaking it.
 
 ## The one-paragraph version
 
-A static React + Vite app for tracking house chores. No backend, no accounts:
-everything lives in the browser's `localStorage`. NFC stickers around the house
-hold URLs like `https://homemaintenance.app/#kitchen`; tapping one opens that
-room's task list, you tap **Log**, done. Deployed on Vercel from `main`.
+A static React + Vite app for tracking house chores. Everything lives in the
+browser's `localStorage` and the app works fully offline; devices that opt in
+also sync through Supabase. There are still **no accounts** — a household is an
+unguessable id plus a key, shared by link. NFC stickers around the house hold
+URLs like `https://homemaintenance.app/#kitchen`; tapping one opens that room's
+task list, you tap **Log**, done. Deployed on Vercel from `main`.
 
 ---
 
@@ -31,8 +33,12 @@ so and ask rather than "improving" it:
    feature that adds a step to that path needs a very good reason.
 5. **Points are encouragement, never a target.** Hitting the weekly goal is not
    the point; the copy says so, and it should keep saying so.
-6. **The user's data is theirs.** It stays in their browser. Don't add
+6. **The user's data is theirs.** It stays in their browser unless they turn on
+   sharing, and even then it goes only to their own Supabase project. Don't add
    analytics, telemetry, or third-party scripts.
+7. **Local-first, always.** Tapping Log writes to this device and returns
+   immediately; syncing happens afterwards. Nothing in the logging path may
+   wait on the network — see the offline rule below.
 
 ---
 
@@ -116,7 +122,7 @@ and no horizontal overflow — the tests assert that last one.
 ## Testing
 
 ```bash
-npm run check              # everything: 257 checks
+npm run check              # everything: 281 checks
 npm run check -- logic     # just the fast pure-logic suite (no browser)
 ```
 
@@ -187,10 +193,24 @@ TEST_URL=https://homemaintenance.app npm run check
 
 ---
 
-## Known gap
+## Sharing between devices
 
-**No cross-device sync.** Logging on the phone doesn't reach the laptop. This is
-the one remaining architectural limitation and it needs a real backend (Supabase
-is the natural fit) — accounts, a schema, and a migration path for existing
-localStorage data. It's a decision to make deliberately, not a chore to knock
-out. Ask before starting it.
+Optional, off until someone turns it on. `supabase/schema.sql` is the whole
+backend: three tables with RLS on and **no policies at all**, plus two
+`security definer` functions that check a household key. The published anon key
+therefore grants nothing by itself.
+
+- **Completions are events**, keyed by `(household, task, instant)`. Merging is
+  a union, so two phones logging offline both arrive and pushing the same event
+  twice changes nothing. This is why sync needed no conflict resolution.
+- **Settings are last-write-wins** — one JSON document holding names, rooms and
+  the roster. The timestamp attached to a push comes from
+  `src/lib/settingsClock.js`, which the providers stamp on real user actions.
+  **Do not try to infer "the user edited something" by diffing state**: a
+  document that has round-tripped through Postgres comes back with different
+  key order, the diff sees a change that never happened, and a device that only
+  *read* the settings overwrites the other phone's edits. That bug was built,
+  found by the two-phone test, and replaced with the explicit clock.
+- The client talks to PostgREST over plain `fetch` — no Supabase SDK — so
+  `tests/fake-supabase.mjs` can stand in for the real thing and the request
+  shapes get exercised for real.
