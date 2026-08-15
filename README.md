@@ -10,6 +10,8 @@ wall, the right list opens on your phone, you tap **Log**, and you're done.
   A quiet day reads as 100%, not 0%.
 - **Nothing to sign into.** Your data lives in your browser, not on a server.
 - **One tap to log.** Tap the tag, tap Log. That's the whole ritual.
+- **Works with no signal.** The whole app is cached on your phone after the
+  first visit, so a tag still opens instantly at the coop or in the basement.
 
 ---
 
@@ -62,7 +64,7 @@ Other commands:
 ```bash
 npm run build     # build the production version into dist/
 npm run preview   # preview that production build locally
-npm run check     # run the tests (209 checks)
+npm run check     # run the tests (257 checks)
 ```
 
 `npm run check` drives a real browser through the app — logging, persistence,

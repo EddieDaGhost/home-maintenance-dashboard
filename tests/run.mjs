@@ -20,6 +20,7 @@ const SUITES = [
   { name: 'themes', file: './themes.mjs', browser: true },
   { name: 'naming', file: './naming.mjs', browser: true, clipboard: true },
   { name: 'rooms', file: './rooms.mjs', browser: true },
+  { name: 'offline', file: './offline.mjs', browser: true },
 ]
 
 function run(command, args) {

@@ -116,7 +116,7 @@ and no horizontal overflow — the tests assert that last one.
 ## Testing
 
 ```bash
-npm run check              # everything: 209 checks
+npm run check              # everything: 257 checks
 npm run check -- logic     # just the fast pure-logic suite (no browser)
 ```
 
@@ -139,7 +139,10 @@ TEST_URL=https://homemaintenance.app npm run check
 ## Deployment
 
 - **Vercel, auto-deploys from `main`.** Framework preset Vite, output `dist/`.
-  No environment variables — if something asks for one, that's a red flag.
+  No environment variables today — if something asks for one, be suspicious.
+- **The build emits a service worker** (`dist/sw.js`) that precaches the app.
+  A new deploy is picked up on the next load: `index.html` is fetched
+  network-first, hashed assets are cache-first, old caches are cleaned up.
 - **Domain:** `homemaintenance.app` (registered at Porkbun, DNS pointed at
   Vercel). `.app` is HSTS-preloaded, so **every NFC tag URL must be `https://`**.
 - **Don't write NFC tags against a `*.vercel.app` URL.** Those generated URLs sit
@@ -176,6 +179,11 @@ TEST_URL=https://homemaintenance.app npm run check
   the household screen and had to be rewritten.
 - **localStorage is per-device.** There is no sync. Backups are the only recovery
   path, which is why the backup feature exists — don't quietly remove it.
+- **The app must work with no signal.** Tags get tapped at the coop and in the
+  basement. A service worker (via `vite-plugin-pwa`) precaches the whole shell,
+  and `tests/offline.mjs` asserts a tag tap still opens its room with the
+  network off. Anything that makes first paint depend on the network — a font
+  from a CDN, a blocking API call — breaks the tap that matters most.
 
 ---
 
