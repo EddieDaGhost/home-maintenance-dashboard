@@ -209,6 +209,71 @@ export default async function run({ browser, page, check, errors, URL, tmp }) {
     check(`no horizontal overflow (${themeId})`, overflow <= 0, `${overflow}px`)
   }
 
+  // ===================== EDITING A TASK AFTER THE FACT =====================
+  // Points, schedule and repeat are overrides keyed by task id, so none of this
+  // can move an id or orphan a history.
+  await page.goto(`${URL}/#kitchen`, { waitUntil: 'networkidle' })
+  await page.getByRole('button', { name: 'Edit room' }).click()
+  await page.waitForTimeout(300)
+  const kitchen = page.getByRole('dialog', { name: 'Edit room' })
+
+  check('task settings start hidden', (await kitchen.getByLabel('Points for Dishes').count()) === 0)
+  await kitchen.getByRole('button', { name: 'Settings for Dishes' }).click()
+  await page.waitForTimeout(250)
+  check('the row opens', (await kitchen.getByLabel('Points for Dishes').count()) === 1)
+  check('showing what it ships with', (await kitchen.getByLabel('Points for Dishes').inputValue()) === '4')
+
+  await kitchen.getByLabel('Points for Dishes').fill('9')
+  await kitchen.getByLabel('Let Dishes be logged more than once').check()
+  await page.waitForTimeout(300)
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
+
+  check('the new value is used', (await page.getByText('Every day').count()) > 0)
+  // Dishes may already be logged by this point in the suite, in which case the
+  // repeat button is the one on offer — either way the next tap is worth 9.
+  const logDishes = async () => {
+    const fresh = page.getByRole('button', { name: 'Log Dishes as done' })
+    if (await fresh.count()) await fresh.click()
+    else await page.getByRole('button', { name: 'Log Dishes again' }).click()
+    await page.waitForTimeout(400)
+  }
+  await logDishes()
+  const toast = await page.getByRole('status').innerText()
+  check('a log is worth the edited points', /\+9 pts$/.test(toast), toast)
+
+  // ---- repeat: the button stays, and every tap counts again ----
+  check('a repeatable task can be logged again', (await page.getByRole('button', { name: 'Log Dishes again' }).count()) === 1)
+  const before = await page.evaluate(() => {
+    const raw = JSON.parse(localStorage.getItem('home-maintenance-dashboard/v1') ?? '{"completions":{}}')
+    return (raw.completions['kitchen-dishes'] ?? []).length
+  })
+  await page.getByRole('button', { name: 'Log Dishes again' }).click()
+  await page.waitForTimeout(400)
+  check('the repeat is visible on the card', (await page.getByText(/^×\d+$/).count()) === 1)
+  const after = await page.evaluate(() => {
+    const raw = JSON.parse(localStorage.getItem('home-maintenance-dashboard/v1'))
+    return raw.completions['kitchen-dishes'].length
+  })
+  check('and the extra tap was recorded', after === before + 1, `${before} -> ${after}`)
+
+  await page.reload({ waitUntil: 'networkidle' })
+  check('the edit survives a reload', (await page.getByRole('button', { name: 'Log Dishes again' }).count()) === 1)
+
+  // ---- back to the original ----
+  await page.goto(`${URL}/#kitchen`, { waitUntil: 'networkidle' })
+  await page.getByRole('button', { name: 'Edit room' }).click()
+  await page.waitForTimeout(300)
+  await kitchen.getByRole('button', { name: 'Settings for Dishes' }).click()
+  await page.waitForTimeout(250)
+  await kitchen.getByRole('button', { name: 'Reset Dishes to its original settings' }).click()
+  await page.waitForTimeout(300)
+  check('resetting restores the shipped points', (await kitchen.getByLabel('Points for Dishes').inputValue()) === '4')
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
+  check('and the repeat button goes with it', (await page.getByRole('button', { name: 'Log Dishes again' }).count()) === 0)
+  check('while the history it earned is kept', (await page.getByText(/Dishes/).count()) > 0)
+
   check('no console/page errors', errors.length === 0, errors.join(' | '))
 
 }

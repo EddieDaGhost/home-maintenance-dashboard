@@ -68,7 +68,7 @@ Other commands:
 ```bash
 npm run build     # build the production version into dist/
 npm run preview   # preview that production build locally
-npm run check     # run the tests (448 checks)
+npm run check     # run the tests (513 checks)
 ```
 
 `npm run check` drives a real browser through the app — logging, persistence,
@@ -92,6 +92,11 @@ the bottom of the room list. From there you can:
 - **Rename** the room, its subtitle, and every task in it
 - **Change its icon and color** from a picker
 - **Add a task**, with any of the schedules below and its own point value
+- **Edit any task** — tap the ⌄ next to it to change what it's worth, how often
+  it's due, and whether it can be logged more than once. Built-in chores and
+  ones you invented are edited the same way, and *Back to the original* undoes
+  it. Your history is filed under the task, not its settings, so none of this
+  costs you a streak.
 - **Remove a task**, or **remove the room itself**
 - **Reset this room** to undo all your renaming
 
@@ -259,6 +264,31 @@ The heatmap uses one color in four steps — darker means a busier day in
 Homestead, brighter means a busier day in Starship — with a neutral square for
 "nothing logged". Both ramps were checked for monotone lightness, visible gaps
 between steps, and contrast against their own background.
+
+---
+
+## Chores you do more than once
+
+Some things get done three times a day. Open the room, tap ⌄ next to the task
+and turn on **Can be logged more than once**. The Log button stops disappearing
+after the first tap, the card shows a ×2, ×3, and every tap is worth its full
+points and credits again.
+
+---
+
+## When the list has got away from you
+
+**Setup → Start fresh.** Draws a line under the backlog: everything stays on the
+list, it just stops being described as late.
+
+It is the honest version of a reset. It marks nothing as done, so it can't hand
+you points or credits you didn't earn; it deletes nothing, so your history,
+streak and balance come out exactly as they went in; and the moment you log one
+of those chores, that one goes straight back to its normal schedule. You can
+undo it whenever you want the full picture back.
+
+Overdue chores are amber rather than red, for the same reason. Red is reserved
+for things that actually take something away from you.
 
 ---
 

@@ -25,11 +25,15 @@ export function AwayProvider({ children }) {
       isAway: (now = new Date()) => awayStore.isAway(away, now),
       untilLabel: (now = new Date()) => awayStore.awayUntilLabel(away, now),
       upcoming: (now = new Date()) => awayStore.upcomingWindows(away, now),
+      hasFreshStart: () => awayStore.hasFreshStart(away),
+      freshStartLabel: () => awayStore.freshStartLabel(away),
 
       ...touching({
         addWindow: (from, to) => setAway((a) => awayStore.addWindow(a, from, to)),
         endNow: (now = new Date()) => setAway((a) => awayStore.endWindowNow(a, now)),
         removeWindow: (from) => setAway((a) => awayStore.removeWindow(a, from)),
+        startFresh: (now = new Date()) => setAway((a) => awayStore.startFresh(a, now)),
+        clearFreshStart: () => setAway((a) => awayStore.clearFreshStart(a)),
       }),
     }),
     [away],

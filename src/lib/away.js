@@ -1,9 +1,13 @@
-// Being away.
+// The dates that soften the schedule.
 //
-// The app is otherwise honest about time passing, which is right — except when
-// nobody is home. A long weekend shouldn't cost you a streak or hand you a wall
-// of overdue on the doormat, so a window of days can be marked away and the
-// scheduling logic reads it.
+// The app is otherwise honest about time passing, which is right — except in
+// two cases. A long weekend when nobody was home shouldn't cost you a streak or
+// hand you a wall of overdue on the doormat; and a backlog from before you
+// started caring shouldn't shout at you forever.
+//
+// Both live here, and both are read by the one filter at the end of
+// getTaskState(). A second module would mean a second opinion about what
+// "behind" means, which is exactly what this codebase doesn't have.
 //
 // Away is a property of the household, not of a person: it means the house is
 // empty and isn't making mess. If one person travels while the other stays, the
@@ -17,7 +21,7 @@ import { MS_PER_DAY, addDays, startOfDay } from './date.js'
 
 const STORAGE_KEY = 'home-maintenance-dashboard/away/v1'
 
-export const emptyAway = { windows: [] }
+export const emptyAway = { windows: [], freshStartAt: 0 }
 
 /** Enough for years of travel, few enough that the settings doc stays small. */
 const MAX_WINDOWS = 24
@@ -47,13 +51,16 @@ export function normalizeAway(data) {
     .map((w) => ({ from: dayOf(Math.min(w.from, w.to)), to: dayOf(Math.max(w.from, w.to)) }))
     .sort((a, b) => b.from - a.from)
     .slice(0, MAX_WINDOWS)
-  return { windows }
+  const freshStartAt =
+    Number.isFinite(data.freshStartAt) && data.freshStartAt > 0 ? dayOf(data.freshStartAt) : 0
+
+  return { windows, freshStartAt }
 }
 
 export function saveAway(away) {
   if (typeof window === 'undefined') return
   try {
-    if (!away?.windows?.length) {
+    if (!away?.windows?.length && !away?.freshStartAt) {
       window.localStorage.removeItem(STORAGE_KEY)
       return
     }
@@ -95,13 +102,43 @@ export function awayUntilLabel(away, now = new Date()) {
   return `Away until ${end.toLocaleDateString([], { month: 'short', day: 'numeric' })}`
 }
 
+/**
+ * Anything not done since a fresh start is worth doing, but it isn't a failure —
+ * you drew a line and started from there. Deliberately reads `lastDone` rather
+ * than rewriting the schedule maths: once the task is actually logged, its own
+ * clock takes over again and the app is honest without anybody clearing a flag.
+ */
+export function pardoned(away, lastDone) {
+  const at = away?.freshStartAt
+  if (!at) return false
+  return !Number.isFinite(lastDone) || lastDone < at
+}
+
+export function hasFreshStart(away) {
+  return Boolean(away?.freshStartAt)
+}
+
+export function freshStartLabel(away) {
+  if (!away?.freshStartAt) return null
+  return new Date(away.freshStartAt).toLocaleDateString([], { month: 'short', day: 'numeric' })
+}
+
 // --- writing ----------------------------------------------------------------
+
+/** Draw a line under the backlog. Logs nothing, deletes nothing. */
+export function startFresh(away, now = new Date()) {
+  return normalizeAway({ ...(away ?? emptyAway), freshStartAt: dayOf(now) })
+}
+
+export function clearFreshStart(away) {
+  return normalizeAway({ ...(away ?? emptyAway), freshStartAt: 0 })
+}
 
 export function addWindow(away, from, to) {
   const start = dayOf(Math.min(from, to))
   const end = dayOf(Math.max(from, to))
   const windows = [{ from: start, to: end }, ...(away?.windows ?? []).filter((w) => w.from !== start)]
-  return normalizeAway({ windows })
+  return normalizeAway({ ...away, windows })
 }
 
 /** Home early. Ends today's window today rather than deleting it — you really
@@ -113,6 +150,7 @@ export function endWindowNow(away, now = new Date()) {
   // Ending on the day it started means the trip never happened; drop it.
   if (current.from >= today) return removeWindow(away, current.from)
   return normalizeAway({
+    ...away,
     windows: (away?.windows ?? []).map((w) =>
       w.from === current.from ? { ...w, to: addDays(new Date(today), -1).getTime() } : w,
     ),
@@ -120,7 +158,7 @@ export function endWindowNow(away, now = new Date()) {
 }
 
 export function removeWindow(away, from) {
-  return normalizeAway({ windows: (away?.windows ?? []).filter((w) => w.from !== from) })
+  return normalizeAway({ ...away, windows: (away?.windows ?? []).filter((w) => w.from !== from) })
 }
 
 /** Trips that haven't happened yet, newest first — shown under the date form. */

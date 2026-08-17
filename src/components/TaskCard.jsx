@@ -1,4 +1,4 @@
-import { AlertCircle, Check, Circle, Clock, Moon, Undo2 } from 'lucide-react'
+import { AlertCircle, Check, Circle, Clock, Moon, RotateCw, Undo2 } from 'lucide-react'
 import { STATUS, scheduleLabel } from '../lib/schedule.js'
 import { friendlyDate } from '../lib/date.js'
 import { useTheme } from '../theme/ThemeProvider.jsx'
@@ -17,10 +17,13 @@ const STATUS_STYLES = {
     icon: { background: 'var(--surface-2)', color: 'var(--ink-3)' },
     card: {},
   },
+  // Warm amber, not alarm red: the app has no failure state, so nothing about a
+  // chore should look like a fire alarm. --alert-* stays for the things that
+  // actually take something away from you.
   [STATUS.OVERDUE]: {
     Icon: AlertCircle,
-    icon: { background: 'var(--alert-soft)', color: 'var(--alert-ink)' },
-    card: { '--surface': 'var(--alert-soft)', '--line': 'var(--alert-line)' },
+    icon: { background: 'var(--attention-soft)', color: 'var(--attention-ink)' },
+    card: { '--surface': 'var(--attention-soft)', '--line': 'var(--attention-line)' },
   },
   [STATUS.RESTING]: {
     Icon: Moon,
@@ -57,6 +60,9 @@ export default function TaskCard({ task, state, areaLabel, onLog, onUndo, readOn
   const style = STATUS_STYLES[state.status] ?? STATUS_STYLES[STATUS.DUE]
   const { Icon } = style
   const isDone = state.status === STATUS.DONE
+  // A repeatable task still reads DONE — it shouldn't keep nagging — but the
+  // Log button stays available, and every tap counts again.
+  const canRepeat = Boolean(task.repeatable)
 
   return (
     <div className="panel flex items-center gap-3 p-3.5" style={style.card}>
@@ -74,13 +80,18 @@ export default function TaskCard({ task, state, areaLabel, onLog, onUndo, readOn
         >
           {name}
           <CountDots done={state.done} target={state.target} />
+          {canRepeat && state.done > 1 ? (
+            <span className="numeral ml-2 align-middle text-xs font-semibold" style={{ color: 'var(--good-ink)' }}>
+              ×{state.done}
+            </span>
+          ) : null}
         </p>
         {/* Status first — it is the part worth reading at a glance. */}
         <p className="mt-0.5 text-xs leading-snug" style={{ color: 'var(--ink-2)' }}>
           {areaLabel ? <span className="font-medium">{areaLabel} · </span> : null}
           <span
             className={state.status === STATUS.OVERDUE ? 'font-semibold' : undefined}
-            style={state.status === STATUS.OVERDUE ? { color: 'var(--alert-ink)' } : undefined}
+            style={state.status === STATUS.OVERDUE ? { color: 'var(--attention-ink)' } : undefined}
           >
             {isDone && state.lastDone ? friendlyDate(state.lastDone) : state.detail}
           </span>
@@ -94,16 +105,29 @@ export default function TaskCard({ task, state, areaLabel, onLog, onUndo, readOn
       </div>
 
       {readOnly ? null : isDone ? (
-        <button
-          type="button"
-          onClick={() => onUndo(task.id)}
-          className="flex h-10 shrink-0 items-center gap-1 rounded-xl px-3 text-xs font-semibold transition active:scale-95"
-          style={{ color: 'var(--ink-2)' }}
-          aria-label={`Undo ${name}`}
-        >
-          <Undo2 className="h-4 w-4" />
-          Undo
-        </button>
+        <div className="flex shrink-0 items-center gap-1">
+          <button
+            type="button"
+            onClick={() => onUndo(task.id)}
+            className="flex h-10 shrink-0 items-center gap-1 rounded-xl px-3 text-xs font-semibold transition active:scale-95"
+            style={{ color: 'var(--ink-2)' }}
+            aria-label={`Undo ${name}`}
+          >
+            <Undo2 className="h-4 w-4" />
+            Undo
+          </button>
+          {canRepeat ? (
+            <button
+              type="button"
+              onClick={() => onLog(task.id)}
+              className="btn-primary flex h-10 shrink-0 items-center gap-1 px-3 text-xs"
+              aria-label={`Log ${name} again`}
+            >
+              <RotateCw className="h-4 w-4" />
+              Again
+            </button>
+          ) : null}
+        </div>
       ) : (
         <button
           type="button"

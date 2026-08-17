@@ -170,6 +170,36 @@ export default async function run({ browser, check, URL }) {
     await b.page.waitForTimeout(2500)
     check('and the other phone is away too', (await b.page.getByText(/streak carries over/).count()) === 1)
 
+    // ---- an edited task reaches the other phone ----
+    await a.page.keyboard.press('Escape')
+    await a.page.goto(`${URL}/#kitchen`, { waitUntil: 'networkidle' })
+    await a.page.getByRole('button', { name: 'Edit room' }).click()
+    await a.page.waitForTimeout(300)
+    const room = a.page.getByRole('dialog', { name: 'Edit room' })
+    await room.getByRole('button', { name: 'Settings for Dishes' }).click()
+    await a.page.waitForTimeout(250)
+    await room.getByLabel('Points for Dishes').fill('11')
+    await a.page.keyboard.press('Escape')
+    await a.page.waitForTimeout(3200)
+    check(
+      'an edited task reached the server',
+      [...server.state.values()][0]?.doc?.custom?.taskSettings?.['kitchen-dishes']?.points === 11,
+      JSON.stringify([...server.state.values()][0]?.doc?.custom?.taskSettings ?? null),
+    )
+
+    await b.page.goto(`${URL}/#kitchen`, { waitUntil: 'networkidle' })
+    await b.page.waitForTimeout(2500)
+    await b.page.getByRole('button', { name: 'Edit room' }).click()
+    await b.page.waitForTimeout(300)
+    await b.page.getByRole('dialog', { name: 'Edit room' }).getByRole('button', { name: 'Settings for Dishes' }).click()
+    await b.page.waitForTimeout(250)
+    check(
+      'and the other phone is worth the same',
+      (await b.page.getByRole('dialog', { name: 'Edit room' }).getByLabel('Points for Dishes').inputValue()) === '11',
+    )
+    await b.page.keyboard.press('Escape')
+    await b.page.waitForTimeout(300)
+
     // ---- a wrong key is refused ----
     // Probed from the test process, not the page: a deliberate 400 inside the
     // browser would show up as a console error and fail the check below.
