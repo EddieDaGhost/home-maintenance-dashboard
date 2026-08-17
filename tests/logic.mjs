@@ -169,6 +169,20 @@ export default async function run({ check }) {
     CATALOG.every((i) => ['home', 'starship', 'cats'].every((t) => i.labels?.[t]?.name)),
     true,
   )
+  // Every `art` key has to be handled by all three scene components. There is no
+  // way to import a .jsx scene from here, so this list is the guard: adding an
+  // item with new art fails this check, which is the reminder to go and draw it
+  // in Windowsill, Ship and Cats rather than shipping an item that draws nothing.
+  const DRAWN = [
+    'succulent', 'fern', 'monstera', 'orchid',
+    'terracotta', 'sage', 'cobalt', 'blush', 'copper',
+    'herbs', 'curtain',
+    'rain', 'snow', 'glow',
+    'suncatcher', 'bunting', 'chimes', 'lantern',
+  ]
+  is('every item has art the scenes can draw', CATALOG.every((i) => DRAWN.includes(i.art)), true)
+  is('and nothing in that list is unused', DRAWN.every((art) => CATALOG.some((i) => i.art === art)), true)
+
   is('itemById finds one', itemById('vessel-fern')?.slot, 'vessel')
   is('every slot has something in it', ALL_SLOTS.every((slot) => CATALOG_BY_SLOT[slot].length > 1), true)
   is(

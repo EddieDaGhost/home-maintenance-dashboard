@@ -1,5 +1,6 @@
 import { SLOTS } from '../../config/catalog.js'
 import { MOOD } from '../../lib/credits.js'
+import { SceneDefs, shade, tintUp } from './parts.jsx'
 
 // The Starship scene: your ship at its mooring, and whether the lights are on.
 //
@@ -27,16 +28,22 @@ function Engines({ x, spread }) {
 }
 
 /** One silhouette per hull: a single pointed shape, so nothing reads as a sofa. */
-function Hull({ d, cockpit, hull, panels = [] }) {
+function Hull({ d, cockpit, hull, panels = [], lights = [] }) {
   return (
     <g>
-      <path d={d} fill={hull} />
+      <path d={d} fill={hull} stroke={shade(hull, 0.4)} strokeWidth="1.1" strokeLinejoin="round" />
       {/* A lit top edge and a shaded underside give the flat shape some depth. */}
       <path d={d} fill="url(#ship-sheen)" />
       {panels.map(([x, y, width, height]) => (
         <rect key={`${x}-${y}`} x={x} y={y} width={width} height={height} rx="3" fill="#0b1626" fillOpacity="0.22" />
       ))}
-      <ellipse cx={cockpit[0]} cy={cockpit[1]} rx="9" ry="5.5" fill="#bfe7ff" opacity="0.95" />
+      {/* Running lights along the spine — the expensive hulls get more of them. */}
+      {lights.map(([x, y]) => (
+        <circle key={`${x}-${y}`} cx={x} cy={y} r="1.5" fill="#bfe7ff" opacity="0.9" />
+      ))}
+      <ellipse cx={cockpit[0]} cy={cockpit[1]} rx="9.5" ry="6" fill={shade(hull, 0.55)} />
+      <ellipse cx={cockpit[0]} cy={cockpit[1] - 0.5} rx="8" ry="4.6" fill="#bfe7ff" />
+      <ellipse cx={cockpit[0] - 2} cy={cockpit[1] - 1.6} rx="4" ry="1.8" fill={tintUp('#bfe7ff', 0.7)} opacity="0.85" />
     </g>
   )
 }
@@ -58,7 +65,13 @@ function Scout({ hull }) {
       {/* Swept fins, drawn behind the hull so they read as attached. */}
       <path d="M-46 -12 L-34 -34 L-6 -22 Z" fill={hull} opacity="0.7" />
       <path d="M-46 12 L-34 34 L-6 22 Z" fill={hull} opacity="0.7" />
-      <Hull d="M-50 -14 L14 -20 L60 0 L14 20 L-50 14 Z" cockpit={[30, 0]} hull={hull} />
+      <Hull
+        d="M-50 -14 L14 -20 L60 0 L14 20 L-50 14 Z"
+        cockpit={[30, 0]}
+        hull={hull}
+        panels={[[-38, -9, 30, 18]]}
+        lights={[[-4, -13], [10, -15]]}
+      />
     </g>
   )
 }
@@ -76,6 +89,7 @@ function Freighter({ hull }) {
           [-28, -19, 24, 38],
           [2, -19, 22, 38],
         ]}
+        lights={[[-46, -24], [-16, -26], [14, -26], [-46, 24], [-16, 26], [14, 26]]}
       />
     </g>
   )
@@ -84,14 +98,17 @@ function Freighter({ hull }) {
 function Cruiser({ hull }) {
   return (
     <g transform="translate(160 100)">
-      <Engines x={-74} spread={10} />
+      {/* A wider burn than anything else in the slot — at 320 credits the
+          difference should be visible without reading the label. */}
+      <Engines x={-74} spread={15} />
       <path d="M-64 -16 L-46 -42 L-4 -24 Z" fill={hull} opacity="0.65" />
       <path d="M-64 16 L-46 42 L-4 24 Z" fill={hull} opacity="0.65" />
       <Hull
         d="M-74 -12 L-26 -22 L40 -14 L84 0 L40 14 L-26 22 L-74 12 Z"
         cockpit={[52, 0]}
         hull={hull}
-        panels={[[-20, -10, 40, 20]]}
+        panels={[[-20, -10, 40, 20], [-52, -7, 24, 14]]}
+        lights={[[-40, -14], [-14, -18], [12, -14], [-40, 14], [-14, 18], [12, 14], [34, -9], [34, 9]]}
       />
     </g>
   )
@@ -278,6 +295,7 @@ export default function Ship({ equipped = {}, companions = [], mood = MOOD.LIVEL
       aria-label={dim ? 'A ship at its mooring, running dark' : 'A ship at its mooring, lit up'}
     >
       <defs>
+        <SceneDefs />
         <radialGradient id="ship-void" cx="50%" cy="30%">
           <stop offset="0%" stopColor={dim ? '#0a1120' : '#12233f'} />
           <stop offset="100%" stopColor="#04070f" />

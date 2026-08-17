@@ -111,7 +111,7 @@ src/
 ├── state/           React context providers (Names, Areas, People, Estate, Away)
 ├── theme/           ThemeProvider
 ├── components/      All UI
-│   └── scenes/      The credits scene, one component per look
+│   └── scenes/      The credits scene, one per look, sharing parts.jsx
 └── index.css        Every color in the app, as CSS variables per theme
 ```
 
@@ -141,10 +141,35 @@ also names its credits scene through `progression.sceneKind`; reusing an existin
 one costs nothing, and a new one is a component in `src/components/scenes/` plus
 a `labels` entry per item in `catalog.js`.
 
-**Scenes are inline SVG, never image files.** `SpaceBackdrop.jsx` is the
-precedent: the service worker precaches the shell, and anything that waits on a
-download breaks the tap that matters most. Flat colour at low opacity over a dark
-background goes muddy — use a gradient that actually fades to zero for any glow.
+**Scenes are inline SVG, never image files.** Two reasons, and the second is the
+load-bearing one:
+
+1. The service worker precaches the shell, and anything that waits on a download
+   breaks the tap that matters most. `SpaceBackdrop.jsx` is the precedent.
+2. **The art is parameterized.** The finish slot recolours the vessel at
+   runtime, mood dims the whole scene, and companions rescale the same shape.
+   Pre-rendered images would have to bake every combination — 4 vessels × 5
+   finishes × 2 moods × 3 themes is 120 files for the main character alone. The
+   three scene files are ~40KB of code and cover all of it. Whenever "should
+   this be an image?" comes up again, that's the answer.
+
+**Draw with `scenes/parts.jsx`, not from scratch.** `Solid`, `Blob` and `Ground`
+give a shape its outline, its top light and its contact shadow. Three rules
+learned the hard way:
+
+- **Outline with `shade(fill)`, never black.** A black outline turns everything
+  into clip-art, and it can't follow a colour the user picked from the shop.
+- **Everything resting on a surface casts a `Ground` shadow.** Nothing did in
+  the first pass, and that alone made the whole scene look pasted on.
+- **Never hardcode a colour in a vessel.** It has to come from the equipped
+  finish or the shop's recolouring silently stops working.
+
+**Detail scales with price.** The 50-credit succulent is a plain rosette; the
+320-credit orchid has five blooms, a bud, aerial roots and strap leaves. If the
+top of a slot doesn't look more expensive than the bottom, the slot is broken.
+
+Flat colour at low opacity over a dark background goes muddy — use a gradient
+that actually fades to zero for any glow.
 
 **User-facing strings live in the theme's `copy` object**, so a theme can rename
 "areas" to "decks". Don't hardcode a label a theme might want to change.
@@ -163,7 +188,7 @@ and no horizontal overflow — the tests assert that last one.
 ## Testing
 
 ```bash
-npm run check              # everything: 513 checks
+npm run check              # everything: 525 checks
 npm run check -- logic     # just the fast pure-logic suite (no browser)
 ```
 
