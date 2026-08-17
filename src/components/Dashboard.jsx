@@ -14,6 +14,7 @@ import {
   PlaneTakeoff,
   Plus,
   RotateCcw,
+  Sunrise,
   Trophy,
   Upload,
   Users,
@@ -44,6 +45,7 @@ import EditAreaSheet from './EditAreaSheet.jsx'
 import HistorySheet from './HistorySheet.jsx'
 import HouseholdSheet, { PersonAvatar } from './HouseholdSheet.jsx'
 import AwaySheet from './AwaySheet.jsx'
+import FreshStartSheet from './FreshStartSheet.jsx'
 
 function greeting(now) {
   const hour = now.getHours()
@@ -156,7 +158,7 @@ export default function Dashboard({
   const { areas, allTasks, hiddenAreas, restoreArea } = useAreas()
   const { activePerson, activeId, people, isShared } = usePeople()
   const { entry } = useEstate()
-  const { away, isAway, untilLabel, endNow } = useAway()
+  const { away, isAway, untilLabel, endNow, hasFreshStart, freshStartLabel } = useAway()
 
   const [pickerOpen, setPickerOpen] = useState(false)
   const [tagsOpen, setTagsOpen] = useState(false)
@@ -165,6 +167,7 @@ export default function Dashboard({
   const [householdOpen, setHouseholdOpen] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
   const [awayOpen, setAwayOpen] = useState(false)
+  const [freshOpen, setFreshOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
   const fileInput = useRef(null)
 
@@ -422,6 +425,16 @@ export default function Dashboard({
             onClick={() => setShareOpen(true)}
           />
           <SettingsRow
+            icon={Sunrise}
+            label="Start fresh"
+            detail={
+              hasFreshStart()
+                ? `Clean slate since ${freshStartLabel()}`
+                : 'Draw a line under a backlog you\'d rather not look at'
+            }
+            onClick={() => setFreshOpen(true)}
+          />
+          <SettingsRow
             icon={PlaneTakeoff}
             label="Away"
             detail={travelling ? untilLabel(now) : 'Pause everything while you travel'}
@@ -489,6 +502,7 @@ export default function Dashboard({
       <ThemePicker open={pickerOpen} onClose={() => setPickerOpen(false)} />
       <AboutSheet open={aboutOpen} onClose={() => setAboutOpen(false)} />
       <AwaySheet open={awayOpen} onClose={() => setAwayOpen(false)} now={now} />
+      <FreshStartSheet open={freshOpen} onClose={() => setFreshOpen(false)} now={now} />
       {sync ? <ShareSheet open={shareOpen} onClose={() => setShareOpen(false)} sync={sync} /> : null}
       <TagSetup open={tagsOpen} onClose={() => setTagsOpen(false)} />
       <HistorySheet open={historyOpen} onClose={() => setHistoryOpen(false)} log={log} now={now} />

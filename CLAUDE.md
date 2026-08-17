@@ -32,6 +32,13 @@ so and ask rather than "improving" it:
    plants and "out of commission" were considered and deliberately rejected:
    one log flips the scene straight back, and nothing you own is ever taken
    away or degraded.
+   **Overdue is amber, never red.** `--alert-*` is for things that take
+   something away from you — stopping sharing, removing a room. A chore that
+   has been sitting a while gets `--attention-*`. The app has no failure state,
+   so nothing in it should be the colour of a fire alarm.
+   **Start fresh** exists for when the list has built up anyway: it draws a line
+   and stops old chores being called late. It logs nothing, deletes nothing, and
+   moves neither the streak nor the credit balance — see below.
 3. **Streaks are generous.** The streak anchors to today *or yesterday*, so
    logging at 12:30am doesn't break it. Nothing can make a streak count down.
    Days the household is **away** are stepped over: they don't add to the streak
@@ -69,6 +76,12 @@ user-editable, follow that pattern rather than mutating the underlying id.
 When a room or task is removed, its history is deliberately *kept* — see
 `src/lib/custom.js`, which hides built-in rooms rather than deleting them.
 
+**Editing a task follows the same rule.** Points, schedule and whether it can be
+logged more than once live in `custom.taskSettings`, keyed by task id and merged
+on top in `composeAreas()` (`src/lib/compose.js`). A built-in task and one you
+invented are edited through the same map, so they behave identically — and
+nothing about editing can move an id.
+
 ---
 
 ## Layout
@@ -87,7 +100,8 @@ src/
 │   ├── stats.js     Streaks, points, progress, heatmap data
 │   ├── storage.js   localStorage read/write + entry normalisation
 │   ├── names.js     Display-name overrides
-│   ├── custom.js    User-added rooms/tasks, hidden built-ins
+│   ├── custom.js    User-added rooms/tasks, hidden built-ins, task overrides
+│   ├── compose.js   Built-ins + your rooms + your overrides, merged into one list
 │   ├── people.js    Household, who's logging
 │   ├── away.js      Trips: the days nothing is due and the streak carries over
 │   ├── credits.js   Credits earned/spent, and how lively the scene is
@@ -108,7 +122,8 @@ src/
 - Changing how it looks → `src/index.css` (tokens) or the component
 - Changing wording → `src/config/themes.js` (`copy` object, per theme)
 - Changing what credits buy → `src/config/catalog.js`
-- Changing what "away" suppresses → `applyAway()` in `src/lib/schedule.js`
+- Changing what "away" suppresses → `applyGrace()` in `src/lib/schedule.js`
+- Changing what a task is worth → it's an override; see `taskSettings` below
 
 ---
 
@@ -148,7 +163,7 @@ and no horizontal overflow — the tests assert that last one.
 ## Testing
 
 ```bash
-npm run check              # everything: 448 checks
+npm run check              # everything: 513 checks
 npm run check -- logic     # just the fast pure-logic suite (no browser)
 ```
 
@@ -232,9 +247,22 @@ on the estate screen.
 
 ---
 
-## Going away
+## Going away, and starting fresh
 
-A window of days when the house is empty. `src/lib/away.js` holds a **list** of
+`src/lib/away.js` holds the dates that soften the schedule, and `applyGrace()`
+at the end of `getTaskState()` is the only thing that reads them. There are two,
+and they must stay in one place: a second module would be a second opinion about
+what "behind" means.
+
+**Start fresh** (`freshStartAt`) draws a line under a backlog. Anything not
+logged since reads as *due* rather than *overdue*, and once it is logged its own
+clock takes over again with no flag to clear. It is deliberately derived from
+`lastDone` rather than rewriting any schedule maths, and it **logs nothing and
+deletes nothing** — the streak, the history and the credit balance must come out
+the other side identical. `tests/fresh-start.mjs` asserts exactly that, byte for
+byte.
+
+**Away** is a window of days when the house is empty. `src/lib/away.js` holds a **list** of
 them — not one slot, because the streak has to span trips taken months ago and a
 single slot forgets the older one.
 

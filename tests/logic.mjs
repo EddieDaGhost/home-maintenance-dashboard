@@ -37,13 +37,23 @@ import { buildBackup, parseBackup } from '../src/lib/backup.js'
 import {
   addWindow,
   awayUntilLabel,
+  clearFreshStart,
   endWindowNow,
+  hasFreshStart,
   inGrace,
   isAway,
   normalizeAway,
   removeWindow,
+  startFresh,
   upcomingWindows,
 } from '../src/lib/away.js'
+import {
+  emptyCustom,
+  normalizeCustom,
+  resetTaskSettings,
+  updateTaskSettings,
+} from '../src/lib/custom.js'
+import { composeAreas } from '../src/lib/compose.js'
 import { THEME_LIST } from '../src/config/themes.js'
 
 const ALL_TASKS = AREAS.flatMap((area) => area.tasks.map((task) => ({ ...task, area })))
@@ -356,4 +366,86 @@ export default async function run({ check }) {
 
   const withTrip = parseBackup(JSON.stringify(buildBackup(shared, {}, null, null, estate, justBack)))
   is('a backup carries the trips', withTrip.away.windows.length, 1)
+
+  // =========================================================================
+  // Editing a task after the fact
+  // =========================================================================
+
+  const taskIn = (custom, taskId) =>
+    composeAreas(custom)
+      .flatMap((a) => a.tasks)
+      .find((t) => t.id === taskId)
+
+  is('a task starts with what it shipped with', taskIn(emptyCustom, 'kitchen-dishes').points, 4)
+
+  let edited = updateTaskSettings(emptyCustom, 'kitchen-dishes', { points: 9 })
+  is('points can be changed', taskIn(edited, 'kitchen-dishes').points, 9)
+  is('and the id never moves', taskIn(edited, 'kitchen-dishes').id, 'kitchen-dishes')
+  is('so the history still counts', weeklyPoints({ completions: { 'kitchen-dishes': [MON.getTime()] } }, MON, [taskIn(edited, 'kitchen-dishes')]), 9)
+
+  edited = updateTaskSettings(edited, 'kitchen-dishes', { schedule: { kind: 'weekly' } })
+  is('the schedule can be changed', taskIn(edited, 'kitchen-dishes').schedule.kind, 'weekly')
+  is('and the new schedule is what gets used', getTaskState(taskIn(edited, 'kitchen-dishes'), [], TUE).status, STATUS.DUE)
+
+  edited = updateTaskSettings(edited, 'kitchen-dishes', { repeatable: true })
+  is('repeat can be turned on', taskIn(edited, 'kitchen-dishes').repeatable, true)
+  is('but it does not change the status machine', getTaskState(taskIn(edited, 'kitchen-dishes'), [MON.getTime()], MON).status, STATUS.DONE)
+
+  // Logging the same thing twice in a day is already worth twice as much —
+  // the only thing repeat changes is whether the button is still there.
+  const twice = { completions: { 'kitchen-dishes': [MON.getTime(), MON.getTime() - 3600000] } }
+  is('two logs in a day pay twice', weeklyPoints(twice, MON, ALL_TASKS), 8)
+  is('and are worth twice the credits', creditsEarned(twice, ALL_TASKS, 'me', [{ id: 'me' }]), 8)
+
+  is('resetting puts the original back', taskIn(resetTaskSettings(edited, 'kitchen-dishes'), 'kitchen-dishes').points, 4)
+  is('and leaves nothing behind', Object.keys(resetTaskSettings(edited, 'kitchen-dishes').taskSettings).length, 0)
+
+  // A task you invented is edited through exactly the same map.
+  const mine = updateTaskSettings(
+    addTaskFixture(),
+    'kitchen-my-thing',
+    { points: 12 },
+  )
+  is('a custom task edits the same way', taskIn(mine, 'kitchen-my-thing').points, 12)
+
+  is('rubbish settings normalise away', Object.keys(normalizeCustom({ taskSettings: { x: { points: 'lots' } } }).taskSettings).length, 0)
+  is('and so do out-of-range points', Object.keys(normalizeCustom({ taskSettings: { x: { points: 500 } } }).taskSettings).length, 0)
+  is('a real setting survives the round trip', normalizeCustom(edited).taskSettings['kitchen-dishes'].points, 9)
+
+  // =========================================================================
+  // Starting fresh
+  // =========================================================================
+
+  const backlog = [daysAgo(40)]
+  const fresh = startFresh({}, MON)
+
+  is('nothing is fresh by default', hasFreshStart({}), false)
+  is('starting fresh records the day', hasFreshStart(fresh), true)
+  is('a long-overdue chore is overdue without it', st('litter-full-change', backlog, MON).status, STATUS.OVERDUE)
+  is('and merely due with it', getTaskState(task('litter-full-change'), backlog, MON, fresh).status, STATUS.DUE)
+  is('worded without blame', getTaskState(task('litter-full-change'), backlog, MON, fresh).detail, 'Worth doing when you can')
+  is('a chore never logged at all is covered too', getTaskState(task('bath1-mirror'), [], SUN, fresh).status, STATUS.DUE)
+  is('something done since the line is untouched', getTaskState(task('kitchen-dishes'), [MON.getTime()], MON, fresh).status, STATUS.DONE)
+  is('the scene goes lively again', sceneMood({ completions: { 'chickens-checkin': backlog } }, MON, ALL_TASKS, null, fresh), MOOD.LIVELY)
+
+  // The whole point: it changes what is *said*, never what is *stored*.
+  const historyBefore = JSON.stringify({ completions: { 'kitchen-dishes': [daysAgo(0), daysAgo(1)] } })
+  const streakLog2 = JSON.parse(historyBefore)
+  is('the streak is untouched', currentStreak(streakLog2, MON, null, fresh), currentStreak(streakLog2, MON))
+  is('and so are the credits', creditsEarned(streakLog2, ALL_TASKS, 'me', [{ id: 'me' }]), 8)
+  is('and the history itself', JSON.stringify(streakLog2), historyBefore)
+
+  is('undoing it brings the honest answer back', getTaskState(task('litter-full-change'), backlog, MON, clearFreshStart(fresh)).status, STATUS.OVERDUE)
+  is('a fresh start survives being stored', normalizeAway(fresh).freshStartAt, fresh.freshStartAt)
+  is('and rides alongside a trip', hasFreshStart(addWindow(fresh, day(3).getTime(), day(1).getTime())), true)
+  is('while the trip still works', isAway(addWindow(fresh, day(1).getTime(), day(-1).getTime()), MON), true)
+}
+
+/** A one-task custom store, so the "same map for both kinds" claim is tested. */
+function addTaskFixture() {
+  return normalizeCustom({
+    tasks: {
+      kitchen: [{ id: 'kitchen-my-thing', name: 'My thing', schedule: { kind: 'weekly' }, points: 3 }],
+    },
+  })
 }

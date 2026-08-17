@@ -1,49 +1,10 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { AREAS as BUILT_IN_AREAS, BUILT_IN_IDS } from '../config/areas.js'
-import { iconFor } from '../config/icons.js'
 import * as customStore from '../lib/custom.js'
+import { composeAreas } from '../lib/compose.js'
 import { touching } from '../lib/settingsClock.js'
 
 const AreasContext = createContext(null)
-
-/**
- * Merges the built-in rooms from src/config/areas.js with whatever you've added
- * or hidden from inside the app, and hands the result to the whole app. Nothing
- * else needs to know which rooms are built in and which are yours.
- */
-function composeAreas(custom) {
-  const hidden = new Set(custom.hidden)
-
-  const builtIns = BUILT_IN_AREAS.filter((area) => !hidden.has(area.id)).map((area) => {
-    const appearance = custom.appearance[area.id] ?? {}
-    return {
-      ...area,
-      icon: appearance.iconName ? iconFor(appearance.iconName) : area.icon,
-      iconName: appearance.iconName ?? area.iconName,
-      color: appearance.color ?? area.color,
-      isCustom: false,
-      tasks: [
-        ...area.tasks.filter((task) => !hidden.has(task.id)).map((task) => ({ ...task, isCustom: false })),
-        ...(custom.tasks[area.id] ?? []).map((task) => ({ ...task, isCustom: true })),
-      ],
-    }
-  })
-
-  const mine = custom.areas.map((area) => ({
-    id: area.id,
-    name: area.name,
-    subtitle: area.subtitle ?? '',
-    icon: iconFor(area.iconName),
-    iconName: area.iconName,
-    color: area.color ?? 'sky',
-    isCustom: true,
-    tasks: (custom.tasks[area.id] ?? [])
-      .filter((task) => !hidden.has(task.id))
-      .map((task) => ({ ...task, isCustom: true })),
-  }))
-
-  return [...builtIns, ...mine]
-}
 
 export function AreasProvider({ children }) {
   const [custom, setCustom] = useState(customStore.loadCustom)
@@ -69,6 +30,7 @@ export function AreasProvider({ children }) {
       custom,
       setCustom,
       hiddenTaskIds: custom.hidden,
+      isTaskEdited: (taskId) => customStore.hasTaskSettings(custom, taskId),
 
       ...touching({
         addArea: (draft) => setCustom((c) => customStore.addArea(c, draft, BUILT_IN_IDS)),
@@ -77,6 +39,8 @@ export function AreasProvider({ children }) {
         restoreArea: (areaId) => setCustom((c) => customStore.restoreArea(c, areaId)),
 
         addTask: (areaId, task) => setCustom((c) => customStore.addTask(c, areaId, task, BUILT_IN_IDS)),
+        updateTask: (taskId, patch) => setCustom((c) => customStore.updateTaskSettings(c, taskId, patch)),
+        resetTask: (taskId) => setCustom((c) => customStore.resetTaskSettings(c, taskId)),
         removeTask: (areaId, taskId) => setCustom((c) => customStore.removeTask(c, areaId, taskId)),
         restoreTask: (taskId) => setCustom((c) => customStore.restoreTask(c, taskId)),
       }),

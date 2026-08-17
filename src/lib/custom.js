@@ -7,7 +7,10 @@
 
 const STORAGE_KEY = 'home-maintenance-dashboard/custom/v1'
 
-export const emptyCustom = { areas: [], tasks: {}, hidden: [], appearance: {} }
+export const emptyCustom = { areas: [], tasks: {}, hidden: [], appearance: {}, taskSettings: {} }
+
+/** What you're allowed to change about a task after it exists. */
+const SETTABLE = ['points', 'repeatable', 'schedule']
 
 function makeId(prefix, name, taken) {
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || prefix
@@ -42,11 +45,24 @@ export function normalizeCustom(data) {
     const clean = list.filter((t) => t && typeof t.id === 'string' && t.schedule?.kind)
     if (clean.length) tasks[areaId] = clean
   }
+  const taskSettings = {}
+  for (const [taskId, value] of Object.entries(data.taskSettings ?? {})) {
+    if (!value || typeof value !== 'object') continue
+    const entry = {}
+    if (Number.isFinite(value.points) && value.points >= 1 && value.points <= 99) {
+      entry.points = Math.round(value.points)
+    }
+    if (typeof value.repeatable === 'boolean') entry.repeatable = value.repeatable
+    if (value.schedule?.kind) entry.schedule = value.schedule
+    if (Object.keys(entry).length) taskSettings[taskId] = entry
+  }
+
   return {
     areas,
     tasks,
     hidden: Array.isArray(data.hidden) ? data.hidden.filter((id) => typeof id === 'string') : [],
     appearance: data.appearance && typeof data.appearance === 'object' ? data.appearance : {},
+    taskSettings,
   }
 }
 
@@ -55,7 +71,8 @@ function isEmptyCustom(custom) {
     custom.areas.length === 0 &&
     custom.hidden.length === 0 &&
     Object.keys(custom.tasks).length === 0 &&
-    Object.keys(custom.appearance).length === 0
+    Object.keys(custom.appearance).length === 0 &&
+    Object.keys(custom.taskSettings ?? {}).length === 0
   )
 }
 
@@ -136,6 +153,39 @@ export function removeTask(custom, areaId, taskId) {
   }
   if (custom.hidden.includes(taskId)) return custom
   return { ...custom, hidden: [...custom.hidden, taskId] }
+}
+
+/**
+ * Change what a task is worth, how often it happens, or whether it can be
+ * logged more than once. Stored as an override keyed by task id — the same
+ * shape as names.js — so the id never moves and the history stays filed
+ * under it.
+ *
+ * Unlike updateArea() this has one branch rather than two: a custom area
+ * carries its name and icon inline and so has to be mutated in place, but a
+ * task doesn't, and a single override map means a built-in task and one you
+ * invented behave identically.
+ */
+export function updateTaskSettings(custom, taskId, patch) {
+  const entry = { ...(custom.taskSettings?.[taskId] ?? {}) }
+  for (const key of SETTABLE) {
+    if (key in patch) entry[key] = patch[key]
+  }
+  const taskSettings = { ...(custom.taskSettings ?? {}) }
+  if (Object.keys(entry).length === 0) delete taskSettings[taskId]
+  else taskSettings[taskId] = entry
+  return { ...custom, taskSettings }
+}
+
+/** Back to whatever the task shipped with. */
+export function resetTaskSettings(custom, taskId) {
+  const taskSettings = { ...(custom.taskSettings ?? {}) }
+  delete taskSettings[taskId]
+  return { ...custom, taskSettings }
+}
+
+export function hasTaskSettings(custom, taskId) {
+  return Boolean(custom.taskSettings?.[taskId])
 }
 
 export function restoreTask(custom, taskId) {

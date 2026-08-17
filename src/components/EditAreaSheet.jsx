@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Nfc, Plus, RotateCcw, Trash2, X } from 'lucide-react'
+import { ChevronDown, Nfc, Plus, RotateCcw, Trash2, X } from 'lucide-react'
 import { PALETTES, paletteFor } from '../config/areas.js'
 import { ICON_NAMES, iconFor } from '../config/icons.js'
 import { useNames } from '../state/NamesProvider.jsx'
@@ -117,6 +117,64 @@ function AddTaskForm({ onAdd, onCancel }) {
 }
 
 /**
+ * The editable half of a task row, revealed by its disclosure. Points, repeat
+ * and schedule are stored as an override keyed by task id, so nothing here can
+ * move an id or orphan a history — see updateTaskSettings in src/lib/custom.js.
+ *
+ * Deliberately inline rather than a second sheet: a dialog on top of a dialog
+ * is miserable on a phone.
+ */
+function TaskSettings({ task, edited, onChange, onReset }) {
+  return (
+    <div className="mt-2 space-y-3 rounded-xl border p-3" style={{ borderColor: 'var(--line)' }}>
+      <ScheduleFields value={task.schedule} onChange={(schedule) => onChange({ schedule })} />
+
+      <label className="flex items-center gap-2 text-sm" style={{ color: 'var(--ink-2)' }}>
+        <input
+          type="number"
+          className="field w-20"
+          aria-label={`Points for ${task.name}`}
+          min={1}
+          max={99}
+          value={task.points ?? 1}
+          onChange={(e) => onChange({ points: Math.min(99, Math.max(1, Number(e.target.value) || 1)) })}
+        />
+        points each time
+      </label>
+
+      <label className="flex items-start gap-2.5 text-sm" style={{ color: 'var(--ink-2)' }}>
+        <input
+          type="checkbox"
+          className="mt-0.5 h-5 w-5 shrink-0"
+          aria-label={`Let ${task.name} be logged more than once`}
+          checked={Boolean(task.repeatable)}
+          onChange={(e) => onChange({ repeatable: e.target.checked })}
+        />
+        <span>
+          Can be logged more than once
+          <span className="block text-xs" style={{ color: 'var(--ink-3)' }}>
+            Every tap counts again, so three trips to the coop are worth three times the points.
+          </span>
+        </span>
+      </label>
+
+      {edited ? (
+        <button
+          type="button"
+          onClick={onReset}
+          aria-label={`Reset ${task.name} to its original settings`}
+          className="flex w-full items-center justify-center gap-2 py-1.5 text-xs font-semibold transition active:scale-95"
+          style={{ color: 'var(--ink-2)' }}
+        >
+          <RotateCcw className="h-3.5 w-3.5" />
+          Back to the original
+        </button>
+      ) : null}
+    </div>
+  )
+}
+
+/**
  * One sheet for everything about a room: what it's called, what it looks like,
  * which tasks it holds, and whether it exists at all.
  *
@@ -125,14 +183,17 @@ function AddTaskForm({ onAdd, onCancel }) {
 export default function EditAreaSheet({ area, open, mode = 'edit', onClose, onCreated, onDeleted }) {
   const { themeId } = useTheme()
   const { nameFor, subtitleFor, isRenamed, saveArea, resetArea } = useNames()
-  const { addArea, updateArea, removeArea, addTask, removeTask } = useAreas()
+  const { addArea, updateArea, removeArea, addTask, removeTask, updateTask, resetTask, isTaskEdited } =
+    useAreas()
 
   const [form, setForm] = useState({ name: '', subtitle: '', iconName: 'home', color: 'sky', tasks: {} })
   const [addingTask, setAddingTask] = useState(false)
+  const [openTaskId, setOpenTaskId] = useState(null)
 
   useEffect(() => {
     if (!open) return
     setAddingTask(false)
+    setOpenTaskId(null)
     if (mode === 'create') {
       setForm({ name: '', subtitle: '', iconName: 'home', color: 'sky', tasks: {} })
       return
@@ -144,8 +205,11 @@ export default function EditAreaSheet({ area, open, mode = 'edit', onClose, onCr
       color: area.color,
       tasks: Object.fromEntries(area.tasks.map((task) => [task.id, nameFor(task)])),
     })
+    // Keyed on the room's id, not the object: editing a task's points rebuilds
+    // the area, and depending on identity would re-seed the form and slam the
+    // open settings panel shut on every keystroke.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, area, mode])
+  }, [open, area?.id, mode])
 
   const handleSave = () => {
     if (mode === 'create') {
@@ -257,36 +321,62 @@ export default function EditAreaSheet({ area, open, mode = 'edit', onClose, onCr
           <>
             <div className="space-y-2.5">
               <p className="label">Tasks</p>
-              {area.tasks.map((task) => (
-                <div key={task.id} className="flex items-center gap-2">
-                  <input
-                    className="field"
-                    aria-label={`Name for ${task.name}`}
-                    value={form.tasks[task.id] ?? ''}
-                    placeholder={task.name}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, tasks: { ...f.tasks, [task.id]: e.target.value } }))
-                    }
-                  />
-                  <button
-                    type="button"
-                    aria-label={`Remove ${nameFor(task)}`}
-                    onClick={() => {
-                      const label = task.isCustom ? 'Delete' : 'Hide'
-                      if (!window.confirm(`${label} "${nameFor(task)}"? Your history for it is kept.`)) return
-                      removeTask(area.id, task.id)
-                      setForm((f) => {
-                        const tasks = { ...f.tasks }
-                        delete tasks[task.id]
-                        return { ...f, tasks }
-                      })
-                    }}
-                    className="btn-secondary flex h-10 w-10 shrink-0 items-center justify-center"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              ))}
+              {area.tasks.map((task) => {
+                const expanded = openTaskId === task.id
+                return (
+                  <div key={task.id}>
+                    <div className="flex items-center gap-2">
+                      <input
+                        className="field"
+                        aria-label={`Name for ${task.name}`}
+                        value={form.tasks[task.id] ?? ''}
+                        placeholder={task.name}
+                        onChange={(e) =>
+                          setForm((f) => ({ ...f, tasks: { ...f.tasks, [task.id]: e.target.value } }))
+                        }
+                      />
+                      <button
+                        type="button"
+                        aria-label={`Settings for ${task.name}`}
+                        aria-expanded={expanded}
+                        onClick={() => setOpenTaskId(expanded ? null : task.id)}
+                        className="btn-secondary flex h-10 w-10 shrink-0 items-center justify-center"
+                      >
+                        <ChevronDown
+                          className="h-4 w-4 transition-transform"
+                          style={{ transform: expanded ? 'rotate(180deg)' : undefined }}
+                        />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`Remove ${nameFor(task)}`}
+                        onClick={() => {
+                          const label = task.isCustom ? 'Delete' : 'Hide'
+                          if (!window.confirm(`${label} "${nameFor(task)}"? Your history for it is kept.`)) return
+                          removeTask(area.id, task.id)
+                          setForm((f) => {
+                            const tasks = { ...f.tasks }
+                            delete tasks[task.id]
+                            return { ...f, tasks }
+                          })
+                        }}
+                        className="btn-secondary flex h-10 w-10 shrink-0 items-center justify-center"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+
+                    {expanded ? (
+                      <TaskSettings
+                        task={task}
+                        edited={isTaskEdited(task.id)}
+                        onChange={(patch) => updateTask(task.id, patch)}
+                        onReset={() => resetTask(task.id)}
+                      />
+                    ) : null}
+                  </div>
+                )
+              })}
 
               {addingTask ? (
                 <AddTaskForm
