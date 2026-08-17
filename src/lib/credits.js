@@ -83,11 +83,13 @@ export function boostActive(estateEntry, now = Date.now()) {
  */
 export const MOOD = { LIVELY: 'lively', QUIET: 'quiet' }
 
-export function sceneMood(log, now, tasks = [], estateEntry = null) {
+export function sceneMood(log, now, tasks = [], estateEntry = null, away = null) {
   const at = now instanceof Date ? now.getTime() : now
   if (boostActive(estateEntry, at)) return MOOD.LIVELY
   for (const task of tasks) {
-    const state = getTaskState(task, log?.completions?.[task.id] ?? [], now)
+    // Passing `away` through is what keeps the scene lively on holiday without
+    // a second opinion about what "behind" means.
+    const state = getTaskState(task, log?.completions?.[task.id] ?? [], now, away)
     if (state.status === STATUS.OVERDUE) return MOOD.QUIET
   }
   return MOOD.LIVELY

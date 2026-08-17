@@ -68,7 +68,7 @@ Other commands:
 ```bash
 npm run build     # build the production version into dist/
 npm run preview   # preview that production build locally
-npm run check     # run the tests (360 checks)
+npm run check     # run the tests (429 checks)
 ```
 
 `npm run check` drives a real browser through the app — logging, persistence,
@@ -259,6 +259,25 @@ The heatmap uses one color in four steps — darker means a busier day in
 Homestead, brighter means a busier day in Starship — with a neutral square for
 "nothing logged". Both ramps were checked for monotone lightness, visible gaps
 between steps, and contrast against their own background.
+
+---
+
+## Going away
+
+**Setup → Away.** Pick two dates, or tap *This weekend* / *A week*. While you're
+gone:
+
+- Nothing reads as due. Every room says all clear.
+- Your streak carries straight over the gap instead of resetting.
+- The credits scene stays lively.
+
+The day you get home, everything comes back — worded gently for the first day,
+so you get a to-do list rather than a wall of red. After that it's honest again.
+
+It applies to the **whole household**, because it means the house is empty. If
+someone stays home, leave it off and let them log as usual. Past trips are kept
+so your streak still reads correctly months later, and ending one early trims it
+rather than pretending you never went.
 
 ---
 

@@ -6,6 +6,7 @@
 
 import { MS_PER_DAY, daysBetween, startOfDay, startOfWeek } from './date.js'
 import { STATUS, getTaskState, isActionable } from './schedule.js'
+import { windowOn } from './away.js'
 import { timeOf } from './storage.js'
 
 /** Every completion across every task, newest first, tagged with its task. */
@@ -26,22 +27,34 @@ function activeDays(log, tasks) {
 /**
  * Consecutive days ending today (or yesterday, so an evening person doesn't
  * lose the streak at midnight) where at least one task was logged.
+ *
+ * Days the household was away are stepped over: they don't add to the streak —
+ * you didn't do a chore — but they don't end it either. A week in Michigan
+ * shouldn't cost you three months.
  */
-export function currentStreak(log, now = new Date(), tasks = null) {
+export function currentStreak(log, now = new Date(), tasks = null, away = null) {
   const days = activeDays(log, tasks)
   if (days.size === 0) return 0
 
+  const wasAway = (day) => Boolean(away) && windowOn(away, day) !== null
   const today = startOfDay(now).getTime()
-  const yesterday = today - MS_PER_DAY
 
-  let cursor
-  if (days.has(today)) cursor = today
-  else if (days.has(yesterday)) cursor = yesterday
-  else return 0
+  // Find the day the streak hangs from: today, yesterday, or — if a trip has
+  // only just ended — the last day before it started. Away days are free to
+  // step over; one ordinary quiet day is the usual grace, and no more.
+  let cursor = today
+  let slack = 1
+  while (!days.has(cursor)) {
+    if (!wasAway(cursor)) {
+      if (slack === 0) return 0
+      slack -= 1
+    }
+    cursor -= MS_PER_DAY
+  }
 
   let streak = 0
-  while (days.has(cursor)) {
-    streak += 1
+  while (days.has(cursor) || wasAway(cursor)) {
+    if (days.has(cursor)) streak += 1
     cursor -= MS_PER_DAY
   }
   return streak
@@ -123,11 +136,11 @@ export function completedToday(log, now = new Date(), tasks = null) {
  * Tasks that are resting or not due yet are left out, so a quiet day still
  * reads as 100% instead of guilt-tripping you.
  */
-export function progressFor(tasks, log, now = new Date()) {
+export function progressFor(tasks, log, now = new Date(), away = null) {
   let done = 0
   let open = 0
   for (const task of tasks) {
-    const state = getTaskState(task, log.completions[task.id] ?? [], now)
+    const state = getTaskState(task, log.completions[task.id] ?? [], now, away)
     if (state.status === STATUS.DONE) done += 1
     else if (isActionable(state.status)) open += 1
   }
@@ -141,11 +154,11 @@ export function progressFor(tasks, log, now = new Date()) {
 }
 
 /** Tasks that are due or overdue right now, most urgent first. */
-export function tasksNeedingAttention(log, now = new Date(), tasks = []) {
+export function tasksNeedingAttention(log, now = new Date(), tasks = [], away = null) {
   return tasks
     .map((task) => ({
       task,
-      state: getTaskState(task, log.completions[task.id] ?? [], now),
+      state: getTaskState(task, log.completions[task.id] ?? [], now, away),
     }))
     .filter(({ state }) => isActionable(state.status))
     .sort((a, b) => {

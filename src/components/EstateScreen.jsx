@@ -24,6 +24,7 @@ import { useTheme } from '../theme/ThemeProvider.jsx'
 import { useAreas } from '../state/AreasProvider.jsx'
 import { usePeople } from '../state/PeopleProvider.jsx'
 import { useEstate } from '../state/EstateProvider.jsx'
+import { useAway } from '../state/AwayProvider.jsx'
 import Windowsill from './scenes/Windowsill.jsx'
 import Ship from './scenes/Ship.jsx'
 import Cats from './scenes/Cats.jsx'
@@ -113,11 +114,12 @@ export default function EstateScreen({ log, now, onBack, onToast, readOnly = fal
   const { allTasks } = useAreas()
   const { activePerson, activeId, people, isShared } = usePeople()
   const { entry, buyItem, equip, buyCompanion, buyTreat } = useEstate()
+  const { away } = useAway()
 
   const earned = creditsEarned(log, allTasks, activeId, people)
   const balance = creditsBalance(log, allTasks, activeId, people, entry)
   const unit = copy.creditsUnit
-  const mood = sceneMood(log, now, allTasks, entry)
+  const mood = sceneMood(log, now, allTasks, entry, away)
   const boosted = boostActive(entry, now.getTime())
   const Scene = SCENES[theme.progression?.sceneKind] ?? Windowsill
 

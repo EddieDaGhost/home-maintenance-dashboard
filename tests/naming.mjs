@@ -84,6 +84,10 @@ export default async function run({ browser, page, check, errors, URL, tmp }) {
   check('backup identifies the app', parsed.app === 'home-maintenance-dashboard')
   check('backup contains the history', Object.keys(parsed.completions).includes('bath1-mirror'))
   check('backup contains custom names', parsed.names['bathroom-1'].name === "Kids' Bathroom")
+  // The newer fields ride along whether or not anything has been put in them,
+  // so a restore can't quietly drop what a future version wrote.
+  check('backup carries the estate', parsed.estate !== undefined)
+  check('backup carries away windows', Array.isArray(parsed.away?.windows))
 
   // ===================== RESTORE =====================
   // Wipe everything, as if this were a new phone.

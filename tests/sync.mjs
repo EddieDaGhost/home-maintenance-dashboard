@@ -150,6 +150,26 @@ export default async function run({ browser, check, URL }) {
     await b.page.waitForTimeout(2500)
     check('a rename on one phone reaches the other', (await b.page.getByText("Kids' Bathroom").count()) > 0)
 
+    // ---- going away reaches the other phone ----
+    // This is the check that catches a missing touching() wrapper: without it
+    // the settings clock never moves, phone A never offers the trip, and phone B
+    // spends the holiday showing overdue.
+    await a.page.goto(URL, { waitUntil: 'networkidle' })
+    await a.page.getByRole('button', { name: /^Away/ }).click()
+    await a.page.waitForTimeout(300)
+    await a.page.getByRole('dialog', { name: 'Away' }).getByRole('button', { name: 'A week' }).click()
+    await a.page.waitForTimeout(3200)
+    check('phone A knows it is away', (await a.page.getByText(/streak carries over/).count()) === 1)
+    check(
+      'the trip reached the server',
+      ([...server.state.values()][0]?.doc?.away?.windows ?? []).length === 1,
+      JSON.stringify([...server.state.values()][0]?.doc?.away ?? null),
+    )
+
+    await b.page.goto(URL, { waitUntil: 'networkidle' })
+    await b.page.waitForTimeout(2500)
+    check('and the other phone is away too', (await b.page.getByText(/streak carries over/).count()) === 1)
+
     // ---- a wrong key is refused ----
     // Probed from the test process, not the page: a deliberate 400 inside the
     // browser would show up as a console error and fail the check below.
