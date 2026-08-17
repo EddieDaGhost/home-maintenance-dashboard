@@ -14,7 +14,9 @@ import {
 import { buildCalendar } from '../src/lib/calendar.js'
 import { weekIndex } from '../src/lib/date.js'
 import {
+  ALL_SLOTS,
   CATALOG,
+  CATALOG_BY_SLOT,
   COMPANION_COST,
   MAX_COMPANIONS,
   TREAT_COST,
@@ -29,8 +31,19 @@ import {
   entryFor,
   equip,
   normalizeEstate,
+  renameCompanion,
 } from '../src/lib/estate.js'
 import { buildBackup, parseBackup } from '../src/lib/backup.js'
+import {
+  addWindow,
+  awayUntilLabel,
+  endWindowNow,
+  inGrace,
+  isAway,
+  normalizeAway,
+  removeWindow,
+  upcomingWindows,
+} from '../src/lib/away.js'
 import { THEME_LIST } from '../src/config/themes.js'
 
 const ALL_TASKS = AREAS.flatMap((area) => area.tasks.map((task) => ({ ...task, area })))
@@ -147,6 +160,13 @@ export default async function run({ check }) {
     true,
   )
   is('itemById finds one', itemById('vessel-fern')?.slot, 'vessel')
+  is('every slot has something in it', ALL_SLOTS.every((slot) => CATALOG_BY_SLOT[slot].length > 1), true)
+  is(
+    'each slot lists cheapest first',
+    ALL_SLOTS.every((slot) => CATALOG_BY_SLOT[slot].every((item, i, list) => i === 0 || list[i - 1].cost <= item.cost)),
+    true,
+  )
+  is('every item sits in a real slot', CATALOG.every((i) => ALL_SLOTS.includes(i.slot)), true)
   is('itemById shrugs at nonsense', itemById('nope'), null)
   is(
     'every look has the estate copy it needs',
@@ -208,6 +228,11 @@ export default async function run({ check }) {
   let many = {}
   for (let i = 0; i < MAX_COMPANIONS + 2; i += 1) many = buyCompanion(many, 'eddie', COMPANION_COST, 99999)
   is('companions stop at the cap', entryFor(many, 'eddie').companions.length, MAX_COMPANIONS)
+  is('companions start unnamed', entryFor(many, 'eddie').companions[0].name, '')
+  const named = renameCompanion(many, 'eddie', entryFor(many, 'eddie').companions[0].id, '  Bruce  ')
+  is('and can be named', entryFor(named, 'eddie').companions[0].name, 'Bruce')
+  is('naming one leaves the others alone', entryFor(named, 'eddie').companions[1].name, '')
+  is('a name survives being read back', normalizeEstate(named).eddie.companions[0].name, 'Bruce')
   is('and only the ones bought were charged', entryFor(many, 'eddie').spent, MAX_COMPANIONS * COMPANION_COST)
 
   const T0 = MON.getTime()
@@ -248,4 +273,87 @@ export default async function run({ check }) {
   is('a backup restores the estate', restored.estate.eddie.spent, fern.cost)
   const old = parseBackup(JSON.stringify({ app: 'home-maintenance-dashboard', version: 2, completions: {} }))
   is('a backup from before the shop still reads', Object.keys(old.estate).length, 0)
+  is('and has no trips in it', old.away.windows.length, 0)
+
+  // =========================================================================
+  // Being away
+  // =========================================================================
+
+  const day = (n, from = MON) => new Date(from.getTime() - n * 86400000)
+  // Away for the four days ending yesterday: home again this morning.
+  const justBack = addWindow({}, day(4).getTime(), day(1).getTime())
+  // Away right now, through tomorrow.
+  const onHoliday = addWindow({}, day(2).getTime(), day(-1).getTime())
+
+  is('a stored trip reads back', justBack.windows.length, 1)
+  is('away is away', isAway(onHoliday, MON), true)
+  is('and home is home', isAway(justBack, MON), false)
+  is('the day after counts as grace', inGrace(justBack, MON), true)
+  is('two days after does not', inGrace(addWindow({}, day(6).getTime(), day(2).getTime()), MON), false)
+  const backwards = addWindow({}, day(1).getTime(), day(5).getTime()).windows[0]
+  is('a window written backwards is put right', backwards.from < backwards.to, true)
+  is('and is stored at day resolution', new Date(backwards.from).getHours(), 0)
+
+  // --- nothing is due while you're away, whatever the schedule kind ---
+  const away2 = (id, completions, now = MON) => getTaskState(task(id), completions, now, onHoliday)
+  is('a daily task rests while away', away2('kitchen-dishes', []).status, STATUS.RESTING)
+  is('a weekday task rests while away', away2('litter-scoop', []).status, STATUS.RESTING)
+  is('an interval task rests while away', away2('litter-full-change', [daysAgo(18)]).status, STATUS.RESTING)
+  // A fortnight away, so the window actually covers the Sunday being asked about.
+  const fortnight = addWindow({}, day(2).getTime(), day(-7).getTime())
+  is('a weekend task rests while away', getTaskState(task('laundry-wash'), [], SUN, fortnight).status, STATUS.RESTING)
+  is('and says so plainly', away2('kitchen-dishes', []).detail, 'Away')
+  is('but done stays done', away2('kitchen-dishes', [MON.getTime()]).status, STATUS.DONE)
+  is('nothing is on the plate while away', tasksNeedingAttention({ completions: {} }, MON, ALL_TASKS, onHoliday).length, 0)
+  is('an area reads 100% while away', progressFor(AREAS[0].tasks, { completions: {} }, MON, onHoliday).percent, 100)
+
+  // --- the day you get back is a list, not a reckoning ---
+  is('overdue softens to due the day you are back', getTaskState(task('litter-full-change'), [daysAgo(18)], MON, justBack).status, STATUS.DUE)
+  is(
+    'and is honest again once the grace is over',
+    getTaskState(task('litter-full-change'), [daysAgo(18)], MON, addWindow({}, day(9).getTime(), day(5).getTime())).status,
+    STATUS.OVERDUE,
+  )
+  is('with no away store, nothing changes', st('litter-full-change', [daysAgo(18)], MON).status, STATUS.OVERDUE)
+
+  // --- the streak carries over the gap ---
+  const beforeTrip = {
+    completions: { 'kitchen-dishes': [daysAgo(5), daysAgo(6), daysAgo(7), daysAgo(8)] },
+  }
+  is('without a trip that streak is stale', currentStreak(beforeTrip, MON), 0)
+  is('the trip carries it over', currentStreak(beforeTrip, MON, null, justBack), 4)
+  is('away days do not add to it', currentStreak(beforeTrip, MON, null, justBack) < 8, true)
+  is(
+    'logging from the road still counts',
+    currentStreak({ completions: { 'kitchen-dishes': [daysAgo(0), daysAgo(3), daysAgo(5)] } }, MON, null, onHoliday),
+    2,
+  )
+  is('a trip cannot resurrect an ancient streak', currentStreak({ completions: { 'kitchen-dishes': [daysAgo(40)] } }, MON, null, justBack), 0)
+
+  // --- the scene stays lively ---
+  is('an overdue task normally quiets the scene', sceneMood({ completions: { 'chickens-checkin': [daysAgo(5)] } }, MON, ALL_TASKS), MOOD.QUIET)
+  is(
+    'but not while away',
+    sceneMood({ completions: { 'chickens-checkin': [daysAgo(5)] } }, MON, ALL_TASKS, null, onHoliday),
+    MOOD.LIVELY,
+  )
+
+  // --- coming home early, and tidying up ---
+  const endedEarly = endWindowNow(onHoliday, MON)
+  is('coming back early ends the trip', isAway(endedEarly, MON), false)
+  is('but keeps the days you were gone', endedEarly.windows.length, 1)
+  is('a trip cancelled on its first day is dropped', endWindowNow(addWindow({}, MON.getTime(), day(-3).getTime()), MON).windows.length, 0)
+  is('a trip can be removed outright', removeWindow(justBack, justBack.windows[0].from).windows.length, 0)
+  is('upcoming lists what has not finished', upcomingWindows(onHoliday, MON).length, 1)
+  is('and not what has', upcomingWindows(justBack, MON).length, 0)
+
+  // --- reading a stored away back ---
+  is('rubbish normalises to no trips', normalizeAway('nope').windows.length, 0)
+  is('so does a broken window', normalizeAway({ windows: [{ from: 'x' }, null, 7] }).windows.length, 0)
+  is('a corrupt store is never away', isAway(normalizeAway(undefined), MON), false)
+  is('the label names the day', typeof awayUntilLabel(onHoliday, MON), 'string')
+  is('and there is no label when home', awayUntilLabel(justBack, MON), null)
+
+  const withTrip = parseBackup(JSON.stringify(buildBackup(shared, {}, null, null, estate, justBack)))
+  is('a backup carries the trips', withTrip.away.windows.length, 1)
 }

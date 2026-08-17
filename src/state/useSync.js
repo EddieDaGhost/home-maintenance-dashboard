@@ -32,6 +32,8 @@ export function useSync({
   setHousehold,
   estate,
   setEstate,
+  away,
+  setAway,
 }) {
   const [link, setLink] = useState(loadLink)
   const [status, setStatus] = useState({ state: 'idle', error: null })
@@ -44,8 +46,8 @@ export function useSync({
 
   // Everything the sync needs, kept in a ref so the callback below doesn't have
   // to be rebuilt (and re-trigger effects) every time a task is logged.
-  const latest = useRef({ log, names, custom, household, estate })
-  latest.current = { log, names, custom, household, estate }
+  const latest = useRef({ log, names, custom, household, estate, away })
+  latest.current = { log, names, custom, household, estate, away }
 
   useEffect(() => {
     saveLink(link)
@@ -63,6 +65,7 @@ export function useSync({
         custom: currentCustom,
         household: currentHousehold,
         estate: currentEstate,
+        away: currentAway,
       } = latest.current
 
       // Offer settings only when this device edited them more recently than the
@@ -81,6 +84,7 @@ export function useSync({
               custom: currentCustom,
               household: currentHousehold,
               estate: currentEstate,
+              away: currentAway,
             })
           : null,
         stateUpdatedAt: shouldPush ? editedAt : null,
@@ -102,6 +106,7 @@ export function useSync({
         if (doc.custom && typeof doc.custom === 'object') setCustom(doc.custom)
         if (doc.household && Array.isArray(doc.household?.people)) setHousehold(doc.household)
         if (doc.estate && typeof doc.estate === 'object') setEstate(doc.estate)
+        if (doc.away && Array.isArray(doc.away?.windows)) setAway(doc.away)
       }
 
       const at = Date.now()
@@ -112,7 +117,7 @@ export function useSync({
     } finally {
       inFlight.current = false
     }
-  }, [link.householdId, link.key, setLog, setNames, setCustom, setHousehold, setEstate])
+  }, [link.householdId, link.key, setLog, setNames, setCustom, setHousehold, setEstate, setAway])
 
   /** Start sharing: mint a household and put this device in it. */
   const startSharing = useCallback(async () => {
@@ -154,7 +159,7 @@ export function useSync({
     }
     const timer = setTimeout(syncNow, 2500)
     return () => clearTimeout(timer)
-  }, [log, names, custom, household, estate, link.householdId, syncNow])
+  }, [log, names, custom, household, estate, away, link.householdId, syncNow])
 
   // Sync when the app opens or comes back to the front, then on a slow timer.
   useEffect(() => {

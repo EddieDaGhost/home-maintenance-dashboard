@@ -68,7 +68,7 @@ Other commands:
 ```bash
 npm run build     # build the production version into dist/
 npm run preview   # preview that production build locally
-npm run check     # run the tests (360 checks)
+npm run check     # run the tests (448 checks)
 ```
 
 `npm run check` drives a real browser through the app — logging, persistence,
@@ -262,16 +262,39 @@ between steps, and contrast against their own background.
 
 ---
 
+## Going away
+
+**Setup → Away.** Pick two dates, or tap *This weekend* / *A week*. While you're
+gone:
+
+- Nothing reads as due. Every room says all clear.
+- Your streak carries straight over the gap instead of resetting.
+- The credits scene stays lively.
+
+The day you get home, everything comes back — worded gently for the first day,
+so you get a to-do list rather than a wall of red. After that it's honest again.
+
+It applies to the **whole household**, because it means the house is empty. If
+someone stays home, leave it off and let them log as usual. Past trips are kept
+so your streak still reads correctly months later, and ending one early trims it
+rather than pretending you never went.
+
+---
+
 ## Credits and your windowsill
 
 Everything you log is worth points. Points measure the week and reset on Monday;
 **credits** are the same numbers kept forever, and they buy things.
 
-**Setup → Your windowsill** opens a scene that is yours to build. Credits buy a
-plant, a pot glaze, a view, and a few small joys — plus more plants, and plant
-food that perks everything up for a day. In Starship the same purchases are a
-hull, a livery, a dock and a decal; in Cats they're a cat, a coat, a room and a
-collar.
+The balance sits on the dashboard, under your streak. Tapping it opens a scene
+that is yours to build: a plant, a pot glaze, a view, the weather outside, and a
+few small joys — plus more plants (name them if you like), and plant food that
+perks everything up for a day. In Starship the same purchases are a hull, a
+livery, a dock, whatever you're flying through, and a decal; in Cats they're a
+cat, a coat, a room, the weather, and a collar.
+
+Eighteen things to buy, 50–320 credits each. A fully kept week is about 120, so
+the cheap end is a couple of days and the whole catalogue is a few months.
 
 Three things it deliberately does *not* do:
 

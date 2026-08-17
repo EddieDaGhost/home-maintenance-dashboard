@@ -11,6 +11,19 @@ import { MOOD } from '../../lib/credits.js'
 
 const POT_DEFAULT = '#9a8577'
 
+/**
+ * The sky, top to bottom. Weather has to change the light or it reads as
+ * decoration stuck on a sunny day — rain falling past a bright sun is a
+ * sun-shower, which is not what anybody bought.
+ */
+const SKY = {
+  clear: ['#a9d8f0', '#d6ecf7', '#f6e7c8'],
+  rain: ['#7d93a6', '#a8bcc7', '#c9d4d6'],
+  snow: ['#9fb4c9', '#c8d7e4', '#e8eef2'],
+  glow: ['#79b4dd', '#ffd49a', '#ff9f5e'],
+  night: ['#3d4a63', '#5c6178', '#7a7183'],
+}
+
 const LEAF = {
   lively: { light: '#7cc47f', mid: '#4b9a5b', dark: '#2f7043' },
   quiet: { light: '#6c9a74', mid: '#48765a', dark: '#33553f' },
@@ -101,7 +114,29 @@ function Orchid({ x, y, tint, mood }) {
   )
 }
 
-const PLANTS = { fern: Fern, monstera: Monstera, orchid: Orchid }
+/** The 50-credit first purchase: squat, round, very hard to kill. */
+function Succulent({ x, y, tint }) {
+  const petal = (angle, length, fill) => (
+    <ellipse
+      key={`${angle}-${length}`}
+      cx="0"
+      cy={-length / 2}
+      rx="5.5"
+      ry={length / 2}
+      fill={fill}
+      transform={`rotate(${angle})`}
+    />
+  )
+  return (
+    <g transform={`translate(${x} ${y - 20}) scale(1.15)`}>
+      {[0, 60, 120, 180, 240, 300].map((a) => petal(a, 26, tint.mid))}
+      {[30, 90, 150, 210, 270, 330].map((a) => petal(a, 18, tint.light))}
+      <circle r="4.5" fill={tint.dark} />
+    </g>
+  )
+}
+
+const PLANTS = { succulent: Succulent, fern: Fern, monstera: Monstera, orchid: Orchid }
 
 function Plant({ art, x, y, tint, mood }) {
   const Shape = PLANTS[art] ?? Sprout
@@ -231,10 +266,93 @@ function Lantern({ dim }) {
   )
 }
 
-const FLAIR = { suncatcher: SunCatcher, bunting: Bunting, lantern: Lantern }
+function Chimes({ dim }) {
+  const tubes = [0, 1, 2, 3]
+  return (
+    <g opacity={dim ? 0.6 : 1}>
+      <path d="M62 14 V26" stroke="#c9c1b6" strokeWidth="1.2" />
+      <ellipse cx="62" cy="28" rx="13" ry="3" fill="#b9a88f" />
+      {tubes.map((i) => {
+        const tx = 50 + i * 8
+        const length = 26 + (i % 2 ? 10 : 0)
+        return (
+          <g key={tx}>
+            <path d={`M${tx} 29 V${29 + length}`} stroke="#cbb9a0" strokeWidth="1" />
+            <rect x={tx - 2} y={29 + length} width="4" height="16" rx="2" fill="#d9c9a4" />
+          </g>
+        )
+      })}
+    </g>
+  )
+}
+
+const FLAIR = { suncatcher: SunCatcher, bunting: Bunting, lantern: Lantern, chimes: Chimes }
+
 
 /**
- * @param equipped  { vessel, finish, scene, flair } — catalogue items or null
+ * Deterministic scatter. Stepping a counter through a modulo lands points in
+ * neat diagonal strings — snow came out looking like beads on a wire — so this
+ * hashes the index instead. Same layout every render, like SpaceBackdrop.
+ */
+function scatter(i, seed) {
+  const t = Math.sin(i * 127.1 + seed * 311.7) * 43758.5453
+  return t - Math.floor(t)
+}
+
+/**
+ * Weather sits over the glass, so it reads as outside rather than in the room.
+ * Every scene draws its own; only this one has a window to run down.
+ */
+function Weather({ art, dim }) {
+  if (art === 'rain') {
+    return (
+      <g opacity={dim ? 0.5 : 0.75}>
+        {Array.from({ length: 26 }, (_, i) => {
+          const rx = 40 + scatter(i, 1) * 240
+          const ry = 14 + scatter(i, 2) * 126
+          return (
+            <path
+              key={i}
+              d={`M${rx} ${ry} l-2.5 9`}
+              stroke="#d7ecf7"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              opacity="0.8"
+            />
+          )
+        })}
+        {/* A couple of fat drops holding on to the glass. */}
+        {[[92, 96], [176, 62], [242, 118]].map(([dx, dy]) => (
+          <circle key={dx} cx={dx} cy={dy} r="3" fill="#e8f6ff" opacity="0.55" />
+        ))}
+      </g>
+    )
+  }
+  if (art === 'snow') {
+    return (
+      <g>
+        {Array.from({ length: 30 }, (_, i) => {
+          const sx = 38 + scatter(i, 3) * 244
+          const sy = 12 + scatter(i, 4) * 130
+          return <circle key={i} cx={sx} cy={sy} r={scatter(i, 5) > 0.75 ? 2.6 : 1.6} fill="#ffffff" opacity={dim ? 0.55 : 0.85} />
+        })}
+        {/* Settled along the bottom of the frame. */}
+        <path d="M34 148 q40 -8 80 -2 q46 -8 90 -1 q40 -6 82 3 L286 148 Z" fill="#ffffff" opacity="0.7" />
+      </g>
+    )
+  }
+  if (art === 'glow') {
+    return (
+      <g>
+        <rect x="34" y="8" width="252" height="140" fill="url(#ws-golden)" />
+      </g>
+    )
+  }
+  return null
+}
+
+/**
+ * @param equipped  { vessel, finish, scene, flair, weather } — items or null
  * @param companions extra plants, one per purchase
  * @param mood      MOOD.LIVELY | MOOD.QUIET
  */
@@ -245,6 +363,9 @@ export default function Windowsill({ equipped = {}, companions = [], mood = MOOD
   const vesselArt = equipped[SLOTS.VESSEL]?.art
   const sceneArt = equipped[SLOTS.SCENE]?.art
   const FlairShape = FLAIR[equipped[SLOTS.FLAIR]?.art]
+  const weatherArt = equipped[SLOTS.WEATHER]?.art
+  const overcast = weatherArt === 'rain' || weatherArt === 'snow'
+  const sky = dim ? SKY.night : (SKY[weatherArt] ?? SKY.clear)
 
   // Companions line up along the sill either side of the main pot. Six is the
   // cap, which fits without anything overlapping the frame.
@@ -259,12 +380,17 @@ export default function Windowsill({ equipped = {}, companions = [], mood = MOOD
     >
       <defs>
         <linearGradient id="ws-sky" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={dim ? '#3d4a63' : '#a9d8f0'} />
-          <stop offset="60%" stopColor={dim ? '#5c6178' : '#d6ecf7'} />
-          <stop offset="100%" stopColor={dim ? '#7a7183' : '#f6e7c8'} />
+          <stop offset="0%" stopColor={sky[0]} />
+          <stop offset="60%" stopColor={sky[1]} />
+          <stop offset="100%" stopColor={sky[2]} />
+        </linearGradient>
+        <linearGradient id="ws-golden" x1="0" y1="1" x2="0.4" y2="0">
+          <stop offset="0%" stopColor="#ffb257" stopOpacity={dim ? 0.4 : 0.62} />
+          <stop offset="65%" stopColor="#ffd98f" stopOpacity="0.22" />
+          <stop offset="100%" stopColor="#ffd98f" stopOpacity="0" />
         </linearGradient>
         <linearGradient id="ws-beam" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#fff3cd" stopOpacity={dim ? 0.06 : 0.55} />
+          <stop offset="0%" stopColor="#fff3cd" stopOpacity={dim ? 0.06 : overcast ? 0.14 : 0.55} />
           <stop offset="100%" stopColor="#fff3cd" stopOpacity="0" />
         </linearGradient>
       </defs>
@@ -277,13 +403,24 @@ export default function Windowsill({ equipped = {}, companions = [], mood = MOOD
       {dim ? (
         <>
           <circle cx="228" cy="42" r="13" fill="#f2eede" opacity="0.85" />
-          <circle cx="223" cy="38" r="13" fill={dim ? '#5c6178' : 'none'} />
+          <circle cx="223" cy="38" r="13" fill="#5c6178" />
         </>
-      ) : (
-        <circle cx="228" cy="42" r="17" fill="#fff6d2" opacity="0.9" />
+      ) : weatherArt === 'rain' ? null : (
+        <circle
+          cx="228"
+          cy={weatherArt === 'glow' ? 66 : 42}
+          r={weatherArt === 'glow' ? 21 : 17}
+          fill={weatherArt === 'glow' ? '#fff0c0' : '#fff6d2'}
+          opacity={weatherArt === 'snow' ? 0.4 : 0.9}
+        />
       )}
       {/* Hills, so the window looks out at something. */}
-      <path d="M34 148 Q90 108 148 132 Q206 100 286 138 L286 148 Z" fill={dim ? '#3b4a44' : '#b8d3a8'} />
+      <path
+        d="M34 148 Q90 108 148 132 Q206 100 286 138 L286 148 Z"
+        fill={dim ? '#3b4a44' : weatherArt === 'snow' ? '#dfe8ea' : weatherArt === 'rain' ? '#93ab8d' : '#b8d3a8'}
+      />
+
+      <Weather art={weatherArt} dim={dim} />
 
       {/* Light falling into the room */}
       <path d="M204 20 L286 20 L286 148 L124 160 Z" fill="url(#ws-beam)" />

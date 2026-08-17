@@ -6,6 +6,7 @@ import { NamesProvider, useNames } from './state/NamesProvider.jsx'
 import { AreasProvider, useAreas } from './state/AreasProvider.jsx'
 import { PeopleProvider, usePeople } from './state/PeopleProvider.jsx'
 import { EstateProvider, useEstate } from './state/EstateProvider.jsx'
+import { AwayProvider, useAway } from './state/AwayProvider.jsx'
 import { downloadBackup, parseBackup } from './lib/backup.js'
 import { claimDevice, loadDevice, looksSetUp } from './lib/device.js'
 import { parseJoinHash } from './lib/sync.js'
@@ -28,6 +29,7 @@ function AppShell() {
   const { areas, areasById, allTasks, custom, setCustom } = useAreas()
   const { activeId, household, setHousehold } = usePeople()
   const { estate, setEstate } = useEstate()
+  const { away, setAway } = useAway()
   const [log, setLog] = useState(loadLog)
   const [device, setDevice] = useState(loadDevice)
   const sync = useSync({
@@ -41,6 +43,8 @@ function AppShell() {
     setHousehold,
     estate,
     setEstate,
+    away,
+    setAway,
   })
   const [previewing, setPreviewing] = useState(false)
   // Not a URL hash: hashes are NFC area ids, and #join= is already taken.
@@ -157,9 +161,9 @@ function AppShell() {
   }, [log, names, areas, copy, showToast])
 
   const handleBackup = useCallback(() => {
-    downloadBackup(log, names, household, custom, estate)
+    downloadBackup(log, names, household, custom, estate, away)
     showToast('Backup saved')
-  }, [log, names, household, custom, estate, showToast])
+  }, [log, names, household, custom, estate, away, showToast])
 
   const handleRestore = useCallback(
     async (file) => {
@@ -176,13 +180,14 @@ function AppShell() {
         setHousehold(restored.household)
         setCustom(restored.custom)
         setEstate(restored.estate)
+        setAway(restored.away)
         setNow(new Date())
         showToast('Backup restored')
       } catch (error) {
         showToast(error.message)
       }
     },
-    [setNames, setHousehold, setCustom, setEstate, showToast],
+    [setNames, setHousehold, setCustom, setEstate, setAway, showToast],
   )
 
   const area = useMemo(() => (areaId ? (areasById[areaId] ?? null) : null), [areaId, areasById])
@@ -297,7 +302,9 @@ export default function App() {
         <AreasProvider>
           <PeopleProvider>
             <EstateProvider>
-              <AppShell />
+              <AwayProvider>
+                <AppShell />
+              </AwayProvider>
             </EstateProvider>
           </PeopleProvider>
         </AreasProvider>

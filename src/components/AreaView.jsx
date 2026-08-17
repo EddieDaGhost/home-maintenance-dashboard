@@ -8,6 +8,7 @@ import { progressFor } from '../lib/stats.js'
 import { useTheme } from '../theme/ThemeProvider.jsx'
 import { useNames } from '../state/NamesProvider.jsx'
 import { usePeople } from '../state/PeopleProvider.jsx'
+import { useAway } from '../state/AwayProvider.jsx'
 import EditAreaSheet from './EditAreaSheet.jsx'
 import ProgressBar from './ProgressBar.jsx'
 import TaskCard from './TaskCard.jsx'
@@ -58,13 +59,14 @@ export default function AreaView({ area, log, now, onLog, onUndo, onBack, readOn
   const { themeId, copy } = useTheme()
   const { nameFor, subtitleFor } = useNames()
   const { nameOf, isShared } = usePeople()
+  const { away } = useAway()
   const [editing, setEditing] = useState(false)
   const palette = paletteFor(area, themeId)
   const Icon = area.icon
-  const { percent, done, open } = progressFor(area.tasks, log, now)
+  const { percent, done, open } = progressFor(area.tasks, log, now, away)
 
   const tasks = area.tasks
-    .map((task) => ({ task, state: getTaskState(task, log.completions[task.id] ?? [], now) }))
+    .map((task) => ({ task, state: getTaskState(task, log.completions[task.id] ?? [], now, away) }))
     .sort((a, b) => SORT_ORDER[a.state.status] - SORT_ORDER[b.state.status])
 
   const openTasks = tasks.filter(({ state }) => isActionable(state.status))

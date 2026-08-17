@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Flame, Trophy } from 'lucide-react'
 import { activityGrid, bestStreak, currentStreak, historyByDay, historyTotals } from '../lib/stats.js'
+import { useAway } from '../state/AwayProvider.jsx'
 import { DAY_SHORT } from '../lib/date.js'
 import { useAreas } from '../state/AreasProvider.jsx'
 import { useNames } from '../state/NamesProvider.jsx'
@@ -141,6 +142,7 @@ export default function HistorySheet({ open, onClose, log, now }) {
   const { allTasks } = useAreas()
   const { nameFor } = useNames()
   const { nameOf, isShared } = usePeople()
+  const { away } = useAway()
   const [selected, setSelected] = useState(null)
 
   const tasksById = useMemo(() => Object.fromEntries(allTasks.map((t) => [t.id, t])), [allTasks])
@@ -166,7 +168,7 @@ export default function HistorySheet({ open, onClose, log, now }) {
     >
       <div className="space-y-4">
         <div className="flex gap-2">
-          <Stat icon={Flame} value={currentStreak(log, now)} label="Streak" tone="#f97316" />
+          <Stat icon={Flame} value={currentStreak(log, now, null, away)} label="Streak" tone="#f97316" />
           <Stat icon={Flame} value={bestStreak(log)} label="Best" tone="var(--ink-3)" />
           <Stat icon={Trophy} value={totals.thisMonth} label="This month" tone="#f59e0b" />
         </div>

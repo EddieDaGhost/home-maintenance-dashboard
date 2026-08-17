@@ -27,6 +27,10 @@ export function ThemeProvider({ children }) {
       .querySelector('meta[name="theme-color"]')
       ?.setAttribute('content', STATUS_BAR_COLOR[themeId] ?? STATUS_BAR_COLOR.home)
     try {
+      // Don't write anything for somebody who has only ever looked at the
+      // default. Every other store leaves a visitor's browser untouched until
+      // they choose something; this one shouldn't be the exception.
+      if (themeId === DEFAULT_THEME_ID && window.localStorage.getItem(STORAGE_KEY) === null) return
       window.localStorage.setItem(STORAGE_KEY, themeId)
     } catch {
       // Private browsing — the theme just won't stick between visits.

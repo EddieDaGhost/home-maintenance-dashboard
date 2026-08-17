@@ -38,6 +38,22 @@ export default async function run({ page, check, errors, URL }) {
   check('preview offers an explanation instead', (await page.getByRole('button', { name: 'What is this?' }).count()) === 1)
   check('preview still says nothing is saved', (await page.getByText(/Nothing here is saved/).count()) === 1)
 
+  // ---- a visitor can see the scene, which is the best part of the pitch ----
+  await page.getByRole('button', { name: /Your windowsill/ }).click()
+  await page.waitForTimeout(400)
+  check('preview reaches the scene', (await page.getByRole('heading', { level: 1 }).innerText()) === 'The windowsill')
+  check('with an empty sill of their own', (await page.locator('#credit-balance').innerText()) === '0 cr')
+  check('the prices are still on show', (await page.getByText('Boston fern').count()) === 1)
+  check('but nothing can be bought', await page.getByRole('button', { name: /Buy Boston fern/ }).isDisabled())
+
+  const touched = await page.evaluate(() =>
+    Object.keys(localStorage).filter((k) => k.startsWith('home-maintenance-dashboard/')),
+  )
+  check('and looking at it writes nothing', touched.length === 0, touched.join(', '))
+
+  await page.getByRole('button', { name: 'All areas' }).click()
+  await page.waitForTimeout(300)
+
   // ---- preview is session-only ----
   // A real tag tap is a fresh page load; changing only the hash is not.
   await page.goto(`${URL}/#chickens`, { waitUntil: 'networkidle' })

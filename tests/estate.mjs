@@ -30,7 +30,8 @@ async function seed(page, URL, completions, people = null) {
 }
 
 const openEstate = async (page) => {
-  await page.getByRole('button', { name: /Your windowsill|Your ship|Your cats/ }).click()
+  // Both the dashboard row and the Setup row lead here; either will do.
+  await page.getByRole('button', { name: /Your windowsill|Your ship|Your cats/ }).first().click()
   await page.waitForTimeout(300)
 }
 
@@ -40,6 +41,14 @@ export default async function run({ page, check, errors, URL }) {
   // ---- the shop opens and shows what's been earned ----
   await seed(page, URL, { 'kitchen-dishes': dishes(30, 'me') })
   check('the dashboard advertises a balance', (await page.getByText('120 cr to spend').count()) === 1)
+
+  // The row under the stat tiles is the front door; the Setup row still works
+  // too, but this is the one that should get tapped.
+  await page.getByRole('button', { name: /120 cr to spend/ }).click()
+  await page.waitForTimeout(300)
+  check('and it opens the screen', (await page.getByRole('heading', { level: 1 }).innerText()) === 'The windowsill')
+  await page.getByRole('button', { name: 'All areas' }).click()
+  await page.waitForTimeout(300)
 
   await openEstate(page)
   check('the screen opens', (await page.getByRole('heading', { level: 1 }).innerText()) === 'The windowsill')
@@ -78,6 +87,29 @@ export default async function run({ page, check, errors, URL }) {
   check(
     'and you can put it back on for free',
     (await page.getByRole('button', { name: 'Put Boston fern away' }).count()) === 1,
+  )
+
+  // ---- the weather slot, and naming what you collect ----
+  await seed(page, URL, { 'kitchen-dishes': dishes(120, 'me') })
+  await openEstate(page)
+  check('the weather slot is on offer', (await page.getByText('Rain on the glass').count()) === 1)
+  await page.getByRole('button', { name: 'Buy Rain on the glass for 110 credits' }).click()
+  await page.waitForTimeout(400)
+  check('weather can be worn', (await page.getByRole('button', { name: 'Put Rain on the glass away' }).count()) === 1)
+  check('and it does not disturb the other slots', (await page.getByRole('button', { name: /Buy Boston fern/ }).count()) === 1)
+
+  check('nothing is on the sill yet', (await page.getByRole('textbox', { name: /Name for another plant/ }).count()) === 0)
+  await page.getByRole('button', { name: /Buy Another plant/ }).click()
+  await page.waitForTimeout(400)
+  const nameField = page.getByRole('textbox', { name: 'Name for another plant 1' })
+  check('a companion can be named', (await nameField.count()) === 1)
+  await nameField.fill('Bruce')
+  await page.waitForTimeout(400)
+  await page.reload({ waitUntil: 'networkidle' })
+  await openEstate(page)
+  check(
+    'and the name sticks',
+    (await page.getByRole('textbox', { name: 'Name for another plant 1' }).inputValue()) === 'Bruce',
   )
 
   // ---- falling behind, and the way back ----

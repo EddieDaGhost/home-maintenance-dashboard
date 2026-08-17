@@ -97,7 +97,17 @@ function Cruiser({ hull }) {
   )
 }
 
-const HULLS = { fern: Scout, monstera: Freighter, orchid: Cruiser }
+/** The 50-credit first purchase: one seat and an engine. */
+function PodRunner({ hull }) {
+  return (
+    <g transform="translate(160 100)">
+      <Engines x={-26} spread={6} />
+      <Hull d="M-26 -12 L6 -14 L34 0 L6 14 L-26 12 Z" cockpit={[14, 0]} hull={hull} />
+    </g>
+  )
+}
+
+const HULLS = { succulent: PodRunner, fern: Scout, monstera: Freighter, orchid: Cruiser }
 
 /** Docking lights: the guide strips along the bay. */
 function DockingLights({ dim }) {
@@ -160,7 +170,76 @@ function RunningLamp({ dim }) {
   )
 }
 
-const FLAIR = { suncatcher: Decal, bunting: Pennants, lantern: RunningLamp }
+function AntennaArray({ dim }) {
+  return (
+    <g opacity={dim ? 0.55 : 1} stroke="#cbd5e1" fill="none" strokeWidth="1.4">
+      <path d="M160 148 V166" />
+      <path d="M160 152 l-14 -6 M160 158 l14 -6 M160 164 l-11 -5" />
+      <circle cx="160" cy="170" r="4" fill="#38bdf8" stroke="none" opacity="0.9" />
+    </g>
+  )
+}
+
+const FLAIR = { suncatcher: Decal, bunting: Pennants, lantern: RunningLamp, chimes: AntennaArray }
+
+
+/**
+ * Deterministic scatter. Stepping a counter through a modulo lands points in
+ * neat diagonal strings — snow came out looking like beads on a wire — so this
+ * hashes the index instead. Same layout every render, like SpaceBackdrop.
+ */
+function scatter(i, seed) {
+  const t = Math.sin(i * 127.1 + seed * 311.7) * 43758.5453
+  return t - Math.floor(t)
+}
+
+/**
+ * Out there. Same slot as the windowsill's weather; in space it's whatever the
+ * ship happens to be flying through.
+ */
+function Weather({ art, dim }) {
+  if (art === 'rain') {
+    // Charged particles, streaked by the ship's own motion.
+    return (
+      <g opacity={dim ? 0.45 : 0.8}>
+        {Array.from({ length: 22 }, (_, i) => {
+          const px = 10 + scatter(i, 1) * 300
+          const py = 8 + scatter(i, 2) * 184
+          return (
+            <path
+              key={i}
+              d={`M${px} ${py} l18 3`}
+              stroke="#7dd3fc"
+              strokeWidth="1.3"
+              strokeLinecap="round"
+              opacity={i % 3 ? 0.7 : 1}
+            />
+          )
+        })}
+      </g>
+    )
+  }
+  if (art === 'snow') {
+    return (
+      <g opacity={dim ? 0.5 : 0.9}>
+        {Array.from({ length: 26 }, (_, i) => {
+          const px = 8 + scatter(i, 3) * 304
+          const py = 6 + scatter(i, 4) * 188
+          const r = scatter(i, 5) > 0.8 ? 3.4 : 1.8
+          return <circle key={i} cx={px} cy={py} r={r} fill="#dbeafe" opacity={scatter(i, 6) > 0.3 ? 0.7 : 1} />
+        })}
+      </g>
+    )
+  }
+  if (art === 'glow') {
+    return (
+      <g opacity={dim ? 0.55 : 1}>
+        <path d="M-10 60 Q80 24 160 58 Q250 92 330 48 L330 96 Q250 132 160 98 Q80 64 -10 100 Z" fill="url(#ship-aurora)" />
+      </g>
+    )
+  }
+  return null
+}
 
 /** A tender flying alongside for every companion bought. */
 function Tender({ x, y, hull, glow }) {
@@ -180,6 +259,7 @@ export default function Ship({ equipped = {}, companions = [], mood = MOOD.LIVEL
   const Vessel = HULLS[equipped[SLOTS.VESSEL]?.art] ?? Shuttle
   const sceneArt = equipped[SLOTS.SCENE]?.art
   const FlairShape = FLAIR[equipped[SLOTS.FLAIR]?.art]
+  const weatherArt = equipped[SLOTS.WEATHER]?.art
 
   const spots = [
     [56, 48],
@@ -207,6 +287,12 @@ export default function Ship({ equipped = {}, companions = [], mood = MOOD.LIVEL
           <stop offset="0%" stopColor={glow} stopOpacity={dim ? 0.35 : 0.95} />
           <stop offset="100%" stopColor={glow} stopOpacity="0" />
         </radialGradient>
+        <linearGradient id="ship-aurora" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#5eead4" stopOpacity="0" />
+          <stop offset="45%" stopColor="#34d399" stopOpacity="0.45" />
+          <stop offset="70%" stopColor="#a855f7" stopOpacity="0.35" />
+          <stop offset="100%" stopColor="#a855f7" stopOpacity="0" />
+        </linearGradient>
         <radialGradient id="ship-lamp">
           <stop offset="0%" stopColor="#fde68a" stopOpacity="0.75" />
           <stop offset="100%" stopColor="#fde68a" stopOpacity="0" />
@@ -238,6 +324,8 @@ export default function Ship({ equipped = {}, companions = [], mood = MOOD.LIVEL
       ))}
 
       {sceneArt === 'curtain' ? <NebulaView dim={dim} /> : null}
+
+      <Weather art={weatherArt} dim={dim} />
 
       {companions.slice(0, spots.length).map((companion, i) => (
         <Tender key={companion.id} x={spots[i][0]} y={spots[i][1]} hull={hull} glow={glow} />

@@ -15,6 +15,7 @@
 //   upcoming - scheduled, but not yet
 
 import { timeOf } from './storage.js'
+import { inGrace, isAway } from './away.js'
 import {
   DAY_NAMES,
   DAY_SHORT,
@@ -82,11 +83,37 @@ function windowTarget(schedule) {
 }
 
 /**
+ * While the household is away nothing is on anyone's plate, and for a day after
+ * getting back nothing is scolded for. This is applied once, here, at the end —
+ * so it covers all nine schedule kinds, and so every other part of the app
+ * (the queue, the progress bars, the credits scene) inherits the same answer
+ * rather than inventing a second definition of "behind".
+ *
+ * Done stays done: you might well log something from the road.
+ */
+function applyAway(state, away, now) {
+  if (!away || state.status === STATUS.DONE) return state
+  if (isAway(away, now)) {
+    if (!isActionable(state.status)) return state
+    return { ...state, status: STATUS.RESTING, detail: 'Away' }
+  }
+  if (state.status === STATUS.OVERDUE && inGrace(away, now)) {
+    return { ...state, status: STATUS.DUE, detail: 'Back home — worth a look' }
+  }
+  return state
+}
+
+/**
  * @param {object} task        a task from src/config/areas.js
  * @param {Array} completions  entries {at, by}, newest first
  * @param {Date} now
+ * @param {object} away        the away store, or null when nobody's travelling
  */
-export function getTaskState(task, completions = [], now = new Date()) {
+export function getTaskState(task, completions = [], now = new Date(), away = null) {
+  return applyAway(computeTaskState(task, completions, now), away, now)
+}
+
+function computeTaskState(task, completions, now) {
   const schedule = task.schedule
   const lastDone = completions.length ? timeOf(completions[0]) : null
 

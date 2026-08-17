@@ -34,6 +34,9 @@ so and ask rather than "improving" it:
    away or degraded.
 3. **Streaks are generous.** The streak anchors to today *or yesterday*, so
    logging at 12:30am doesn't break it. Nothing can make a streak count down.
+   Days the household is **away** are stepped over: they don't add to the streak
+   — you didn't do a chore — but they can't break it either. A week away must
+   never cost somebody three months.
 4. **One tap to log.** Tapping a tag and tapping Log is the whole ritual. Any
    feature that adds a step to that path needs a very good reason.
 5. **Points are encouragement, never a target.** Hitting the weekly goal is not
@@ -86,11 +89,12 @@ src/
 │   ├── names.js     Display-name overrides
 │   ├── custom.js    User-added rooms/tasks, hidden built-ins
 │   ├── people.js    Household, who's logging
+│   ├── away.js      Trips: the days nothing is due and the streak carries over
 │   ├── credits.js   Credits earned/spent, and how lively the scene is
 │   ├── estate.js    What each person has bought, keyed by person id
 │   ├── backup.js    Export/import JSON
 │   └── calendar.js  .ics builder
-├── state/           React context providers (Names, Areas, People, Estate)
+├── state/           React context providers (Names, Areas, People, Estate, Away)
 ├── theme/           ThemeProvider
 ├── components/      All UI
 │   └── scenes/      The credits scene, one component per look
@@ -104,6 +108,7 @@ src/
 - Changing how it looks → `src/index.css` (tokens) or the component
 - Changing wording → `src/config/themes.js` (`copy` object, per theme)
 - Changing what credits buy → `src/config/catalog.js`
+- Changing what "away" suppresses → `applyAway()` in `src/lib/schedule.js`
 
 ---
 
@@ -143,7 +148,7 @@ and no horizontal overflow — the tests assert that last one.
 ## Testing
 
 ```bash
-npm run check              # everything: 360 checks
+npm run check              # everything: 448 checks
 npm run check -- logic     # just the fast pure-logic suite (no browser)
 ```
 
@@ -209,7 +214,14 @@ on the estate screen.
   count as that person's rather than nobody's.
 - **One catalogue, three costumes.** An item is the same purchase in every look;
   only its name and its drawing change. `labels` in `src/config/catalog.js` must
-  cover **all three** themes — the logic suite fails a half-added item.
+  cover **all three** themes — the logic suite fails a half-added item, and the
+  slot needs art in all three scene components too.
+- **Weather has to change the light**, not sit on top of it. Rain falling past a
+  bright sun reads as a sun-shower, which is not what anybody bought — so the
+  weather item drives the sky colour and the sunbeam as well as drawing itself.
+- **Scatter by hashing the index, not by stepping a modulo.** `(i * 41) % 244`
+  lands points in neat diagonal strings; the snow came out looking like beads on
+  a wire. `scatter()` in each scene hashes instead, and is still deterministic.
 - **Item ids are permanent**, for the same reason area and task ids are:
   ownership is recorded by id, so renaming one un-buys it for everybody.
 - **Liveliness is computed, never stored.** `sceneMood()` reads `STATUS.OVERDUE`
@@ -217,6 +229,30 @@ on the estate screen.
   — the scene and the task list must not be able to disagree.
 - **Removing a person leaves their estate in the map**, unreachable but intact,
   matching how a removed room keeps its history.
+
+---
+
+## Going away
+
+A window of days when the house is empty. `src/lib/away.js` holds a **list** of
+them — not one slot, because the streak has to span trips taken months ago and a
+single slot forgets the older one.
+
+- **It is household-wide, not per person.** Away means nobody is home and the
+  house isn't making mess. If one person travels and the other stays, the chores
+  still need doing and this should be off. The streak is already household-wide,
+  so this is consistent.
+- **One place decides.** `applyAway()` runs at the end of `getTaskState()`, so
+  all nine schedule kinds are covered by one rule and everything downstream —
+  the queue, progress bars, the credits scene — inherits the same answer. Do not
+  add a second "are we away" check anywhere, for the same reason there is only
+  one definition of overdue.
+- **Done stays done** while away: you might well log something from the road.
+- **Coming home is a list, not a reckoning.** For `GRACE_DAYS` after a trip,
+  overdue reads as due. After that the app is honest again — the litter really
+  does need doing.
+- **Ending a trip early trims it, it doesn't delete it.** You really were away
+  for the days you were away, and the streak still needs to know that.
 
 ---
 

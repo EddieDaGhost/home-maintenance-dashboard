@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import {
   CalendarPlus,
   ChevronRight,
+  Coins,
   Download,
   Flame,
   Flower2,
@@ -10,6 +11,7 @@ import {
   Link2,
   Nfc,
   PartyPopper,
+  PlaneTakeoff,
   Plus,
   RotateCcw,
   Trophy,
@@ -30,6 +32,7 @@ import { useNames } from '../state/NamesProvider.jsx'
 import { useAreas } from '../state/AreasProvider.jsx'
 import { usePeople } from '../state/PeopleProvider.jsx'
 import { useEstate } from '../state/EstateProvider.jsx'
+import { useAway } from '../state/AwayProvider.jsx'
 import { creditsBalance } from '../lib/credits.js'
 import ProgressBar from './ProgressBar.jsx'
 import TaskCard from './TaskCard.jsx'
@@ -40,6 +43,7 @@ import TagSetup from './TagSetup.jsx'
 import EditAreaSheet from './EditAreaSheet.jsx'
 import HistorySheet from './HistorySheet.jsx'
 import HouseholdSheet, { PersonAvatar } from './HouseholdSheet.jsx'
+import AwaySheet from './AwaySheet.jsx'
 
 function greeting(now) {
   const hour = now.getHours()
@@ -60,9 +64,9 @@ function StatTile({ icon: Icon, label, value, tone }) {
   )
 }
 
-function AreaCard({ area, log, now, themeId, copy, nameFor, subtitleFor, onOpen }) {
+function AreaCard({ area, log, now, away, themeId, copy, nameFor, subtitleFor, onOpen }) {
   const palette = paletteFor(area, themeId)
-  const { percent, open } = progressFor(area.tasks, log, now)
+  const { percent, open } = progressFor(area.tasks, log, now, away)
   const Icon = area.icon
 
   return (
@@ -152,6 +156,7 @@ export default function Dashboard({
   const { areas, allTasks, hiddenAreas, restoreArea } = useAreas()
   const { activePerson, activeId, people, isShared } = usePeople()
   const { entry } = useEstate()
+  const { away, isAway, untilLabel, endNow } = useAway()
 
   const [pickerOpen, setPickerOpen] = useState(false)
   const [tagsOpen, setTagsOpen] = useState(false)
@@ -159,15 +164,17 @@ export default function Dashboard({
   const [historyOpen, setHistoryOpen] = useState(false)
   const [householdOpen, setHouseholdOpen] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
+  const [awayOpen, setAwayOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
   const fileInput = useRef(null)
 
-  const streak = currentStreak(log, now)
+  const streak = currentStreak(log, now, allTasks, away)
   const points = weeklyPoints(log, now, allTasks)
   const goal = weeklyPointsGoal(now, allTasks)
   const today = completedToday(log, now)
-  const attention = tasksNeedingAttention(log, now, allTasks)
+  const attention = tasksNeedingAttention(log, now, allTasks, away)
   const credits = creditsBalance(log, allTasks, activeId, people, entry)
+  const travelling = isAway(now)
   const shortlist = attention.slice(0, 5)
   const ThemeIcon = theme.icon
 
@@ -217,6 +224,25 @@ export default function Dashboard({
         <StatTile icon={PartyPopper} label={copy.todayLabel} value={today} tone="var(--good)" />
       </section>
 
+      {/* Deliberately not a fourth tile — four across a 390px phone is cramped,
+          and this should read as an invitation rather than another number. */}
+      <button
+        type="button"
+        onClick={onOpenEstate}
+        className="panel flex w-full items-center gap-3 p-3.5 text-left transition active:scale-[0.99]"
+      >
+        <Coins className="h-5 w-5 shrink-0" style={{ color: '#f59e0b' }} />
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+            {credits > 0 ? `${credits} ${copy.creditsUnit} to spend` : copy.estateNav}
+          </span>
+          <span className="block text-xs" style={{ color: 'var(--ink-3)' }}>
+            {credits > 0 ? copy.estateNav : 'Log anything to start earning'}
+          </span>
+        </span>
+        <ChevronRight className="h-4 w-4 shrink-0" style={{ color: 'var(--ink-3)' }} />
+      </button>
+
       <section className="panel p-4">
         <div className="mb-2 flex items-baseline justify-between">
           <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
@@ -231,6 +257,24 @@ export default function Dashboard({
           {copy.weekNote}
         </p>
       </section>
+
+      {travelling ? (
+        <section
+          className="panel flex items-center gap-3 p-4"
+          style={{ '--surface': 'var(--good-soft)', '--line': 'var(--good-line)' }}
+        >
+          <PlaneTakeoff className="h-5 w-5 shrink-0" style={{ color: 'var(--good-ink)' }} />
+          <p className="min-w-0 flex-1 text-sm leading-snug" style={{ color: 'var(--ink-2)' }}>
+            <strong style={{ color: 'var(--ink)' }}>{untilLabel(now)}.</strong> Nothing&apos;s due,
+            and your streak carries over.
+          </p>
+          {readOnly ? null : (
+            <button type="button" onClick={() => endNow(now)} className="btn-secondary h-9 shrink-0 px-3 text-xs">
+              We&apos;re back
+            </button>
+          )}
+        </section>
+      ) : null}
 
       <section>
         <h2 className="section-title mb-2.5 px-1">
@@ -285,6 +329,7 @@ export default function Dashboard({
               area={area}
               log={log}
               now={now}
+              away={away}
               themeId={themeId}
               copy={copy}
               nameFor={nameFor}
@@ -355,7 +400,7 @@ export default function Dashboard({
           <SettingsRow
             icon={Flower2}
             label={copy.estateNav}
-            detail={`${credits} ${copy.creditsUnit} to spend`}
+            detail={copy.estateNavDetail}
             onClick={onOpenEstate}
           />
           <SettingsRow
@@ -375,6 +420,12 @@ export default function Dashboard({
                 : 'One household across two phones'
             }
             onClick={() => setShareOpen(true)}
+          />
+          <SettingsRow
+            icon={PlaneTakeoff}
+            label="Away"
+            detail={travelling ? untilLabel(now) : 'Pause everything while you travel'}
+            onClick={() => setAwayOpen(true)}
           />
           <SettingsRow
             icon={Nfc}
@@ -437,6 +488,7 @@ export default function Dashboard({
 
       <ThemePicker open={pickerOpen} onClose={() => setPickerOpen(false)} />
       <AboutSheet open={aboutOpen} onClose={() => setAboutOpen(false)} />
+      <AwaySheet open={awayOpen} onClose={() => setAwayOpen(false)} now={now} />
       {sync ? <ShareSheet open={shareOpen} onClose={() => setShareOpen(false)} sync={sync} /> : null}
       <TagSetup open={tagsOpen} onClose={() => setTagsOpen(false)} />
       <HistorySheet open={historyOpen} onClose={() => setHistoryOpen(false)} log={log} now={now} />
