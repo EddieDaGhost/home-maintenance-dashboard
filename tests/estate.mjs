@@ -59,6 +59,39 @@ export default async function run({ page, check, errors, URL }) {
   // is half of why you'd want any of it.
   check('the expensive things are listed too', (await page.getByText('Orchid').count()) === 1)
 
+  // ---- trying things on ----
+  // The whole point is that looking is free, including at what you can't yet
+  // afford. Nothing here may spend a credit or write a purchase.
+  await page.getByRole('button', { name: 'See Orchid in the scene' }).click()
+  await page.waitForTimeout(400)
+  check('the trying bar appears', (await page.getByText('Trying Orchid').count()) === 1)
+  check('and says nothing was spent', (await page.getByText(/just a look/).count()) === 1)
+  check('the balance is untouched', (await balance(page)) === '120 cr', await balance(page))
+  check(
+    "an item you can't afford still previews",
+    await page.getByRole('button', { name: /Orchid costs 320 credits/ }).isDisabled(),
+  )
+  check('and says how far off you are', (await page.getByText(/Need 200 more/).count()) === 1)
+  const nothingBought = await page.evaluate((key) => localStorage.getItem(key), ESTATE_KEY)
+  check('and nothing was written', nothingBought === null, String(nothingBought))
+
+  await page.getByRole('button', { name: 'Stop trying Orchid' }).click()
+  await page.waitForTimeout(300)
+  check('putting it back clears the bar', (await page.getByText('Trying Orchid').count()) === 0)
+
+  // Buying from the bar is the one path that does spend.
+  await page.getByRole('button', { name: 'See Terracotta in the scene' }).click()
+  await page.waitForTimeout(400)
+  await page.getByRole('button', { name: 'Buy Terracotta now' }).click()
+  await page.waitForTimeout(400)
+  check('buying from the bar spends once', (await balance(page)) === '60 cr', await balance(page))
+  check('and clears the preview', (await page.getByText(/Trying /).count()) === 0)
+  check('and leaves it worn', (await page.getByRole('button', { name: 'Put Terracotta away' }).count()) === 1)
+
+  // Back to a clean slate for the rest of the suite.
+  await seed(page, URL, { 'kitchen-dishes': dishes(30, 'me') })
+  await openEstate(page)
+
   // ---- buying ----
   await page.getByRole('button', { name: 'Buy Boston fern for 80 credits' }).click()
   await page.waitForTimeout(400)

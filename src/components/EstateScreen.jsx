@@ -1,4 +1,5 @@
-import { ArrowLeft, Check, Coins, Plus, Sparkles } from 'lucide-react'
+import { useRef, useState } from 'react'
+import { ArrowLeft, Check, Coins, Eye, Plus, Sparkles, X } from 'lucide-react'
 import {
   ALL_SLOTS,
   CATALOG_BY_SLOT,
@@ -8,6 +9,9 @@ import {
   TREAT,
   TREAT_COST,
   TREAT_HOURS,
+  COMPANION_ID,
+  TREAT_ID,
+  itemById,
   itemLabel,
 } from '../config/catalog.js'
 import {
@@ -59,21 +63,31 @@ function Price({ cost, unit, affordable }) {
  * One purchasable row. Three states: not yet affordable (still listed, with its
  * price — knowing what's coming is half the fun), affordable, and owned. Owned
  * items become a toggle for wearing them.
+ *
+ * Tapping the name tries it on, whether or not you can afford it. Looking is
+ * free, and the thing you can't afford yet is the one most worth looking at.
  */
-function ShopRow({ item, themeId, balance, unit, owned, equipped, onBuy, onEquip, readOnly }) {
+function ShopRow({ item, themeId, balance, unit, owned, equipped, trying, onBuy, onEquip, onTry, readOnly }) {
   const { name, note } = itemLabel(item, themeId)
   const affordable = canAfford(balance, item)
 
   return (
     <div className="flex items-center gap-3 px-3.5 py-3">
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-          {name}
+      <button
+        type="button"
+        onClick={() => onTry(item.id)}
+        aria-label={`See ${name} in the scene`}
+        aria-pressed={trying}
+        className="min-w-0 flex-1 text-left transition active:scale-[0.98]"
+      >
+        <span className="flex items-center gap-1.5 text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+          <span className="truncate">{name}</span>
+          <Eye className="h-3.5 w-3.5 shrink-0" style={{ color: trying ? 'var(--accent)' : 'var(--ink-3)' }} />
         </span>
         <span className="block truncate text-xs" style={{ color: 'var(--ink-3)' }}>
           {note}
         </span>
-      </span>
+      </button>
 
       {owned ? (
         <button
@@ -124,6 +138,30 @@ export default function EstateScreen({ log, now, onBack, onToast, readOnly = fal
   const boosted = boostActive(entry, now.getTime())
   const Scene = SCENES[theme.progression?.sceneKind] ?? Windowsill
 
+  // Trying something on. Local to this screen and never stored: nothing about a
+  // preview should reach the estate, the sync, or anybody else's phone.
+  const [tryingId, setTryingId] = useState(null)
+  const sceneRef = useRef(null)
+
+  const tryOn = (id) => {
+    setTryingId((current) => (current === id ? null : id))
+    // The shop runs well below the fold on a phone, and a preview you can't see
+    // is not a preview.
+    sceneRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  const trying = tryingId ? (tryingId === COMPANION_ID ? COMPANION : tryingId === TREAT_ID ? TREAT : itemById(tryingId)) : null
+  const tryingLabel = trying ? itemLabel(trying, themeId) : null
+
+  // What the scene draws: what you own, with the thing you're trying laid over
+  // the top. Companions and the treat are scene inputs too, so they preview by
+  // adding one to the list and by forcing the lively mood.
+  const shown = equippedItems(entry)
+  if (trying?.slot) shown[trying.slot] = trying
+  const shownCompanions =
+    tryingId === COMPANION_ID ? [...entry.companions, { id: 'preview', name: '' }] : entry.companions
+  const shownMood = tryingId === TREAT_ID ? MOOD.LIVELY : mood
+
   const buy = (item) => {
     buyItem(item, balance)
     onToast?.(`${itemLabel(item, themeId).name} — yours`)
@@ -170,10 +208,56 @@ export default function EstateScreen({ log, now, onBack, onToast, readOnly = fal
         </div>
       </header>
 
-      <section className="panel overflow-hidden">
-        <Scene equipped={equippedItems(entry)} companions={entry.companions} mood={mood} />
+      <section className="panel overflow-hidden" ref={sceneRef}>
+        <Scene equipped={shown} companions={shownCompanions} mood={shownMood} />
+
+        {trying ? (
+          <div
+            className="flex items-center gap-2 px-3.5 py-2.5"
+            style={{ background: 'var(--surface-2)', borderTop: '1px solid var(--line)' }}
+          >
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+                Trying {tryingLabel.name}
+              </span>
+              <span className="numeral block text-xs" style={{ color: 'var(--ink-3)' }}>
+                {trying.cost} {unit} · not bought yet
+              </span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setTryingId(null)}
+              aria-label={`Stop trying ${tryingLabel.name}`}
+              className="btn-secondary flex h-9 w-9 shrink-0 items-center justify-center"
+            >
+              <X className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              disabled={balance < trying.cost || readOnly}
+              onClick={() => {
+                if (trying.id === COMPANION_ID) companion()
+                else if (trying.id === TREAT_ID) treat()
+                else buy(trying)
+                setTryingId(null)
+              }}
+              /* Distinct from the shop row's own Buy button: two buttons with the
+                 same name on one screen is ambiguous read aloud. */
+              aria-label={
+                balance >= trying.cost
+                  ? `Buy ${tryingLabel.name} now`
+                  : `${tryingLabel.name} costs ${trying.cost} credits, ${trying.cost - balance} more than you have`
+              }
+              className="btn-primary h-9 shrink-0 px-3 text-xs"
+              style={balance < trying.cost ? { opacity: 0.35 } : undefined}
+            >
+              {balance < trying.cost ? `Need ${trying.cost - balance} more` : 'Buy it'}
+            </button>
+          </div>
+        ) : null}
+
         <p className="px-4 py-3 text-sm" style={{ color: 'var(--ink-2)' }}>
-          {mood === MOOD.QUIET ? copy.estateQuiet : copy.estateLively}
+          {trying ? 'Nothing has been spent — this is just a look.' : mood === MOOD.QUIET ? copy.estateQuiet : copy.estateLively}
         </p>
       </section>
 
@@ -205,14 +289,27 @@ export default function EstateScreen({ log, now, onBack, onToast, readOnly = fal
         <div className="panel settings-list overflow-hidden">
           <div className="flex items-center gap-3 px-3.5 py-3">
             <Plus className="h-4 w-4 shrink-0" style={{ color: 'var(--ink-3)' }} />
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-                {companionLabel.name}
+            <button
+              type="button"
+              onClick={() => tryOn(COMPANION_ID)}
+              disabled={!roomForMore}
+              aria-label={`See ${companionLabel.name} in the scene`}
+              aria-pressed={tryingId === COMPANION_ID}
+              className="min-w-0 flex-1 text-left transition active:scale-[0.98]"
+            >
+              <span className="flex items-center gap-1.5 text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+                <span className="truncate">{companionLabel.name}</span>
+                {roomForMore ? (
+                  <Eye
+                    className="h-3.5 w-3.5 shrink-0"
+                    style={{ color: tryingId === COMPANION_ID ? 'var(--accent)' : 'var(--ink-3)' }}
+                  />
+                ) : null}
               </span>
               <span className="block truncate text-xs" style={{ color: 'var(--ink-3)' }}>
                 {roomForMore ? companionLabel.note : `That's all ${MAX_COMPANIONS}. That's plenty.`}
               </span>
-            </span>
+            </button>
             {roomForMore ? (
               <>
                 <Price cost={COMPANION_COST} unit={unit} affordable={companionAffordable} />
@@ -232,14 +329,24 @@ export default function EstateScreen({ log, now, onBack, onToast, readOnly = fal
 
           <div className="flex items-center gap-3 px-3.5 py-3">
             <Sparkles className="h-4 w-4 shrink-0" style={{ color: 'var(--ink-3)' }} />
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-                {treatLabel.name}
+            <button
+              type="button"
+              onClick={() => tryOn(TREAT_ID)}
+              aria-label={`See ${treatLabel.name} in the scene`}
+              aria-pressed={tryingId === TREAT_ID}
+              className="min-w-0 flex-1 text-left transition active:scale-[0.98]"
+            >
+              <span className="flex items-center gap-1.5 text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+                <span className="truncate">{treatLabel.name}</span>
+                <Eye
+                  className="h-3.5 w-3.5 shrink-0"
+                  style={{ color: tryingId === TREAT_ID ? 'var(--accent)' : 'var(--ink-3)' }}
+                />
               </span>
               <span className="block truncate text-xs" style={{ color: 'var(--ink-3)' }}>
                 {boosted ? 'Running now — buying again adds another day.' : treatLabel.note}
               </span>
-            </span>
+            </button>
             <Price cost={TREAT_COST} unit={unit} affordable={treatAffordable} />
             <button
               type="button"
@@ -300,8 +407,10 @@ export default function EstateScreen({ log, now, onBack, onToast, readOnly = fal
                 unit={unit}
                 owned={owns(entry, item.id)}
                 equipped={entry.equipped[slot] === item.id}
+                trying={tryingId === item.id}
                 onBuy={buy}
                 onEquip={equip}
+                onTry={tryOn}
                 readOnly={readOnly}
               />
             ))}
