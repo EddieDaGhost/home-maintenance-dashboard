@@ -148,7 +148,7 @@ and no horizontal overflow — the tests assert that last one.
 ## Testing
 
 ```bash
-npm run check              # everything: 429 checks
+npm run check              # everything: 435 checks
 npm run check -- logic     # just the fast pure-logic suite (no browser)
 ```
 

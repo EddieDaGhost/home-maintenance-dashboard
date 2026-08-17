@@ -30,7 +30,8 @@ async function seed(page, URL, completions, people = null) {
 }
 
 const openEstate = async (page) => {
-  await page.getByRole('button', { name: /Your windowsill|Your ship|Your cats/ }).click()
+  // Both the dashboard row and the Setup row lead here; either will do.
+  await page.getByRole('button', { name: /Your windowsill|Your ship|Your cats/ }).first().click()
   await page.waitForTimeout(300)
 }
 
@@ -40,6 +41,14 @@ export default async function run({ page, check, errors, URL }) {
   // ---- the shop opens and shows what's been earned ----
   await seed(page, URL, { 'kitchen-dishes': dishes(30, 'me') })
   check('the dashboard advertises a balance', (await page.getByText('120 cr to spend').count()) === 1)
+
+  // The row under the stat tiles is the front door; the Setup row still works
+  // too, but this is the one that should get tapped.
+  await page.getByRole('button', { name: /120 cr to spend/ }).click()
+  await page.waitForTimeout(300)
+  check('and it opens the screen', (await page.getByRole('heading', { level: 1 }).innerText()) === 'The windowsill')
+  await page.getByRole('button', { name: 'All areas' }).click()
+  await page.waitForTimeout(300)
 
   await openEstate(page)
   check('the screen opens', (await page.getByRole('heading', { level: 1 }).innerText()) === 'The windowsill')

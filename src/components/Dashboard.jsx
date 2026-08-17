@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import {
   CalendarPlus,
   ChevronRight,
+  Coins,
   Download,
   Flame,
   Flower2,
@@ -223,6 +224,25 @@ export default function Dashboard({
         <StatTile icon={PartyPopper} label={copy.todayLabel} value={today} tone="var(--good)" />
       </section>
 
+      {/* Deliberately not a fourth tile — four across a 390px phone is cramped,
+          and this should read as an invitation rather than another number. */}
+      <button
+        type="button"
+        onClick={onOpenEstate}
+        className="panel flex w-full items-center gap-3 p-3.5 text-left transition active:scale-[0.99]"
+      >
+        <Coins className="h-5 w-5 shrink-0" style={{ color: '#f59e0b' }} />
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+            {credits > 0 ? `${credits} ${copy.creditsUnit} to spend` : copy.estateNav}
+          </span>
+          <span className="block text-xs" style={{ color: 'var(--ink-3)' }}>
+            {credits > 0 ? copy.estateNav : 'Log anything to start earning'}
+          </span>
+        </span>
+        <ChevronRight className="h-4 w-4 shrink-0" style={{ color: 'var(--ink-3)' }} />
+      </button>
+
       <section className="panel p-4">
         <div className="mb-2 flex items-baseline justify-between">
           <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
@@ -380,7 +400,7 @@ export default function Dashboard({
           <SettingsRow
             icon={Flower2}
             label={copy.estateNav}
-            detail={`${credits} ${copy.creditsUnit} to spend`}
+            detail={copy.estateNavDetail}
             onClick={onOpenEstate}
           />
           <SettingsRow
