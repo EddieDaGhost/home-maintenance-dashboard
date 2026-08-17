@@ -36,6 +36,7 @@ const SLOT_TITLES = {
   vessel: { home: 'The plant', starship: 'The hull', cats: 'The cat' },
   finish: { home: 'The pot', starship: 'Livery', cats: 'Coat' },
   scene: { home: 'The window', starship: 'The dock', cats: 'The room' },
+  weather: { home: 'Weather', starship: 'Out there', cats: 'Weather' },
   flair: { home: 'Finishing touches', starship: 'Markings', cats: 'Accessories' },
 }
 
@@ -113,7 +114,7 @@ export default function EstateScreen({ log, now, onBack, onToast, readOnly = fal
   const { themeId, theme, copy } = useTheme()
   const { allTasks } = useAreas()
   const { activePerson, activeId, people, isShared } = usePeople()
-  const { entry, buyItem, equip, buyCompanion, buyTreat } = useEstate()
+  const { entry, buyItem, equip, buyCompanion, renameCompanion, buyTreat } = useEstate()
   const { away } = useAway()
 
   const earned = creditsEarned(log, allTasks, activeId, people)
@@ -257,6 +258,33 @@ export default function EstateScreen({ log, now, onBack, onToast, readOnly = fal
           yours for good.
         </p>
       </section>
+
+      {/* --- naming what you've collected ---------------------------------- */}
+      {entry.companions.length ? (
+        <section>
+          <h2 className="section-title mb-2.5 px-1">{copy.shelfTitle}</h2>
+          <div className="panel space-y-2 p-3.5">
+            {entry.companions.map((companion, index) => (
+              <label key={companion.id} className="flex items-center gap-3">
+                <span className="w-6 shrink-0 text-center text-xs" style={{ color: 'var(--ink-3)' }}>
+                  {index + 1}
+                </span>
+                <input
+                  className="field"
+                  aria-label={`Name for ${companionLabel.name.toLowerCase()} ${index + 1}`}
+                  placeholder={copy.companionPlaceholder}
+                  value={companion.name}
+                  disabled={readOnly}
+                  onChange={(event) => renameCompanion(companion.id, event.target.value)}
+                />
+              </label>
+            ))}
+          </div>
+          <p className="mt-2 px-1 text-xs" style={{ color: 'var(--ink-3)' }}>
+            Names are yours alone and travel with your scene. Leave them blank if you&apos;d rather.
+          </p>
+        </section>
+      ) : null}
 
       {/* --- one section per slot ------------------------------------------ */}
       {ALL_SLOTS.map((slot) => (

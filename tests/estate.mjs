@@ -89,6 +89,29 @@ export default async function run({ page, check, errors, URL }) {
     (await page.getByRole('button', { name: 'Put Boston fern away' }).count()) === 1,
   )
 
+  // ---- the weather slot, and naming what you collect ----
+  await seed(page, URL, { 'kitchen-dishes': dishes(120, 'me') })
+  await openEstate(page)
+  check('the weather slot is on offer', (await page.getByText('Rain on the glass').count()) === 1)
+  await page.getByRole('button', { name: 'Buy Rain on the glass for 110 credits' }).click()
+  await page.waitForTimeout(400)
+  check('weather can be worn', (await page.getByRole('button', { name: 'Put Rain on the glass away' }).count()) === 1)
+  check('and it does not disturb the other slots', (await page.getByRole('button', { name: /Buy Boston fern/ }).count()) === 1)
+
+  check('nothing is on the sill yet', (await page.getByRole('textbox', { name: /Name for another plant/ }).count()) === 0)
+  await page.getByRole('button', { name: /Buy Another plant/ }).click()
+  await page.waitForTimeout(400)
+  const nameField = page.getByRole('textbox', { name: 'Name for another plant 1' })
+  check('a companion can be named', (await nameField.count()) === 1)
+  await nameField.fill('Bruce')
+  await page.waitForTimeout(400)
+  await page.reload({ waitUntil: 'networkidle' })
+  await openEstate(page)
+  check(
+    'and the name sticks',
+    (await page.getByRole('textbox', { name: 'Name for another plant 1' }).inputValue()) === 'Bruce',
+  )
+
   // ---- falling behind, and the way back ----
   await seed(page, URL, {
     'kitchen-dishes': dishes(30, 'me'),

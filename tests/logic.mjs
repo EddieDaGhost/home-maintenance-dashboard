@@ -14,7 +14,9 @@ import {
 import { buildCalendar } from '../src/lib/calendar.js'
 import { weekIndex } from '../src/lib/date.js'
 import {
+  ALL_SLOTS,
   CATALOG,
+  CATALOG_BY_SLOT,
   COMPANION_COST,
   MAX_COMPANIONS,
   TREAT_COST,
@@ -29,6 +31,7 @@ import {
   entryFor,
   equip,
   normalizeEstate,
+  renameCompanion,
 } from '../src/lib/estate.js'
 import { buildBackup, parseBackup } from '../src/lib/backup.js'
 import {
@@ -157,6 +160,13 @@ export default async function run({ check }) {
     true,
   )
   is('itemById finds one', itemById('vessel-fern')?.slot, 'vessel')
+  is('every slot has something in it', ALL_SLOTS.every((slot) => CATALOG_BY_SLOT[slot].length > 1), true)
+  is(
+    'each slot lists cheapest first',
+    ALL_SLOTS.every((slot) => CATALOG_BY_SLOT[slot].every((item, i, list) => i === 0 || list[i - 1].cost <= item.cost)),
+    true,
+  )
+  is('every item sits in a real slot', CATALOG.every((i) => ALL_SLOTS.includes(i.slot)), true)
   is('itemById shrugs at nonsense', itemById('nope'), null)
   is(
     'every look has the estate copy it needs',
@@ -218,6 +228,11 @@ export default async function run({ check }) {
   let many = {}
   for (let i = 0; i < MAX_COMPANIONS + 2; i += 1) many = buyCompanion(many, 'eddie', COMPANION_COST, 99999)
   is('companions stop at the cap', entryFor(many, 'eddie').companions.length, MAX_COMPANIONS)
+  is('companions start unnamed', entryFor(many, 'eddie').companions[0].name, '')
+  const named = renameCompanion(many, 'eddie', entryFor(many, 'eddie').companions[0].id, '  Bruce  ')
+  is('and can be named', entryFor(named, 'eddie').companions[0].name, 'Bruce')
+  is('naming one leaves the others alone', entryFor(named, 'eddie').companions[1].name, '')
+  is('a name survives being read back', normalizeEstate(named).eddie.companions[0].name, 'Bruce')
   is('and only the ones bought were charged', entryFor(many, 'eddie').spent, MAX_COMPANIONS * COMPANION_COST)
 
   const T0 = MON.getTime()

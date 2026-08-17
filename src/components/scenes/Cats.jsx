@@ -26,6 +26,7 @@ function darken(hex, amount = 0.35) {
  * Coon's chest floof. `stripes` is a tabby.
  */
 const BREEDS = {
+  succulent: { stripes: true, scale: 0.72 },
   fern: { stripes: true, scale: 1 },
   monstera: { ruff: true, scale: 1.16 },
   orchid: { points: true, scale: 0.95 },
@@ -131,10 +132,10 @@ function Cat({ x, y, art, coat, mood, scale = 1 }) {
   )
 }
 
-function WindowPerch({ dim }) {
+function WindowPerch({ dim, sky = '#cfe6f2' }) {
   return (
     <g>
-      <rect x="196" y="16" width="104" height="96" rx="4" fill={dim ? '#5d5a72' : '#cfe6f2'} />
+      <rect x="196" y="16" width="104" height="96" rx="4" fill={dim ? '#5d5a72' : sky} />
       <path d="M196 112 Q234 84 262 98 Q284 82 300 92 L300 112 Z" fill={dim ? '#3f4a49' : '#b8d3a8'} />
       <g fill="none" stroke={dim ? '#7c6a58' : '#e0cdb2'} strokeWidth="6">
         <rect x="196" y="16" width="104" height="96" rx="4" />
@@ -184,12 +185,69 @@ function NightLight({ dim }) {
   )
 }
 
+function JingleBall({ dim }) {
+  return (
+    <g opacity={dim ? 0.7 : 1}>
+      <circle cx="228" cy="176" r="7" fill="#e8b04a" stroke="#c08f2e" />
+      <path d="M223 173 q5 4 10 0 M223 179 q5 -4 10 0" stroke="#c08f2e" strokeWidth="1" fill="none" />
+    </g>
+  )
+}
+
+
+/**
+ * Deterministic scatter. Stepping a counter through a modulo lands points in
+ * neat diagonal strings — snow came out looking like beads on a wire — so this
+ * hashes the index instead. Same layout every render, like SpaceBackdrop.
+ */
+function scatter(i, seed) {
+  const t = Math.sin(i * 127.1 + seed * 311.7) * 43758.5453
+  return t - Math.floor(t)
+}
+
+/** Whatever is happening on the other side of the glass — and, in a room with
+    no window bought yet, what the light is doing anyway. */
+function Weather({ art, dim }) {
+  if (art === 'rain') {
+    return (
+      <g opacity={dim ? 0.5 : 0.7}>
+        {Array.from({ length: 22 }, (_, i) => {
+          const rx = 200 + scatter(i, 1) * 100
+          const ry = 20 + scatter(i, 2) * 86
+          return (
+            <path key={i} d={`M${rx} ${ry} l-2.5 8`} stroke="#cfe3ef" strokeWidth="1.5" strokeLinecap="round" />
+          )
+        })}
+        <rect y="150" width="320" height="50" fill="#5b6b78" opacity="0.16" />
+      </g>
+    )
+  }
+  if (art === 'snow') {
+    return (
+      <g>
+        {Array.from({ length: 24 }, (_, i) => {
+          const sx = 198 + scatter(i, 3) * 102
+          const sy = 18 + scatter(i, 4) * 90
+          return <circle key={i} cx={sx} cy={sy} r={scatter(i, 5) > 0.75 ? 2.4 : 1.5} fill="#ffffff" opacity={dim ? 0.6 : 0.9} />
+        })}
+      </g>
+    )
+  }
+  if (art === 'glow') {
+    return <rect width="320" height="200" fill="url(#cats-golden)" />
+  }
+  return null
+}
+
 export default function Cats({ equipped = {}, companions = [], mood = MOOD.LIVELY }) {
   const dim = mood === MOOD.QUIET
   const coat = equipped[SLOTS.FINISH]?.color ?? COAT_DEFAULT
   const art = equipped[SLOTS.VESSEL]?.art
   const sceneArt = equipped[SLOTS.SCENE]?.art
   const flairArt = equipped[SLOTS.FLAIR]?.art
+  const weatherArt = equipped[SLOTS.WEATHER]?.art
+  // Same rule as the windowsill: rain has to take the sunbeam with it.
+  const overcast = weatherArt === 'rain' || weatherArt === 'snow'
 
   // Companions fan out either side of the main cat, smaller, so the one you
   // paid the most for stays the one you look at first.
@@ -218,6 +276,11 @@ export default function Cats({ equipped = {}, companions = [], mood = MOOD.LIVEL
           <stop offset="0%" stopColor="#ffe9a8" stopOpacity={dim ? 0.05 : 0.5} />
           <stop offset="100%" stopColor="#ffe9a8" stopOpacity="0" />
         </linearGradient>
+        <linearGradient id="cats-golden" x1="1" y1="0" x2="0.2" y2="1">
+          <stop offset="0%" stopColor="#ffb257" stopOpacity={dim ? 0.28 : 0.5} />
+          <stop offset="60%" stopColor="#ffd08a" stopOpacity="0.16" />
+          <stop offset="100%" stopColor="#ffd08a" stopOpacity="0" />
+        </linearGradient>
         <radialGradient id="cats-lamp">
           <stop offset="0%" stopColor="#fde68a" stopOpacity={dim ? 0.8 : 0.55} />
           <stop offset="100%" stopColor="#fde68a" stopOpacity="0" />
@@ -228,7 +291,14 @@ export default function Cats({ equipped = {}, companions = [], mood = MOOD.LIVEL
       <rect y="150" width="320" height="50" fill={dim ? '#40342c' : '#c9a678'} />
       <rect y="150" width="320" height="4" fill={dim ? '#584839' : '#b08c5f'} />
 
-      {sceneArt === 'herbs' ? <WindowPerch dim={dim} /> : null}
+      {sceneArt === 'herbs' ? (
+        <WindowPerch
+          dim={dim}
+          sky={weatherArt === 'rain' ? '#a7b8c2' : weatherArt === 'snow' ? '#d3dfe8' : weatherArt === 'glow' ? '#f7cf9b' : '#cfe6f2'}
+        />
+      ) : null}
+
+      <Weather art={weatherArt} dim={dim} />
 
       {/* The warm patch. Everything in this theme is arranged around it. */}
       <path d="M232 24 L300 24 L300 150 L120 190 Z" fill="url(#cats-beam)" />
@@ -245,6 +315,7 @@ export default function Cats({ equipped = {}, companions = [], mood = MOOD.LIVEL
 
       {flairArt === 'suncatcher' ? <BellCollar dim={dim} x={160} y={112} scale={1} /> : null}
       {flairArt === 'bunting' ? <BowTie dim={dim} x={160} y={112} scale={1} /> : null}
+      {flairArt === 'chimes' ? <JingleBall dim={dim} /> : null}
     </svg>
   )
 }

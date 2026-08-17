@@ -68,7 +68,7 @@ Other commands:
 ```bash
 npm run build     # build the production version into dist/
 npm run preview   # preview that production build locally
-npm run check     # run the tests (435 checks)
+npm run check     # run the tests (448 checks)
 ```
 
 `npm run check` drives a real browser through the app — logging, persistence,
@@ -286,11 +286,15 @@ rather than pretending you never went.
 Everything you log is worth points. Points measure the week and reset on Monday;
 **credits** are the same numbers kept forever, and they buy things.
 
-**Setup → Your windowsill** opens a scene that is yours to build. Credits buy a
-plant, a pot glaze, a view, and a few small joys — plus more plants, and plant
-food that perks everything up for a day. In Starship the same purchases are a
-hull, a livery, a dock and a decal; in Cats they're a cat, a coat, a room and a
-collar.
+The balance sits on the dashboard, under your streak. Tapping it opens a scene
+that is yours to build: a plant, a pot glaze, a view, the weather outside, and a
+few small joys — plus more plants (name them if you like), and plant food that
+perks everything up for a day. In Starship the same purchases are a hull, a
+livery, a dock, whatever you're flying through, and a decal; in Cats they're a
+cat, a coat, a room, the weather, and a collar.
+
+Eighteen things to buy, 50–320 credits each. A fully kept week is about 120, so
+the cheap end is a couple of days and the whole catalogue is a few months.
 
 Three things it deliberately does *not* do:
 

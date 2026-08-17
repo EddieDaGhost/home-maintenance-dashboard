@@ -17,6 +17,7 @@ export const SLOTS = {
   VESSEL: 'vessel',
   FINISH: 'finish',
   SCENE: 'scene',
+  WEATHER: 'weather',
   FLAIR: 'flair',
 }
 
@@ -36,6 +37,17 @@ const label = (home, starship, cats) => ({ home, starship, cats })
 
 export const CATALOG = [
   // --- the main character -------------------------------------------------
+  {
+    id: 'vessel-succulent',
+    slot: SLOTS.VESSEL,
+    cost: 50,
+    art: 'succulent',
+    labels: label(
+      { name: 'Succulent', note: 'Nearly impossible to disappoint.' },
+      { name: 'Pod runner', note: 'One seat, no cargo, goes anywhere.' },
+      { name: 'Kitten', note: 'Small. Extremely loud.' },
+    ),
+  },
   {
     id: 'vessel-fern',
     slot: SLOTS.VESSEL,
@@ -108,6 +120,31 @@ export const CATALOG = [
     ),
   },
 
+  {
+    id: 'finish-sage',
+    slot: SLOTS.FINISH,
+    cost: 95,
+    art: 'sage',
+    color: '#7d9471',
+    labels: label(
+      { name: 'Sage glaze', note: 'Quiet green. Goes with everything.' },
+      { name: 'Survey green', note: 'Standard issue, and none the worse.' },
+      { name: 'Silver tabby', note: 'Grey on grey on grey.' },
+    ),
+  },
+  {
+    id: 'finish-blush',
+    slot: SLOTS.FINISH,
+    cost: 150,
+    art: 'blush',
+    color: '#d08a92',
+    labels: label(
+      { name: 'Blush pink', note: 'Bolder than it sounds.' },
+      { name: 'Dawn livery', note: 'Pink, and unashamed about it.' },
+      { name: 'Cream point', note: 'Pale, with warm ears.' },
+    ),
+  },
+
   // --- the setting --------------------------------------------------------
   {
     id: 'scene-herbs',
@@ -129,6 +166,43 @@ export const CATALOG = [
       { name: 'Lace curtain', note: 'Softens the afternoon glare.' },
       { name: 'Nebula view', note: 'Something enormous, very far away.' },
       { name: 'Sunny rug', note: 'Claimed within four minutes.' },
+    ),
+  },
+
+  // --- what the sky is doing ----------------------------------------------
+  // The cheapest slot to add that still changes the whole picture: each scene
+  // already has gradients, so weather is one overlay layer per scene.
+  {
+    id: 'weather-rain',
+    slot: SLOTS.WEATHER,
+    cost: 110,
+    art: 'rain',
+    labels: label(
+      { name: 'Rain on the glass', note: 'The best possible reason to stay in.' },
+      { name: 'Ion drizzle', note: 'Charged particles, streaking past.' },
+      { name: 'Rain outside', note: 'Which is why nobody has moved.' },
+    ),
+  },
+  {
+    id: 'weather-snow',
+    slot: SLOTS.WEATHER,
+    cost: 170,
+    art: 'snow',
+    labels: label(
+      { name: 'First snow', note: 'Everything goes quiet.' },
+      { name: 'Ice field', note: 'Drifting slowly, all the way past.' },
+      { name: 'Snow outside', note: 'Watched intently from indoors.' },
+    ),
+  },
+  {
+    id: 'weather-glow',
+    slot: SLOTS.WEATHER,
+    cost: 240,
+    art: 'glow',
+    labels: label(
+      { name: 'Golden hour', note: 'Twenty minutes, every single day.' },
+      { name: 'Aurora', note: 'A ribbon of light along the hull.' },
+      { name: 'Golden hour', note: 'Prime napping conditions.' },
     ),
   },
 
@@ -156,6 +230,17 @@ export const CATALOG = [
     ),
   },
   {
+    id: 'flair-chimes',
+    slot: SLOTS.FLAIR,
+    cost: 160,
+    art: 'chimes',
+    labels: label(
+      { name: 'Wind chimes', note: 'Tolerable at first.' },
+      { name: 'Antenna array', note: 'Listening to something.' },
+      { name: 'Jingle ball', note: 'Under the sofa within a day.' },
+    ),
+  },
+  {
     id: 'flair-lantern',
     slot: SLOTS.FLAIR,
     cost: 200,
@@ -168,8 +253,12 @@ export const CATALOG = [
   },
 ]
 
+/** Cheapest first inside each slot, so the shop reads as a ladder to climb. */
 export const CATALOG_BY_SLOT = Object.fromEntries(
-  ALL_SLOTS.map((slot) => [slot, CATALOG.filter((item) => item.slot === slot)]),
+  ALL_SLOTS.map((slot) => [
+    slot,
+    CATALOG.filter((item) => item.slot === slot).sort((a, b) => a.cost - b.cost),
+  ]),
 )
 
 const BY_ID = Object.fromEntries(CATALOG.map((item) => [item.id, item]))

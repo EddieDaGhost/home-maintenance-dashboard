@@ -148,7 +148,7 @@ and no horizontal overflow — the tests assert that last one.
 ## Testing
 
 ```bash
-npm run check              # everything: 435 checks
+npm run check              # everything: 448 checks
 npm run check -- logic     # just the fast pure-logic suite (no browser)
 ```
 
@@ -214,7 +214,14 @@ on the estate screen.
   count as that person's rather than nobody's.
 - **One catalogue, three costumes.** An item is the same purchase in every look;
   only its name and its drawing change. `labels` in `src/config/catalog.js` must
-  cover **all three** themes — the logic suite fails a half-added item.
+  cover **all three** themes — the logic suite fails a half-added item, and the
+  slot needs art in all three scene components too.
+- **Weather has to change the light**, not sit on top of it. Rain falling past a
+  bright sun reads as a sun-shower, which is not what anybody bought — so the
+  weather item drives the sky colour and the sunbeam as well as drawing itself.
+- **Scatter by hashing the index, not by stepping a modulo.** `(i * 41) % 244`
+  lands points in neat diagonal strings; the snow came out looking like beads on
+  a wire. `scatter()` in each scene hashes instead, and is still deterministic.
 - **Item ids are permanent**, for the same reason area and task ids are:
   ownership is recorded by id, so renaming one un-buys it for everybody.
 - **Liveliness is computed, never stored.** `sceneMood()` reads `STATUS.OVERDUE`
