@@ -68,7 +68,7 @@ Other commands:
 ```bash
 npm run build     # build the production version into dist/
 npm run preview   # preview that production build locally
-npm run check     # run the tests (513 checks)
+npm run check     # run the tests (525 checks)
 ```
 
 `npm run check` drives a real browser through the app — logging, persistence,
@@ -325,6 +325,11 @@ cat, a coat, a room, the weather, and a collar.
 
 Eighteen things to buy, 50–320 credits each. A fully kept week is about 120, so
 the cheap end is a couple of days and the whole catalogue is a few months.
+
+**Try before you buy.** Tap any item's name and it appears in the scene above,
+with a bar telling you what it costs and that nothing has been spent. That works
+for things you can't afford yet, which is the point — it's how you decide what
+you're saving for.
 
 Three things it deliberately does *not* do:
 

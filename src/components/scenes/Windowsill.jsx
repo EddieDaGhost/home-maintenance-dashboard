@@ -1,5 +1,6 @@
 import { SLOTS } from '../../config/catalog.js'
 import { MOOD } from '../../lib/credits.js'
+import { Blob, Ground, SceneDefs, Solid, shade, tintUp } from './parts.jsx'
 
 // The Homestead scene: a windowsill, whatever you've put on it, and the light.
 //
@@ -32,106 +33,172 @@ const LEAF = {
 function Sprout({ x, y, tint }) {
   return (
     <g transform={`translate(${x} ${y})`}>
-      <path d="M0 0 V-18" stroke={tint.dark} strokeWidth="2" strokeLinecap="round" fill="none" />
-      <path d="M0 -12 C-9 -16 -12 -24 -3 -24 C-1 -20 0 -16 0 -12 Z" fill={tint.mid} />
-      <path d="M0 -16 C9 -20 12 -28 3 -28 C1 -24 0 -20 0 -16 Z" fill={tint.light} />
+      <path d="M0 0 C-1 -8 1 -13 0 -19" stroke={tint.dark} strokeWidth="1.8" strokeLinecap="round" fill="none" />
+      <Solid d="M0 -12 C-9 -16 -12 -25 -3 -25 C-1 -20 0 -16 0 -12 Z" fill={tint.mid} strokeWidth={0.7} />
+      <Solid d="M0 -16 C9 -20 12 -29 3 -29 C1 -24 0 -20 0 -16 Z" fill={tint.light} strokeWidth={0.7} />
     </g>
   )
 }
 
+/**
+ * Fronds that taper. The first pass used identical ellipses all the way up,
+ * which is what made it read as a bottle brush rather than a fern.
+ */
 function Fern({ x, y, tint }) {
-  const fronds = [-62, -40, -18, 4, 26, 48]
+  const fronds = [-68, -46, -24, -2, 20, 42, 62]
   return (
     <g transform={`translate(${x} ${y})`}>
-      {fronds.map((angle, i) => (
-        <g key={angle} transform={`rotate(${angle})`}>
-          <path
-            d="M0 0 C-3 -20 -2 -38 0 -52"
-            stroke={i % 2 ? tint.mid : tint.dark}
-            strokeWidth="2"
-            fill="none"
-            strokeLinecap="round"
-          />
-          {[10, 20, 30, 40].map((d) => (
-            <g key={d}>
-              <ellipse cx="-5" cy={-d} rx="5" ry="2.6" fill={i % 2 ? tint.light : tint.mid} />
-              <ellipse cx="5" cy={-d} rx="5" ry="2.6" fill={i % 2 ? tint.mid : tint.dark} />
-            </g>
-          ))}
-        </g>
-      ))}
+      {fronds.map((angle, i) => {
+        const length = i % 2 ? 54 : 46
+        const near = i % 2 ? tint.light : tint.mid
+        const far = i % 2 ? tint.mid : tint.dark
+        return (
+          <g key={angle} transform={`rotate(${angle})`}>
+            <path
+              d={`M0 2 C-4 ${-length * 0.4} -2 ${-length * 0.75} 1 ${-length}`}
+              stroke={far}
+              strokeWidth="1.8"
+              fill="none"
+              strokeLinecap="round"
+            />
+            {[0.24, 0.42, 0.58, 0.72, 0.85].map((t) => {
+              const d = length * t
+              // Leaflets shrink and sweep upward toward the tip.
+              const size = 6.4 * (1 - t * 0.72)
+              const lean = 10 + t * 26
+              return (
+                <g key={t}>
+                  <Blob cx={-size - 1} cy={-d} rx={size} ry={size * 0.44} fill={near} rotate={lean} outline={false} />
+                  <Blob cx={size + 1} cy={-d} rx={size} ry={size * 0.44} fill={far} rotate={-lean} outline={false} />
+                </g>
+              )
+            })}
+          </g>
+        )
+      })}
     </g>
   )
 }
 
+/**
+ * A monstera is a heart with pieces cut out of it. The first pass drew circles
+ * with grey dashes laid over them, which read as a bush with scratches — the
+ * notches have to come out of the silhouette itself.
+ */
 function Monstera({ x, y, tint }) {
   const leaf = (dx, dy, rot, size, fill) => (
-    <g transform={`translate(${dx} ${dy}) rotate(${rot}) scale(${size})`}>
-      <path
-        d="M0 0 C-22 -6 -26 -32 0 -38 C26 -32 22 -6 0 0 Z"
+    <g key={`${dx}-${dy}`} transform={`translate(${dx} ${dy}) rotate(${rot}) scale(${size})`}>
+      <Solid
+        d={
+          'M0 2 C-13 0 -22 -9 -23 -19 ' +
+          'L-14 -17 L-21 -23 C-21 -29 -17 -34 -11 -37 ' +
+          'L-8 -30 L-8 -38 C-5 -39 -2 -40 0 -40 ' +
+          'C2 -40 5 -39 8 -38 L8 -30 L11 -37 ' +
+          'C17 -34 21 -29 21 -23 L14 -17 L23 -19 ' +
+          'C22 -9 13 0 0 2 Z'
+        }
         fill={fill}
+        strokeWidth={0.9}
       />
-      {/* The splits that make a monstera a monstera. Kept short of the edge —
-          a split that overshoots the leaf reads as a stray grey dash. */}
-      <path d="M-4 -10 H-15 M-4 -20 H-17 M-4 -29 H-11" stroke="#1e4d33" strokeWidth="2.4" opacity="0.5" />
-      <path d="M4 -14 H15 M4 -24 H15" stroke="#1e4d33" strokeWidth="2.4" opacity="0.5" />
+      {/* The midrib and the veins running out to each lobe. */}
+      <path
+        d="M0 1 V-38 M0 -12 L-14 -18 M0 -12 L14 -18 M0 -24 L-9 -32 M0 -24 L9 -32"
+        stroke={shade(fill, 0.3)}
+        strokeWidth="0.9"
+        fill="none"
+        opacity="0.75"
+      />
     </g>
   )
   return (
     <g transform={`translate(${x} ${y})`}>
-      <path d="M0 0 C-6 -18 -4 -34 -14 -44" stroke={tint.dark} strokeWidth="2.5" fill="none" />
-      <path d="M0 0 C4 -20 8 -32 18 -42" stroke={tint.dark} strokeWidth="2.5" fill="none" />
-      <path d="M0 0 V-52" stroke={tint.dark} strokeWidth="2.5" fill="none" />
-      {leaf(-16, -44, -22, 1, tint.mid)}
-      {leaf(20, -42, 24, 0.92, tint.light)}
-      {leaf(0, -52, 2, 1.1, tint.dark)}
+      <path d="M0 2 C-6 -16 -6 -32 -15 -42" stroke={tint.dark} strokeWidth="2.4" fill="none" strokeLinecap="round" />
+      <path d="M0 2 C4 -18 9 -30 19 -40" stroke={tint.dark} strokeWidth="2.4" fill="none" strokeLinecap="round" />
+      <path d="M0 2 V-50" stroke={tint.dark} strokeWidth="2.4" fill="none" strokeLinecap="round" />
+      {leaf(-17, -42, -24, 0.92, tint.mid)}
+      {leaf(21, -40, 26, 0.86, tint.light)}
+      {leaf(0, -50, 2, 1.06, tint.dark)}
     </g>
   )
 }
 
+/**
+ * The 320-credit item, and it has to look like it: five blooms on an arching
+ * spike, a bud still to open, aerial roots over the rim, and proper strap
+ * leaves. Detail is the thing you're actually buying at the top of a slot.
+ */
 function Orchid({ x, y, tint, mood }) {
-  const bloom = mood === MOOD.QUIET ? '#d9c3d2' : '#e8a9cd'
-  const heart = mood === MOOD.QUIET ? '#b99cb2' : '#c76fa8'
+  const bloom = mood === MOOD.QUIET ? '#d9c3d2' : '#eaa8cf'
+  const heart = mood === MOOD.QUIET ? '#a98aa4' : '#b8559b'
+
+  const flower = (bx, by, size, rot) => (
+    <g key={`${bx}-${by}`} transform={`translate(${bx} ${by}) rotate(${rot}) scale(${size})`}>
+      {/* Three broad petals behind, two narrow ones in front — an orchid, not a daisy. */}
+      {[200, 340, 90].map((a) => (
+        <Blob key={a} cx={0} cy={-6.5} rx={5} ry={7} fill={bloom} rotate={a} outline={false} />
+      ))}
+      {[250, 290].map((a) => (
+        <Blob key={a} cx={0} cy={-5.5} rx={3.4} ry={6} fill={tintUp(bloom, 0.3)} rotate={a} outline={false} />
+      ))}
+      <Blob cx={0} cy={1.5} rx={4} ry={4.6} fill={heart} outline={false} />
+      <circle cy="0.5" r="1.4" fill={tintUp(bloom, 0.55)} />
+    </g>
+  )
+
   return (
     <g transform={`translate(${x} ${y})`}>
-      <path d="M0 0 C-14 -4 -20 -10 -24 -14" stroke={tint.dark} strokeWidth="2" fill="none" />
-      <ellipse cx="-26" cy="-14" rx="12" ry="4.5" fill={tint.mid} transform="rotate(-12 -26 -14)" />
-      <ellipse cx="22" cy="-10" rx="12" ry="4.5" fill={tint.mid} transform="rotate(14 22 -10)" />
-      <path d="M0 0 C2 -22 6 -40 2 -58" stroke={tint.dark} strokeWidth="2.2" fill="none" strokeLinecap="round" />
-      {[
-        [3, -26, 0.85],
-        [1, -40, 1],
-        [2, -54, 0.8],
-      ].map(([bx, by, s]) => (
-        <g key={by} transform={`translate(${bx} ${by}) scale(${s})`}>
-          {[0, 72, 144, 216, 288].map((a) => (
-            <ellipse key={a} cx="0" cy="-6" rx="4.2" ry="6.5" fill={bloom} transform={`rotate(${a})`} />
-          ))}
-          <circle r="3" fill={heart} />
-        </g>
-      ))}
+      {/* Aerial roots, over the rim of the pot. */}
+      <path
+        d="M-9 2 C-15 6 -19 10 -17 15 M7 2 C13 7 15 12 12 16"
+        stroke={tintUp(tint.mid, 0.35)}
+        strokeWidth="2"
+        fill="none"
+        strokeLinecap="round"
+        opacity="0.9"
+      />
+      {/* Strap leaves at the base. */}
+      <Solid d="M-2 2 C-16 0 -26 -6 -30 -13 C-24 -18 -12 -15 -2 -6 Z" fill={tint.mid} strokeWidth={0.8} />
+      <Solid d="M2 2 C15 1 24 -4 28 -10 C22 -15 11 -12 2 -4 Z" fill={tint.dark} strokeWidth={0.8} />
+      {/* The spike, arching over as they do. */}
+      <path
+        d="M0 0 C3 -18 10 -34 8 -52 C7 -60 2 -63 -4 -63"
+        stroke={tint.dark}
+        strokeWidth="2"
+        fill="none"
+        strokeLinecap="round"
+      />
+      {flower(6, -22, 0.86, -6)}
+      {flower(10, -35, 1, 4)}
+      {flower(9, -48, 0.94, 12)}
+      {flower(0, -60, 0.8, 26)}
+      {/* One still to open. */}
+      <Blob cx={-6} cy={-63} rx={2.8} ry={4} fill={tintUp(bloom, 0.2)} rotate={30} outline={false} />
     </g>
   )
 }
 
-/** The 50-credit first purchase: squat, round, very hard to kill. */
+/**
+ * The 50-credit first purchase. Deliberately the plainest thing in the shop —
+ * a squat rosette — because the cheap end should look cheap next to the orchid.
+ */
 function Succulent({ x, y, tint }) {
   const petal = (angle, length, fill) => (
-    <ellipse
+    <Blob
       key={`${angle}-${length}`}
-      cx="0"
+      cx={0}
       cy={-length / 2}
-      rx="5.5"
+      rx={5.4}
       ry={length / 2}
       fill={fill}
-      transform={`rotate(${angle})`}
+      rotate={angle}
+      strokeWidth={0.7}
     />
   )
   return (
-    <g transform={`translate(${x} ${y - 20}) scale(1.15)`}>
+    <g transform={`translate(${x} ${y - 11}) scale(1.25)`}>
       {[0, 60, 120, 180, 240, 300].map((a) => petal(a, 26, tint.mid))}
       {[30, 90, 150, 210, 270, 330].map((a) => petal(a, 18, tint.light))}
-      <circle r="4.5" fill={tint.dark} />
+      <Blob cx={0} cy={0} rx={4.4} ry={4.4} fill={tint.dark} strokeWidth={0.7} />
     </g>
   )
 }
@@ -145,21 +212,29 @@ function Plant({ art, x, y, tint, mood }) {
 
 function Pot({ x, y, width, color }) {
   const half = width / 2
+  const depth = width * 0.62
   return (
-    <g transform={`translate(${x} ${y})`}>
-      <path
-        d={`M${-half} 0 L${half} 0 L${half - width * 0.13} ${width * 0.62} L${-half + width * 0.13} ${width * 0.62} Z`}
-        fill={color}
-      />
-      <rect x={-half - 2} y={-5} width={width + 4} height="7" rx="2" fill={color} />
-      {/* A highlight down the left so the pot reads as round, not a trapezoid. */}
-      <path
-        d={`M${-half + 4} 2 L${-half + width * 0.17} ${width * 0.58}`}
-        stroke="#ffffff"
-        strokeOpacity="0.22"
-        strokeWidth="3"
-        strokeLinecap="round"
-      />
+    <g>
+      <Ground x={x} y={y + depth} w={width * 1.5} />
+      <g transform={`translate(${x} ${y})`}>
+        <Solid
+          d={`M${-half} 0 L${half} 0 L${half - width * 0.13} ${depth} Q0 ${depth + width * 0.1} ${-half + width * 0.13} ${depth} Z`}
+          fill={color}
+        />
+        {/* The rim, as a band with its own lit top edge — this is what makes a
+            pot look like a cylinder rather than a trapezoid. */}
+        <Solid d={`M${-half - 2.5} -6 L${half + 2.5} -6 L${half + 2.5} 1.5 L${-half - 2.5} 1.5 Z`} fill={color} />
+        <ellipse cx="0" cy="-6" rx={half + 2.5} ry={width * 0.11} fill={shade(color, 0.42)} />
+        <ellipse cx="0" cy="-6" rx={half - 0.5} ry={width * 0.085} fill={shade(color, 0.62)} />
+        <path
+          d={`M${-half + 4.5} 4 Q${-half + 3} ${depth * 0.6} ${-half + width * 0.19} ${depth - 3}`}
+          stroke="#ffffff"
+          strokeOpacity="0.2"
+          strokeWidth="2.6"
+          strokeLinecap="round"
+          fill="none"
+        />
+      </g>
     </g>
   )
 }
@@ -167,8 +242,9 @@ function Pot({ x, y, width, color }) {
 function SleepingCat({ x, y }) {
   return (
     <g transform={`translate(${x} ${y})`} aria-hidden="true">
-      <ellipse cx="0" cy="0" rx="26" ry="11" fill="#8a7a6d" />
-      <circle cx="-17" cy="-5" r="9" fill="#8a7a6d" />
+      <Ground x={0} y={9} w={62} opacity={0.7} />
+      <Blob cx={0} cy={0} rx={26} ry={11} fill="#8a7a6d" />
+      <Blob cx={-17} cy={-5} rx={9} ry={9} fill="#8a7a6d" />
       <path d="M-23 -11 l3 -7 l5 4 Z M-13 -12 l5 -6 l2 7 Z" fill="#8a7a6d" />
       {/* Tail curled round the front — the whole point of a sleeping cat. */}
       <path d="M20 2 C32 4 30 12 18 10" stroke="#8a7a6d" strokeWidth="5" fill="none" strokeLinecap="round" />
@@ -187,7 +263,8 @@ function Herbs({ tint }) {
         [96, '#b4796a'],
       ].map(([hx, pot], i) => (
         <g key={hx}>
-          <path d={`M${hx - 8} 152 L${hx + 8} 152 L${hx + 6} 164 L${hx - 6} 164 Z`} fill={pot} />
+          <Ground x={hx} y={164} w={22} />
+          <Solid d={`M${hx - 8} 152 L${hx + 8} 152 L${hx + 6} 164 L${hx - 6} 164 Z`} fill={pot} />
           <Sprout x={hx} y={152} tint={tint} />
           {i === 1 ? <Sprout x={hx + 5} y={152} tint={tint} /> : null}
         </g>
@@ -379,6 +456,7 @@ export default function Windowsill({ equipped = {}, companions = [], mood = MOOD
       aria-label={dim ? 'A windowsill in the quiet evening light' : 'A sunlit windowsill'}
     >
       <defs>
+        <SceneDefs />
         <linearGradient id="ws-sky" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={sky[0]} />
           <stop offset="60%" stopColor={sky[1]} />

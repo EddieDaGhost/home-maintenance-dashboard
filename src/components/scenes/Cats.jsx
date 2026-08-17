@@ -1,5 +1,6 @@
 import { SLOTS } from '../../config/catalog.js'
 import { MOOD } from '../../lib/credits.js'
+import { Blob, Ground, SceneDefs, Solid, shade, tintUp } from './parts.jsx'
 
 // The Cats scene: a warm room, a patch of sun, and however many cats you have
 // talked yourself into.
@@ -9,13 +10,6 @@ import { MOOD } from '../../lib/credits.js'
 // failure at all.
 
 const COAT_DEFAULT = '#a08a76'
-
-/** A shade or two darker than the coat, for stripes, points and shading. */
-function darken(hex, amount = 0.35) {
-  const value = parseInt(hex.slice(1), 16)
-  const mix = (channel) => Math.round(channel * (1 - amount))
-  return `rgb(${mix((value >> 16) & 255)}, ${mix((value >> 8) & 255)}, ${mix(value & 255)})`
-}
 
 /**
  * A cat, drawn once and dressed three ways. Everything is built around a head
@@ -61,6 +55,7 @@ function Face({ asleep }) {
 function SittingCat({ coat, mark, breed }) {
   return (
     <g>
+      <Ground x={0} y={44} w={52} />
       {/* Tail first, so it sits behind the body. */}
       <path
         d="M15 40 C38 42 42 22 30 14"
@@ -69,25 +64,31 @@ function SittingCat({ coat, mark, breed }) {
         fill="none"
         strokeLinecap="round"
       />
-      {/* Body: narrow at the shoulders, wide at the base — a sitting cat. */}
-      <path d="M0 4 C13 6 19 22 19 40 L-19 40 C-19 22 -13 6 0 4 Z" fill={coat} />
-      {breed.ruff ? <ellipse cx="0" cy="16" rx="16" ry="9" fill={coat} opacity="0.85" /> : null}
+      {/* Body: narrow at the shoulders, wide at the base, and the haunch
+          rounding out at the bottom — that curve is what says "sitting". */}
+      <Solid
+        d="M0 3 C13 5 18 20 19.5 34 C20.5 40 17 43 12 43 L-12 43 C-17 43 -20.5 40 -19.5 34 C-18 20 -13 5 0 3 Z"
+        fill={coat}
+      />
+      {breed.ruff ? <Blob cx={0} cy={16} rx={16.5} ry={9.5} fill={tintUp(coat, 0.12)} outline={false} /> : null}
       {breed.stripes ? (
         <g stroke={mark} strokeWidth="2.2" strokeLinecap="round" opacity="0.55">
           <path d="M-13 22 h8 M-15 30 h9 M-16 37 h9" />
         </g>
       ) : null}
-      {/* Front paws. */}
-      <ellipse cx="-8" cy="40" rx="6" ry="3.4" fill={breed.points ? mark : coat} />
-      <ellipse cx="8" cy="40" rx="6" ry="3.4" fill={breed.points ? mark : coat} />
+      {/* Front paws, tucked forward under the chest. */}
+      <Blob cx={-8} cy={41} rx={6.4} ry={3.6} fill={breed.points ? mark : coat} strokeWidth={0.8} />
+      <Blob cx={8} cy={41} rx={6.4} ry={3.6} fill={breed.points ? mark : coat} strokeWidth={0.8} />
 
-      <circle cx="0" cy="0" r="12" fill={coat} />
+      {/* Cheeks, then the skull over them — a circle alone reads as a ball. */}
+      <Blob cx={0} cy={3} rx={12.5} ry={9} fill={coat} outline={false} />
+      <Blob cx={0} cy={-0.5} rx={11.5} ry={11} fill={coat} />
       <Ears fill={breed.points ? mark : coat} />
       {breed.ruff ? <path d="M-12 4 l-6 6 l7 0 Z M12 4 l6 6 l-7 0 Z" fill={coat} /> : null}
       {breed.points ? <ellipse cx="0" cy="2" rx="6.5" ry="4.5" fill={mark} opacity="0.5" /> : null}
       {breed.stripes ? (
         <g stroke={mark} strokeWidth="1.8" strokeLinecap="round" opacity="0.55">
-          <path d="M-6 -10 v-3 M0 -11.5 v-3 M6 -10 v-3" />
+          <path d="M-5.5 -6.5 v-3 M0 -8 v-3 M5.5 -6.5 v-3" />
         </g>
       ) : null}
       <Face asleep={false} />
@@ -99,7 +100,8 @@ function SittingCat({ coat, mark, breed }) {
 function CurledCat({ coat, mark, breed }) {
   return (
     <g>
-      <ellipse cx="2" cy="30" rx="26" ry="13" fill={coat} />
+      <Ground x={2} y={42} w={58} />
+      <Blob cx={2} cy={30} rx={26} ry={13} fill={coat} />
       <path d="M24 32 C42 34 40 46 22 42" stroke={coat} strokeWidth="6" fill="none" strokeLinecap="round" />
       {breed.stripes ? (
         <g stroke={mark} strokeWidth="2" strokeLinecap="round" opacity="0.5">
@@ -107,7 +109,7 @@ function CurledCat({ coat, mark, breed }) {
         </g>
       ) : null}
       <g transform="translate(-17 24) scale(0.88)">
-        <circle cx="0" cy="0" r="12" fill={coat} />
+        <Blob cx={0} cy={0} rx={12} ry={11.5} fill={coat} />
         <Ears fill={breed.points ? mark : coat} />
         {breed.ruff ? <path d="M-12 4 l-6 6 l7 0 Z" fill={coat} /> : null}
         <Face asleep />
@@ -118,7 +120,7 @@ function CurledCat({ coat, mark, breed }) {
 
 function Cat({ x, y, art, coat, mood, scale = 1 }) {
   const breed = BREEDS[art] ?? BREEDS.default
-  const mark = darken(coat, breed.points ? 0.45 : 0.28)
+  const mark = shade(coat, breed.points ? 0.45 : 0.28)
   const size = scale * breed.scale
 
   return (
@@ -268,6 +270,7 @@ export default function Cats({ equipped = {}, companions = [], mood = MOOD.LIVEL
       aria-label={dim ? 'Cats asleep in the last of the sun' : 'Cats awake in a sunlit room'}
     >
       <defs>
+        <SceneDefs />
         <linearGradient id="cats-wall" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={dim ? '#3b3040' : '#f6e3c8'} />
           <stop offset="100%" stopColor={dim ? '#2c2530' : '#f1d7b4'} />
@@ -289,7 +292,8 @@ export default function Cats({ equipped = {}, companions = [], mood = MOOD.LIVEL
 
       <rect width="320" height="200" fill="url(#cats-wall)" />
       <rect y="150" width="320" height="50" fill={dim ? '#40342c' : '#c9a678'} />
-      <rect y="150" width="320" height="4" fill={dim ? '#584839' : '#b08c5f'} />
+      <rect y="150" width="320" height="50" fill="url(#p-lit-soft)" />
+      <rect y="150" width="320" height="3.5" fill={dim ? '#584839' : '#b08c5f'} />
 
       {sceneArt === 'herbs' ? (
         <WindowPerch
