@@ -147,13 +147,16 @@ export function mergeCompletions(localCompletions, remoteEvents) {
 }
 
 /** The settings that belong to the household rather than to one phone. */
-export function buildStateDoc({ names, custom, household, estate, away }) {
+export function buildStateDoc({ names, custom, household, estate, away, places }) {
   return {
     names: names ?? {},
     custom: custom ?? null,
     household: household ?? null,
     estate: estate ?? null,
     away: away ?? null,
+    // The town and the work address, but not today's scratch list — see the
+    // note at the top of src/lib/daily.js for why that one stays put.
+    places: places ?? null,
   }
 }
 

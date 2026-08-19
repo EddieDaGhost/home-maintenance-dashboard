@@ -52,6 +52,50 @@ export default async function run({ page, context, check, errors, URL }) {
   check('the dashboard loads offline', (await page.getByText('Day streak').count()) === 1)
   check('offline work shows in the stats', (await page.getByText('Chickens').count()) > 0)
 
+  // ---- Today, with a town saved and no way to reach the weather ----
+  // The forecast must never gate this screen: what's on the plate is the part
+  // that matters at the coop, and yesterday's reading beats an error message.
+  await page.evaluate(() => {
+    const home = {
+      query: 'Kalamazoo',
+      label: 'Kalamazoo, Michigan',
+      latitude: 42.29,
+      longitude: -85.59,
+      units: 'fahrenheit',
+    }
+    localStorage.setItem(
+      'home-maintenance-dashboard/places/v1',
+      JSON.stringify({ home, work: '100 Main St' }),
+    )
+    localStorage.setItem(
+      'home-maintenance-dashboard/forecast/v1',
+      JSON.stringify({
+        key: `${home.latitude},${home.longitude},${home.units}`,
+        reading: {
+          units: 'fahrenheit',
+          at: Date.now() - 3 * 60 * 60 * 1000,
+          temperature: 58,
+          code: 3,
+          isDay: true,
+          high: 66,
+          low: 47,
+          rainChance: 20,
+        },
+      }),
+    )
+  })
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await page.getByRole('button', { name: /on the plate/ }).first().click()
+  await page.waitForTimeout(700)
+
+  check('Today opens with no signal', (await page.getByRole('heading', { name: 'Today' }).count()) === 1)
+  check('the chores are the part that still works', (await page.getByRole('button', { name: /^Log / }).count()) > 0)
+  check('the last reading is shown rather than an error', (await page.getByText('58°F', { exact: true }).count()) === 1)
+  check('with the time it was taken', (await page.getByText(/^Last checked /).count()) === 1)
+  check('and the drive link needs no network to build', (await page.getByRole('link', { name: /Drive to work/ }).count()) === 1)
+
+  await page.goto(URL, { waitUntil: 'domcontentloaded' })
+
   // ---- back inside the house ----
   await context.setOffline(false)
   await page.reload({ waitUntil: 'networkidle' })
