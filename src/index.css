@@ -1,0 +1,336 @@
+@import 'tailwindcss';
+
+/* ==========================================================================
+   TOKENS
+
+   Every colour in the interface is one of these. Components read them and
+   never hardcode a value, which is what lets the whole app flip to dark
+   without a single component knowing about it.
+
+   The one exception is the yarn palette in src/config/palette.js: those forty
+   hexes stand for physical balls of wool, so they are content and must look
+   the same in both themes.
+   ========================================================================== */
+
+:root {
+  --canvas: #faf8f5;
+  --surface: #ffffff;
+  --surface-2: #f4f1ec;
+  --line: #e3ddd4;
+  --line-strong: #cfc7ba;
+
+  --ink: #24282c;
+  --ink-2: #5c646c;
+  --ink-3: #8d959d;
+
+  --accent: #2b7977;
+  --accent-ink: #ffffff;
+  --accent-soft: #e3f1f0;
+
+  --attention: #b8791f;
+  --attention-soft: #fbf1de;
+
+  --stage-bg: #ece7df;
+  --grid-line: rgba(0, 0, 0, 0.16);
+  --grid-bold: rgba(0, 0, 0, 0.42);
+
+  --radius: 14px;
+  --shadow: 0 1px 2px rgba(24, 28, 32, 0.05), 0 4px 14px rgba(24, 28, 32, 0.05);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --canvas: #16181b;
+    --surface: #1e2125;
+    --surface-2: #262a2f;
+    --line: #32373d;
+    --line-strong: #454b52;
+
+    --ink: #eceef0;
+    --ink-2: #a8b0b8;
+    --ink-3: #757d85;
+
+    --accent: #56b3ac;
+    --accent-ink: #10201f;
+    --accent-soft: #1d3634;
+
+    --attention: #d9a441;
+    --attention-soft: #33291a;
+
+    --stage-bg: #101215;
+    --grid-line: rgba(255, 255, 255, 0.14);
+    --grid-bold: rgba(255, 255, 255, 0.4);
+
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 14px rgba(0, 0, 0, 0.3);
+  }
+}
+
+/* ==========================================================================
+   BASE
+   ========================================================================== */
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background-color: var(--canvas);
+  color: var(--ink);
+  font-family:
+    ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
+  /* The layout must never scroll sideways — asserted in tests/tablet.mjs. */
+  overflow-x: hidden;
+}
+
+button {
+  touch-action: manipulation;
+}
+
+/* ==========================================================================
+   COMPONENTS
+   ========================================================================== */
+
+.panel {
+  background-color: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.section-title {
+  font-size: 0.8125rem;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  color: var(--ink);
+}
+
+.label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+}
+
+.numeral {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Tap targets are 44px minimum. The target device is a tablet on a craft table,
+   often touched with a hand that is also holding yarn. */
+.btn-primary,
+.btn-secondary,
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  /* Both axes, not just height. An icon-only button with tight padding is 38px wide
+     otherwise, which is a miss waiting to happen with a hook in your other hand. */
+  min-width: 44px;
+  padding: 0 1rem;
+  border-radius: calc(var(--radius) - 5px);
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: transform 0.08s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border: 1px solid transparent;
+}
+
+.btn-secondary {
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--ink-2);
+  border: 1px solid transparent;
+}
+
+.btn-primary:active,
+.btn-secondary:active,
+.btn-ghost:active {
+  transform: scale(0.97);
+}
+
+.btn-primary:disabled,
+.btn-secondary:disabled,
+.btn-ghost:disabled {
+  opacity: 0.4;
+  transform: none;
+}
+
+.btn-primary:focus-visible,
+.btn-secondary:focus-visible,
+.btn-ghost:focus-visible,
+.field:focus-visible,
+.swatch:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.field {
+  width: 100%;
+  min-height: 44px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius) - 5px);
+  padding: 0.5rem 0.75rem;
+  color: var(--ink);
+  /* 16px exactly. Anything smaller makes iOS Safari zoom the page on focus, which
+     on a tablet propped at arm's length is genuinely disorienting. */
+  font-size: 1rem;
+}
+
+select.field {
+  appearance: none;
+  padding-right: 2rem;
+}
+
+.field::placeholder {
+  color: var(--ink-3);
+}
+
+.field:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* --- Segmented control -------------------------------------------------- */
+
+.segmented {
+  display: inline-flex;
+  padding: 3px;
+  gap: 3px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius) - 3px);
+}
+
+.segmented > button {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 0.875rem;
+  border-radius: calc(var(--radius) - 7px);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--ink-2);
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.segmented > button[aria-pressed='true'] {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+/* --- Slider -------------------------------------------------------------
+   The only genuinely custom control. `touch-action: none` on the track is not
+   optional: without it iOS treats a horizontal drag on the thumb as a page
+   scroll and the slider simply doesn't work on the target device. */
+
+.slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 44px;
+  background: transparent;
+  touch-action: none;
+  cursor: pointer;
+}
+
+.slider::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--line-strong);
+}
+
+.slider::-moz-range-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--line-strong);
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 26px;
+  height: 26px;
+  margin-top: -10px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 3px solid var(--surface);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+
+.slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 3px solid var(--surface);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+
+/* --- Colour swatch ------------------------------------------------------ */
+
+.swatch {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  border: 1px solid var(--line-strong);
+  flex: none;
+}
+
+/* --- Stage -------------------------------------------------------------- */
+
+.stage {
+  background: var(--stage-bg);
+  border-radius: var(--radius);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+/* The chart really IS made of blocks, so upscaling it with nearest-neighbour is
+   not a compromise — it is the correct rendering. Safari needs both properties. */
+.chart-canvas {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  display: block;
+}
+
+.dropzone {
+  border: 2px dashed var(--line-strong);
+  border-radius: var(--radius);
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.dropzone[data-over='true'] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.scroll-y {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "name": "stitch-grid",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Turn a photo into a crochet chart. Gauge-aware pixelation, yarn-colour matching, printable graphgan patterns.",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "node tests/run.mjs",
+    "test": "node tests/run.mjs"
+  },
+  "dependencies": {
+    "lucide-react": "^0.460.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "playwright-core": "^1.49.0",
+    "tailwindcss": "^4.1.0",
+    "vite": "^6.0.0",
+    "vite-plugin-pwa": "^1.3.0"
+  }
+}

@@ -1,0 +1,193 @@
+# Working in this repo
+
+Notes for Claude Code, and for anyone else picking this up. The README says what the app
+*is* — this file is about changing it without breaking it.
+
+---
+
+## The one-paragraph version
+
+A static React + Vite app that turns a photo into a crochet chart. Everything happens in
+the browser; nothing is uploaded, there are no accounts and no backend. The whole design
+reduces to one value — a `Chart` — and every feature is a pure function of it. Deploys to
+a static host from `main`.
+
+---
+
+## Design rules — please don't quietly break these
+
+These are product decisions, not oversights. If a change would violate one, say so and
+ask rather than "improving" it.
+
+1. **A stitch is not square, and gauge is never optional.** `rowsForAspect()` in
+   `src/lib/gauge.js` is the whole product. Gauge correction applies in every mode,
+   including "fill the grid" — the fit toggle governs how a picture fills a grid whose
+   size the user overrode, not whether the maths happens. Anything that draws the chart
+   on square cells is a bug, including in the PDF.
+
+2. **No dithering. Not even as an option.** This gets proposed every time someone looks
+   at the quantizer, so: a chart is ~60 cells wide, so there is no spatial resolution to
+   trade away; a cell is a quarter-inch of yarn viewed from three feet, so the eye
+   resolves every dot instead of blending it; each stray dot costs a join, a cut and two
+   woven ends; and it turns the written pattern into `1 Cream, 1 Denim, 1 Cream…`
+   forever. `despeckle()` is the feature that ships instead, and it goes the other way.
+
+3. **Be honest about estimates.** Yarn amounts are labelled rough and told to buy 20%
+   more. Finished size is stated as "at your gauge" with a note that tension varies.
+   Never print a confident number the user would be right to distrust — a fake-precise
+   estimate is worse than an openly rough one.
+
+4. **Show what a chart costs, not just what it looks like.** `colourChanges()` sits next
+   to the colour count because a 12-colour chart with 900 joins is far more work than a
+   20-colour one with 200. Removing it makes the "fewer colours" slider optimise the
+   wrong thing.
+
+5. **The picture never leaves the device.** No uploads, no analytics, no telemetry, no
+   third-party scripts, no fonts from a CDN. The empty state says so out loud, and that
+   promise is why it can be believed.
+
+6. **It works with no signal.** A craft room is often the worst-connected room in the
+   house. The service worker precaches the shell; nothing on the path to a first chart
+   may wait on the network.
+
+7. **Undo undoes edits, not looks.** Zoom, grid visibility and design/preview mode are
+   view state and are never committed to history. This is the single thing that decides
+   whether undo feels useful or broken.
+
+---
+
+## Ids are permanent
+
+Every palette entry has an `id`. Saved settings, and any future shared link or saved
+project, record a colour **by id**. Renaming an id un-picks that colour for everybody who
+already chose it. Display names are free to change; ids never move.
+
+---
+
+## Layout
+
+```
+src/
+├── config/
+│   ├── palette.js   The 40 yarn colours. The ONE place a literal colour is allowed —
+│   │                these are content (a physical ball of wool), not theme.
+│   └── gauge.js     Stitch presets, default gauge, the hard limits
+├── lib/             Pure functions, no React. Tested in bare Node.
+│   ├── color.js     sRGB <-> linear <-> CIELAB, CIEDE2000
+│   ├── palette.js   The 32³ lookup cube, neighbour table, colour capping
+│   ├── gauge.js     THE CORE: rowsForAspect, finished size, yardage
+│   ├── layout.js    Settings + picture shape -> where every cell comes from
+│   ├── raster.js    Summed-area table — why the slider is free
+│   ├── chart.js     The pipeline, and the Chart type
+│   ├── pattern.js   Rows, corner-to-corner, legend, yarn, written pattern
+│   ├── draw.js      Context-agnostic drawing (canvas OR a test stub)
+│   ├── pdf.js       Hand-rolled PDF: objects, xref, streams, escaping
+│   ├── chartPdf.js  The printable document: cover, tiles, pattern
+│   ├── settings.js  Defaults, clamping, the chart cache key
+│   ├── history.js   Undo
+│   └── image/png/download/storage.js   ← the ONLY modules that touch the DOM
+├── components/      All UI
+└── index.css        Every interface colour, as CSS variables
+```
+
+**Where things live, in one line each:**
+
+- Changing the yarn colours → `src/config/palette.js`
+- Changing how a photo becomes a grid → `src/lib/chart.js`
+- Changing the crochet maths → `src/lib/gauge.js`
+- Changing what gets printed → `src/lib/chartPdf.js`
+- Changing how it looks → `src/index.css` (tokens) or the component
+
+---
+
+## Conventions that matter
+
+**Colours in the interface are never hardcoded.** Everything reads a CSS variable
+(`var(--ink)`, `var(--surface)`, `var(--accent)`). The exception, stated in the file
+itself, is the 40 yarn hexes in `config/palette.js`.
+
+**The order of the pipeline is load-bearing.** Border and pad cells take their palette
+index *before* quantization and are skipped by the remap and by despeckle, which is why a
+border colour survives a `maxColors` of 2. Reordering those steps silently changes output.
+
+**Average in linear light, never in sRGB bytes.** Averaging black and white as bytes
+gives 128; the true middle grey is 188. `tests/color.mjs` pins this, because getting it
+wrong doesn't crash — it just makes every photograph muddy.
+
+**Never put CIEDE2000 on the interaction path.** It's ~40 flops with two `pow(x, 7)`
+calls. The 5-bit cube is built once per colour subset; excluding, capping and swapping
+colours are `Uint8Array(40)` remaps composed into one. If a slider ever feels slow, check
+whether something moved a colour computation into the render loop.
+
+**Draw through `lib/draw.js`, not directly on a context.** It takes anything with the few
+2D methods it uses, so the preview, the PNG export and a 20-line recording stub in the
+tests all drive identical code.
+
+**Mobile and tablet first, genuinely.** The target is an iPad propped on a craft table and
+a phone in a pocket, operated by someone holding a hook. Tap targets ≥ 44px on *both*
+axes, every field at exactly 16px (smaller makes iOS zoom the page), `touch-action: none`
+on slider tracks (or iOS steals the drag), and no horizontal overflow. `tests/tablet.mjs`
+asserts all of it at two viewports.
+
+---
+
+## Testing
+
+```bash
+npm run check              # everything
+npm run check -- gauge     # one suite
+TEST_URL=https://... npm run check
+```
+
+The pure suites need nothing but Node — `playwright-core` is imported lazily so a bare
+checkout can run them. Browser suites drive real Chromium found via `CHROME_PATH` or
+`PLAYWRIGHT_BROWSERS_PATH`; no browser is downloaded at install.
+
+**Run `npm run check` before pushing.** There is no CI, so it's the only safety net.
+
+The suites worth knowing about:
+
+- **`color.mjs`** carries the published CIEDE2000 test vectors. They're the only thing
+  standing between this repo and the three classic bugs — degrees/radians confusion in
+  the T and RT terms, the mean-hue wraparound branches, and the sign of RT. All three
+  produce a function that looks fine and matches colours wrongly forever.
+- **`pdf.mjs`** asserts that **every cross-reference offset lands exactly on its own
+  `N 0 obj`**, that every entry is exactly 20 bytes, and that every `/Length` matches its
+  real stream. A broken PDF fails silently — some viewers tolerate a wrong offset, so a
+  corrupt file can look fine locally and refuse to open on the machine that matters.
+- **`export.mjs`** runs the *same* structural checks against a PDF actually downloaded
+  from a browser, so the two code paths can't drift apart.
+- **`pattern.mjs`** pins the row direction with a four-cell fixture. Get it backwards and
+  every chart is mirrored — which nobody discovers until they've crocheted it.
+
+---
+
+## Things that will bite you
+
+- **PDF cross-reference offsets are BYTE offsets, and `String.length` is not byte length.**
+  The whole file is assembled as a latin1 string so the two are equal by construction;
+  `assertLatin1` throws if anything else reaches the buffer.
+- **Characters with no WinAnsi byte are transliterated, not dropped.** Dropping an en
+  dash turns "stitches 1–30" into "stitches 130", which is a wrong instruction rather
+  than a cosmetic loss. See `TRANSLITERATE` in `pdf.js`.
+- **`createImageBitmap` needs `imageOrientation: 'from-image'`** or every photo taken in
+  portrait on a phone arrives rotated.
+- **The summed-area table must be `Float64Array`.** A 1024² image sums past 6×10¹⁰, which
+  overflows a uint32 and silently corrupts the bottom-right quadrant.
+- **Crochet row 1 is the BOTTOM row**, and odd rows read the cells array reversed. That
+  inversion lives in `pattern.js` and must not be duplicated anywhere else.
+- **Stitch numbers along the PDF run RIGHT TO LEFT.** Stitch 1 is the right-hand edge,
+  because row 1 is worked right to left. Numbering them the other way is subtle and
+  infuriating.
+- **`innerText` in tests returns the RENDERED text**, so `.label` elements come back
+  uppercased by CSS. Match case-insensitively.
+- **Tailwind only keeps classes it can literally see.** No constructed class names.
+
+---
+
+## Workflow
+
+- Develop on a branch, keep adding to the open pull request until it's merged.
+- After a merge, restart the branch from the new `main` rather than stacking on merged
+  history.
+- Commit messages explain *why*, and note what was verified and what wasn't.

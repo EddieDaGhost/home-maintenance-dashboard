@@ -1,0 +1,116 @@
+/**
+ * The yarn palette.
+ *
+ * These 40 hex values are the ONE place in the codebase where a literal colour is
+ * allowed. Everything else reads a CSS variable. The difference: these aren't theme,
+ * they're *content* — each one stands for a physical ball of yarn sitting in a shop.
+ * A theme may not recolour them any more than it may rename a colour the user bought.
+ *
+ * Names are deliberately generic. Brand colour names are trademarks, and a palette
+ * pinned to one manufacturer's range rots the moment they discontinue a shade. The
+ * entry shape leaves room for a `brand` field if that ever changes.
+ *
+ * `letter` is the chart symbol. Crochet charts are followed printed, often in black
+ * and white, and often by someone who can't reliably tell Sage from Moss at a glance —
+ * so every cell can carry its letter. Letters rather than a symbol font on purpose:
+ * ZapfDingbats needs no /Encoding entry and silently renders letters if you give it
+ * one, and that class of bug isn't worth the prettier glyph.
+ *
+ * Ids are permanent. Ownership, saved projects and shared links record a colour by id,
+ * so renaming one changes what somebody else's saved chart means.
+ */
+
+export const PALETTE = [
+  // --- Neutrals: the backbone of most blankets, and the hardest to match well.
+  { id: 'snow', name: 'Snow', hex: '#F7F5F0', groups: ['neutral'] },
+  { id: 'cream', name: 'Cream', hex: '#F2E8D5', groups: ['neutral'] },
+  { id: 'ecru', name: 'Ecru', hex: '#E4D7BC', groups: ['neutral'] },
+  { id: 'oatmeal', name: 'Oatmeal', hex: '#D3C4A6', groups: ['neutral'] },
+  { id: 'linen', name: 'Linen', hex: '#BCAE93', groups: ['neutral'] },
+  { id: 'fog', name: 'Fog', hex: '#B7BDC2', groups: ['neutral'] },
+  { id: 'silver', name: 'Silver', hex: '#969DA5', groups: ['neutral'] },
+  { id: 'slate', name: 'Slate', hex: '#656E77', groups: ['neutral'] },
+  { id: 'charcoal', name: 'Charcoal', hex: '#3A4046', groups: ['neutral'] },
+  { id: 'ink', name: 'Ink', hex: '#1D2023', groups: ['neutral'] },
+
+  // --- Pastels: nursery blankets, which is a large share of what gets made.
+  { id: 'blush', name: 'Blush', hex: '#F4CFCF', groups: ['pastel'] },
+  { id: 'peach', name: 'Peach', hex: '#F8D5B6', groups: ['pastel'] },
+  { id: 'butter', name: 'Butter', hex: '#F5E8AC', groups: ['pastel'] },
+  { id: 'mint', name: 'Mint', hex: '#C2E5CE', groups: ['pastel'] },
+  { id: 'sky', name: 'Sky', hex: '#BDD9ED', groups: ['pastel'] },
+  { id: 'periwinkle', name: 'Periwinkle', hex: '#C4C8E9', groups: ['pastel'] },
+  { id: 'lilac', name: 'Lilac', hex: '#DCC7E4', groups: ['pastel'] },
+  { id: 'shell', name: 'Shell', hex: '#F1DDD3', groups: ['pastel'] },
+
+  // --- Warms.
+  { id: 'cherry', name: 'Cherry', hex: '#C6303A', groups: ['warm'] },
+  { id: 'crimson', name: 'Crimson', hex: '#8C1F2D', groups: ['warm'] },
+  { id: 'coral', name: 'Coral', hex: '#EE7B5E', groups: ['warm'] },
+  { id: 'tangerine', name: 'Tangerine', hex: '#E8843C', groups: ['warm'] },
+  { id: 'marigold', name: 'Marigold', hex: '#EFA92C', groups: ['warm'] },
+  { id: 'mustard', name: 'Mustard', hex: '#C99524', groups: ['warm'] },
+  { id: 'lemon', name: 'Lemon', hex: '#F1D74B', groups: ['warm'] },
+  { id: 'rose', name: 'Rose', hex: '#D87B95', groups: ['warm'] },
+
+  // --- Earths. Skin tones live here too, which is why there are four of them.
+  { id: 'terracotta', name: 'Terracotta', hex: '#B05C40', groups: ['earth'] },
+  { id: 'rust', name: 'Rust', hex: '#94462A', groups: ['earth'] },
+  { id: 'camel', name: 'Camel', hex: '#B08556', groups: ['earth'] },
+  { id: 'chocolate', name: 'Chocolate', hex: '#5A3A2A', groups: ['earth'] },
+
+  // --- Greens.
+  { id: 'sage', name: 'Sage', hex: '#9BAE8C', groups: ['green'] },
+  { id: 'grass', name: 'Grass', hex: '#6BA444', groups: ['green'] },
+  { id: 'moss', name: 'Moss', hex: '#6D7E4D', groups: ['green'] },
+  { id: 'forest', name: 'Forest', hex: '#2E5C39', groups: ['green'] },
+
+  // --- Cools.
+  { id: 'seafoam', name: 'Seafoam', hex: '#7FC6B4', groups: ['cool'] },
+  { id: 'turquoise', name: 'Turquoise', hex: '#34A7C3', groups: ['cool'] },
+  { id: 'teal', name: 'Teal', hex: '#2B7977', groups: ['cool'] },
+  { id: 'denim', name: 'Denim', hex: '#3E5F82', groups: ['cool'] },
+  { id: 'navy', name: 'Navy', hex: '#22314D', groups: ['cool'] },
+  { id: 'plum', name: 'Plum', hex: '#6C3460', groups: ['cool'] },
+]
+
+/**
+ * Subsets a user can restrict matching to. `ids: null` means the whole palette.
+ * Neutrals and pastels are the two people actually ask for by name — a greyscale
+ * portrait and a baby blanket — so they're the two that ship.
+ */
+export const SUBSETS = [
+  { id: 'all', label: 'All colours', groups: null },
+  { id: 'neutrals', label: 'Neutrals', groups: ['neutral'] },
+  { id: 'pastels', label: 'Pastels', groups: ['pastel', 'neutral'] },
+]
+
+const BY_ID = new Map(PALETTE.map((entry, index) => [entry.id, index]))
+
+/** @returns {number} palette index, or -1 if the id is unknown. */
+export function paletteIndex(id) {
+  const index = BY_ID.get(id)
+  return index === undefined ? -1 : index
+}
+
+/** @returns {number[]} the palette indices a subset allows, always non-empty. */
+export function subsetIndices(subsetId) {
+  const subset = SUBSETS.find((s) => s.id === subsetId) ?? SUBSETS[0]
+  if (!subset.groups) return PALETTE.map((_, i) => i)
+  const allowed = PALETTE.map((entry, i) =>
+    entry.groups.some((g) => subset.groups.includes(g)) ? i : -1,
+  ).filter((i) => i >= 0)
+  // A subset that matched nothing would make the whole tool unusable. Fall back.
+  return allowed.length ? allowed : PALETTE.map((_, i) => i)
+}
+
+/** Chart letters: A..Z, then AA, AB, ... Enough for any palette we'd ever ship. */
+export function chartLetter(n) {
+  let out = ''
+  let i = n
+  do {
+    out = String.fromCharCode(65 + (i % 26)) + out
+    i = Math.floor(i / 26) - 1
+  } while (i >= 0)
+  return out
+}
