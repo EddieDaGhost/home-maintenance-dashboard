@@ -468,7 +468,9 @@ export default async function run({ check }) {
   is('a custom task edits the same way', taskIn(mine, 'kitchen-my-thing').points, 12)
 
   is('rubbish settings normalise away', Object.keys(normalizeCustom({ taskSettings: { x: { points: 'lots' } } }).taskSettings).length, 0)
-  is('and so do out-of-range points', Object.keys(normalizeCustom({ taskSettings: { x: { points: 500 } } }).taskSettings).length, 0)
+  is('and so do out-of-range points', Object.keys(normalizeCustom({ taskSettings: { x: { points: 1000 } } }).taskSettings).length, 0)
+  is('zero is out of range too', Object.keys(normalizeCustom({ taskSettings: { x: { points: 0 } } }).taskSettings).length, 0)
+  is('but a big job is allowed to be a big job', normalizeCustom({ taskSettings: { x: { points: 999 } } }).taskSettings.x.points, 999)
   is('a real setting survives the round trip', normalizeCustom(edited).taskSettings['kitchen-dishes'].points, 9)
 
   // =========================================================================

@@ -12,6 +12,16 @@ export const emptyCustom = { areas: [], tasks: {}, hidden: [], appearance: {}, t
 /** What you're allowed to change about a task after it exists. */
 const SETTABLE = ['points', 'repeatable', 'schedule']
 
+/**
+ * The range a task can be worth. Exported so the input and the validator agree —
+ * a field that accepts what the store then throws away is worse than no field.
+ */
+export const MIN_POINTS = 1
+export const MAX_POINTS = 999
+
+/** What a new task is worth when you don't say. */
+export const DEFAULT_TASK_POINTS = 3
+
 function makeId(prefix, name, taken) {
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || prefix
   let id = slug
@@ -49,7 +59,7 @@ export function normalizeCustom(data) {
   for (const [taskId, value] of Object.entries(data.taskSettings ?? {})) {
     if (!value || typeof value !== 'object') continue
     const entry = {}
-    if (Number.isFinite(value.points) && value.points >= 1 && value.points <= 99) {
+    if (Number.isFinite(value.points) && value.points >= MIN_POINTS && value.points <= MAX_POINTS) {
       entry.points = Math.round(value.points)
     }
     if (typeof value.repeatable === 'boolean') entry.repeatable = value.repeatable
@@ -140,7 +150,7 @@ export function addTask(custom, areaId, task, takenIds = []) {
     name: task.name.trim(),
     note: task.note?.trim() || undefined,
     schedule: task.schedule,
-    points: task.points ?? 3,
+    points: task.points ?? DEFAULT_TASK_POINTS,
   }
   return { ...custom, tasks: { ...custom.tasks, [areaId]: [...existing, entry] } }
 }

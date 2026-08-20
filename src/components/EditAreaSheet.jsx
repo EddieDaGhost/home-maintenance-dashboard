@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ChevronDown, Nfc, Plus, RotateCcw, Trash2, X } from 'lucide-react'
 import { PALETTES, paletteFor } from '../config/areas.js'
 import { ICON_NAMES, iconFor } from '../config/icons.js'
+import { DEFAULT_TASK_POINTS, MAX_POINTS, MIN_POINTS } from '../lib/custom.js'
 import { useNames } from '../state/NamesProvider.jsx'
 import { useAreas } from '../state/AreasProvider.jsx'
 import { useTheme } from '../theme/ThemeProvider.jsx'
@@ -64,10 +65,88 @@ function ColorPicker({ value, onChange, themeId }) {
   )
 }
 
+/**
+ * A points box you can actually type in.
+ *
+ * The obvious version — value={points} with a clamp in onChange — is unusable:
+ * clearing the box makes `Number('') || 1` put a 1 straight back, so typing 25
+ * means fighting the field for every keystroke. This keeps the half-typed text
+ * as a string and only commits a number on blur or Enter. An empty box on blur
+ * goes back to what it was rather than to 1, so backspacing out of a field
+ * costs you nothing.
+ */
+function PointsField({ value, onCommit, label, allowBlank = false, blankAs = '' }) {
+  const asText = (v) => (v === null || v === undefined ? '' : String(v))
+  const [draft, setDraft] = useState(() => asText(value))
+
+  // Follow the stored value when it changes underneath us — a reset, a sync, or
+  // switching to a different task in the same open sheet.
+  useEffect(() => {
+    setDraft(asText(value))
+  }, [value])
+
+  /** What `text` is worth, or null for "leave it alone". */
+  const settle = (text, current, blankOk) => {
+    const trimmed = text.trim()
+    if (!trimmed) return blankOk ? { points: null } : null
+    const parsed = Number(trimmed)
+    if (!Number.isFinite(parsed)) return null
+    return { points: Math.min(MAX_POINTS, Math.max(MIN_POINTS, Math.round(parsed))) }
+  }
+
+  const commit = () => {
+    const settled = settle(draft, value, allowBlank)
+    if (!settled) {
+      // Blank or nonsense on an existing task: there is no such thing as worth
+      // nothing, so what was there comes back.
+      setDraft(asText(value))
+      return
+    }
+    setDraft(asText(settled.points))
+    onCommit(settled.points)
+  }
+
+  // Closing the sheet — Escape, the X, or tapping the backdrop — unmounts this
+  // without ever firing a blur. Committing on the way out is what stops a
+  // number you just typed from being silently thrown away.
+  const latest = useRef(null)
+  latest.current = { draft, value, onCommit, allowBlank }
+  useEffect(
+    () => () => {
+      const { draft: text, value: was, onCommit: commitFn, allowBlank: blankOk } = latest.current
+      const settled = settle(text, was, blankOk)
+      if (settled && settled.points !== was) commitFn(settled.points)
+    },
+    [],
+  )
+
+  return (
+    <input
+      type="number"
+      inputMode="numeric"
+      className="field w-24"
+      aria-label={label}
+      min={MIN_POINTS}
+      max={MAX_POINTS}
+      placeholder={allowBlank ? blankAs : undefined}
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault()
+          commit()
+          e.target.blur()
+        }
+      }}
+    />
+  )
+}
+
 function AddTaskForm({ onAdd, onCancel }) {
   const [name, setName] = useState('')
   const [note, setNote] = useState('')
-  const [points, setPoints] = useState(3)
+  const [points, setPoints] = useState(null)
   const [schedule, setSchedule] = useState(SCHEDULE_DEFAULTS.weekly)
 
   return (
@@ -88,15 +167,7 @@ function AddTaskForm({ onAdd, onCancel }) {
       />
       <ScheduleFields value={schedule} onChange={setSchedule} />
       <label className="flex items-center gap-2 text-sm" style={{ color: 'var(--ink-2)' }}>
-        <input
-          type="number"
-          className="field w-20"
-          aria-label="Points"
-          min={1}
-          max={50}
-          value={points}
-          onChange={(e) => setPoints(Math.min(50, Math.max(1, Number(e.target.value) || 1)))}
-        />
+        <PointsField value={points} onCommit={setPoints} label="Points" allowBlank blankAs={String(DEFAULT_TASK_POINTS)} />
         points — bigger jobs are worth more
       </label>
       <div className="flex gap-2">
@@ -130,14 +201,10 @@ function TaskSettings({ task, edited, onChange, onReset }) {
       <ScheduleFields value={task.schedule} onChange={(schedule) => onChange({ schedule })} />
 
       <label className="flex items-center gap-2 text-sm" style={{ color: 'var(--ink-2)' }}>
-        <input
-          type="number"
-          className="field w-20"
-          aria-label={`Points for ${task.name}`}
-          min={1}
-          max={99}
+        <PointsField
           value={task.points ?? 1}
-          onChange={(e) => onChange({ points: Math.min(99, Math.max(1, Number(e.target.value) || 1)) })}
+          onCommit={(points) => onChange({ points })}
+          label={`Points for ${task.name}`}
         />
         points each time
       </label>
