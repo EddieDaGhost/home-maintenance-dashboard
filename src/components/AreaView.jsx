@@ -132,7 +132,15 @@ export default function AreaView({ area, log, now, onLog, onUndo, onBack, readOn
           <h2 className="section-title mb-2.5 px-1">{copy.todoTitle}</h2>
           <div className="space-y-2.5">
             {openTasks.map(({ task, state }) => (
-              <TaskCard key={task.id} task={task} state={state} onLog={onLog} onUndo={onUndo} readOnly={readOnly} />
+              <TaskCard
+                key={task.id}
+                task={task}
+                state={state}
+                entries={log.completions[task.id] ?? []}
+                onLog={onLog}
+                onUndo={onUndo}
+                readOnly={readOnly}
+              />
             ))}
           </div>
         </section>
@@ -156,7 +164,15 @@ export default function AreaView({ area, log, now, onLog, onUndo, onBack, readOn
           </h2>
           <div className="space-y-2.5">
             {restTasks.map(({ task, state }) => (
-              <TaskCard key={task.id} task={task} state={state} onLog={onLog} onUndo={onUndo} readOnly={readOnly} />
+              <TaskCard
+                key={task.id}
+                task={task}
+                state={state}
+                entries={log.completions[task.id] ?? []}
+                onLog={onLog}
+                onUndo={onUndo}
+                readOnly={readOnly}
+              />
             ))}
           </div>
         </section>

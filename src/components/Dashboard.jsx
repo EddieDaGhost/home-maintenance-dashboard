@@ -39,6 +39,7 @@ import { usePlaces } from '../state/PlacesProvider.jsx'
 import { creditsBalance } from '../lib/credits.js'
 import { describeCode, formatTemp, isStale, loadReading } from '../lib/forecast.js'
 import { openItems } from '../lib/daily.js'
+import { mineOf } from '../lib/turns.js'
 import ProgressBar from './ProgressBar.jsx'
 import TaskCard from './TaskCard.jsx'
 import ThemePicker from './ThemePicker.jsx'
@@ -177,13 +178,17 @@ export default function Dashboard({
   const [freshOpen, setFreshOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
   const [placeOpen, setPlaceOpen] = useState(false)
+  const [mineOnly, setMineOnly] = useState(false)
   const fileInput = useRef(null)
 
   const streak = currentStreak(log, now, allTasks, away)
   const points = weeklyPoints(log, now, allTasks)
   const goal = weeklyPointsGoal(now, allTasks)
   const today = completedToday(log, now)
-  const attention = tasksNeedingAttention(log, now, allTasks, away)
+  const everything = tasksNeedingAttention(log, now, allTasks, away)
+  // "Mine" keeps the chores nobody has claimed as well as your own — an
+  // unassigned chore is everybody's to worry about, not nobody's.
+  const attention = mineOnly ? mineOf(everything, log, people, activeId) : everything
   const credits = creditsBalance(log, allTasks, activeId, people, entry)
   const travelling = isAway(now)
   const shortlist = attention.slice(0, 5)
@@ -317,8 +322,8 @@ export default function Dashboard({
       ) : null}
 
       <section>
-        <h2 className="section-title mb-2.5 px-1">
-          {copy.queueTitle}
+        <h2 className="section-title mb-2.5 flex items-center gap-2 px-1">
+          <span>{copy.queueTitle}</span>
           {/* font-sans/tracking-normal opt this count out of the theme's heading styling */}
           {attention.length > shortlist.length ? (
             <span
@@ -327,6 +332,22 @@ export default function Dashboard({
             >
               showing {shortlist.length} of {attention.length}
             </span>
+          ) : null}
+          {/* Only earns its space once somebody else is in the household. */}
+          {isShared ? (
+            <button
+              type="button"
+              onClick={() => setMineOnly((on) => !on)}
+              aria-pressed={mineOnly}
+              className="ml-auto rounded-full px-2.5 py-1 font-sans text-xs font-semibold tracking-normal normal-case transition active:scale-95"
+              style={
+                mineOnly
+                  ? { background: 'var(--accent)', color: 'var(--accent-ink)' }
+                  : { background: 'var(--surface-2)', color: 'var(--ink-2)' }
+              }
+            >
+              Mine
+            </button>
           ) : null}
         </h2>
 
@@ -350,6 +371,7 @@ export default function Dashboard({
                 key={task.id}
                 task={task}
                 state={state}
+                entries={log.completions[task.id] ?? []}
                 areaLabel={nameFor(task.area)}
                 onLog={onLog}
                 onUndo={onUndo}

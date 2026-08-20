@@ -89,6 +89,7 @@ import {
   updateTaskSettings,
 } from '../src/lib/custom.js'
 import { composeAreas } from '../src/lib/compose.js'
+import { ROTATE, isTurnOf, lastLoggedBy, mineOf, turnLabel, whoseTurn } from '../src/lib/turns.js'
 import { THEME_LIST } from '../src/config/themes.js'
 
 const ALL_TASKS = AREAS.flatMap((area) => area.tasks.map((task) => ({ ...task, area })))
@@ -500,6 +501,78 @@ export default async function run({ check }) {
   is('a fresh start survives being stored', normalizeAway(fresh).freshStartAt, fresh.freshStartAt)
   is('and rides alongside a trip', hasFreshStart(addWindow(fresh, day(3).getTime(), day(1).getTime())), true)
   is('while the trip still works', isAway(addWindow(fresh, day(1).getTime(), day(-1).getTime()), MON), true)
+
+  // =========================================================================
+  // Whose job is it
+  // =========================================================================
+
+  const HOUSE = [{ id: 'eddie', name: 'Eddie' }, { id: 'yas', name: 'Yasmine' }]
+  const nameOf = (id) => HOUSE.find((p) => p.id === id)?.name ?? 'Someone'
+  const chore = (assignee) => ({ id: 'litter-scoop', assignee })
+
+  is('an unassigned chore is nobody in particular', whoseTurn(chore(undefined), [], HOUSE), null)
+  is('and stays that way however much it is logged', whoseTurn(chore(null), [{ at: MON.getTime(), by: 'yas' }], HOUSE), null)
+  is('an assigned chore is that person', whoseTurn(chore('yas'), [], HOUSE), 'yas')
+  is('logging it does not move it', whoseTurn(chore('yas'), [{ at: MON.getTime(), by: 'eddie' }], HOUSE), 'yas')
+
+  // A rotation is worked out from the log, not stored — one record of who did
+  // what, so the scene, the credits and this can never disagree.
+  is('a rotation nobody has done starts at the top', whoseTurn(chore(ROTATE), [], HOUSE), 'eddie')
+  is('after Eddie it is Yasmine', whoseTurn(chore(ROTATE), [{ at: MON.getTime(), by: 'eddie' }], HOUSE), 'yas')
+  is('after Yasmine it is Eddie again', whoseTurn(chore(ROTATE), [{ at: MON.getTime(), by: 'yas' }], HOUSE), 'eddie')
+  is(
+    'only the most recent log decides',
+    whoseTurn(chore(ROTATE), [{ at: daysAgo(4), by: 'yas' }, { at: daysAgo(0), by: 'eddie' }], HOUSE),
+    'yas',
+  )
+  is('an entry with no by is nobody, so it starts over', whoseTurn(chore(ROTATE), [MON.getTime()], HOUSE), 'eddie')
+  is('the newest entry is found whatever order they arrive in', lastLoggedBy([{ at: daysAgo(0), by: 'eddie' }, { at: daysAgo(9), by: 'yas' }]), 'eddie')
+
+  // Somebody who has left is not whose turn it is any more.
+  is('a chore assigned to someone gone reads as unassigned', whoseTurn(chore('ghost'), [], HOUSE), null)
+  is('and a rotation past them starts over', whoseTurn(chore(ROTATE), [{ at: MON.getTime(), by: 'ghost' }], HOUSE), 'eddie')
+  is('a one-person house rotates to itself', whoseTurn(chore(ROTATE), [{ at: MON.getTime(), by: 'me' }], [{ id: 'me', name: 'Me' }]), 'me')
+  is('an empty roster is nobody', whoseTurn(chore(ROTATE), [], []), null)
+
+  is('isTurnOf agrees', isTurnOf(chore('yas'), [], HOUSE, 'yas'), true)
+  is('and disagrees', isTurnOf(chore('yas'), [], HOUSE, 'eddie'), false)
+  is('nobody has a turn on an unassigned chore', isTurnOf(chore(null), [], HOUSE, 'eddie'), false)
+
+  // Wording: whose turn it is, never that somebody missed theirs.
+  is('your own reads as yours', turnLabel(chore('eddie'), [], HOUSE, 'eddie', nameOf), 'Yours')
+  is('somebody else reads as their name', turnLabel(chore('yas'), [], HOUSE, 'eddie', nameOf), 'Yasmine')
+  is('a rotation on you reads as your turn', turnLabel(chore(ROTATE), [], HOUSE, 'eddie', nameOf), 'Your turn')
+  is('a rotation on them says whose turn', turnLabel(chore(ROTATE), [{ at: MON.getTime(), by: 'eddie' }], HOUSE, 'eddie', nameOf), "Yasmine's turn")
+  is('unassigned says nothing at all', turnLabel(chore(null), [], HOUSE, 'eddie', nameOf), null)
+  is(
+    'and none of it is ever a telling off',
+    /late|overdue|missed|failed|behind/i.test(
+      [
+        turnLabel(chore('yas'), [], HOUSE, 'eddie', nameOf),
+        turnLabel(chore(ROTATE), [], HOUSE, 'eddie', nameOf),
+      ].join(' '),
+    ),
+    false,
+  )
+
+  // "Mine" keeps what nobody has claimed — an unassigned chore is everybody's.
+  const queue = [
+    { task: chore('eddie') },
+    { task: { id: 'kitchen-dishes', assignee: 'yas' } },
+    { task: { id: 'chickens-checkin' } },
+  ]
+  is('mine keeps mine and the unclaimed', mineOf(queue, { completions: {} }, HOUSE, 'eddie').length, 2)
+  is('and drops what is squarely theirs', mineOf(queue, { completions: {} }, HOUSE, 'eddie').some((q) => q.task.id === 'kitchen-dishes'), false)
+  is('with no active person nothing is filtered', mineOf(queue, { completions: {} }, HOUSE, null).length, 3)
+
+  // Assignment is an override like any other, so it cannot move an id.
+  const assigned = updateTaskSettings(emptyCustom, 'litter-scoop', { assignee: 'yas' })
+  is('assignment stores against the task id', assigned.taskSettings['litter-scoop'].assignee, 'yas')
+  is('and survives being written out', normalizeCustom(assigned).taskSettings['litter-scoop'].assignee, 'yas')
+  is('it reaches the task through compose', composeAreas(assigned).flatMap((a) => a.tasks).find((t) => t.id === 'litter-scoop').assignee, 'yas')
+  is('unassigning takes the whole entry with it', Object.keys(updateTaskSettings(assigned, 'litter-scoop', { assignee: null }).taskSettings).length, 0)
+  is('but leaves other overrides alone', updateTaskSettings(updateTaskSettings(assigned, 'litter-scoop', { points: 7 }), 'litter-scoop', { assignee: null }).taskSettings['litter-scoop'].points, 7)
+  is('a non-string assignee is refused', normalizeCustom({ taskSettings: { x: { assignee: 42 } } }).taskSettings.x, undefined)
 
   // =========================================================================
   // Today: the place, the drive, and the scratch list

@@ -110,6 +110,7 @@ src/
 │   ├── custom.js    User-added rooms/tasks, hidden built-ins, task overrides
 │   ├── compose.js   Built-ins + your rooms + your overrides, merged into one list
 │   ├── people.js    Household, who's logging
+│   ├── turns.js     Whose job a chore is, and whose turn it is next
 │   ├── away.js      Trips: the days nothing is due and the streak carries over
 │   ├── credits.js   Credits earned/spent, and how lively the scene is
 │   ├── estate.js    What each person has bought, keyed by person id
@@ -134,6 +135,7 @@ src/
 - Changing wording → `src/config/themes.js` (`copy` object, per theme)
 - Changing what credits buy → `src/config/catalog.js`
 - Changing what "away" suppresses → `applyGrace()` in `src/lib/schedule.js`
+- Changing whose job a chore is → it's an override too; see `turns.js`
 - Changing what a task is worth → it's an override; see `taskSettings` below
 - Changing the weather source → `src/config/forecast.js`, and read the rule below first
 
@@ -200,7 +202,7 @@ and no horizontal overflow — the tests assert that last one.
 ## Testing
 
 ```bash
-npm run check              # everything: 659 checks
+npm run check              # everything: 714 checks
 npm run check -- logic     # just the fast pure-logic suite (no browser)
 ```
 
@@ -246,6 +248,33 @@ TEST_URL=https://homemaintenance.app npm run check
   stacking onto merged history.
 - Commit messages: explain *why*, not just what. Note anything that was verified
   and anything that wasn't.
+
+---
+
+## Whose job is it
+
+A chore belongs to one person, rotates round the household, or belongs to
+nobody — which is what every chore was before this existed and what most of them
+should stay.
+
+- **It's an override, not a store.** `assignee` is in `SETTABLE` in
+  `src/lib/custom.js`, so it lives in `taskSettings` keyed by task id alongside
+  points and schedule. Ids never move, and it syncs and backs up for free.
+- **A rotation is derived, never stored.** `whoseTurn()` in `src/lib/turns.js`
+  reads the `by` on the newest completion — the same field `creditsEarned()`
+  reads. A stored pointer would be a second opinion, and it would drift the
+  first time somebody logged from the other phone while offline.
+- **It is a hint and never a lock.** Anyone can log anything in one tap whoever
+  it belongs to, and `tests/assign.mjs` asserts exactly that. The moment
+  assignment can stop a tap, design rule 4 is gone.
+- **It never becomes a scolding.** The card says whose turn it is; nothing
+  anywhere says somebody missed theirs. No new colour — certainly not
+  `--alert-*`.
+- **Somebody who has left isn't whose turn it is.** A task assigned to a removed
+  person reads as unassigned rather than as a name nobody recognises, and a
+  rotation whose last logger has gone starts again at the top.
+- **"Mine" keeps what nobody has claimed.** An unassigned chore is everybody's
+  to worry about, not nobody's, so it stays in the filtered list.
 
 ---
 

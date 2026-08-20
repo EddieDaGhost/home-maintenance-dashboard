@@ -10,7 +10,7 @@ const STORAGE_KEY = 'home-maintenance-dashboard/custom/v1'
 export const emptyCustom = { areas: [], tasks: {}, hidden: [], appearance: {}, taskSettings: {} }
 
 /** What you're allowed to change about a task after it exists. */
-const SETTABLE = ['points', 'repeatable', 'schedule']
+const SETTABLE = ['points', 'repeatable', 'schedule', 'assignee']
 
 /**
  * The range a task can be worth. Exported so the input and the validator agree —
@@ -64,6 +64,11 @@ export function normalizeCustom(data) {
     }
     if (typeof value.repeatable === 'boolean') entry.repeatable = value.repeatable
     if (value.schedule?.kind) entry.schedule = value.schedule
+    // A person id or 'rotate'. Not checked against the roster here: the roster
+    // isn't in scope, and a sync can land an assignment a moment before the
+    // person it names. whoseTurn() reads an unknown id as unassigned, which is
+    // the right answer either way.
+    if (typeof value.assignee === 'string' && value.assignee) entry.assignee = value.assignee
     if (Object.keys(entry).length) taskSettings[taskId] = entry
   }
 
@@ -179,7 +184,12 @@ export function removeTask(custom, areaId, taskId) {
 export function updateTaskSettings(custom, taskId, patch) {
   const entry = { ...(custom.taskSettings?.[taskId] ?? {}) }
   for (const key of SETTABLE) {
-    if (key in patch) entry[key] = patch[key]
+    if (!(key in patch)) continue
+    // null means "stop overriding this" — unassigning a chore, say. Deleting
+    // the key rather than storing a null is what lets the last override
+    // removed take the whole entry with it below.
+    if (patch[key] === null || patch[key] === undefined) delete entry[key]
+    else entry[key] = patch[key]
   }
   const taskSettings = { ...(custom.taskSettings ?? {}) }
   if (Object.keys(entry).length === 0) delete taskSettings[taskId]

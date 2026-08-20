@@ -68,7 +68,7 @@ Other commands:
 ```bash
 npm run build     # build the production version into dist/
 npm run preview   # preview that production build locally
-npm run check     # run the tests (659 checks)
+npm run check     # run the tests (714 checks)
 ```
 
 `npm run check` drives a real browser through the app — logging, persistence,
@@ -373,6 +373,25 @@ Three things it deliberately does *not* do:
 - **Credits are per person, not per phone.** Yours are built from what *you*
   logged, so you and your fiancée each build your own scene and it follows you to
   whichever phone you pick up.
+
+---
+
+## Whose job is it
+
+Once there's more than one person in the household, every chore can be given to
+somebody. Open a room, tap **Edit room**, open a task, and pick under **Whose
+job**:
+
+- **Anybody** — the default, and where most chores should stay.
+- **A person** — their name shows on the card.
+- **Take turns** — whoever didn't do it last time is up next. It's worked out
+  from who actually logged it, so it stays right even if you both do it out of
+  order.
+
+**It's a reminder, not a lock.** Anyone can still log anything in one tap, and
+nothing anywhere says somebody missed their turn. There's a **Mine** button on
+the dashboard queue that narrows it to your chores — plus everything nobody has
+claimed, because that's still yours to worry about too.
 
 ---
 

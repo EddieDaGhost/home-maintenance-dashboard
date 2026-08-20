@@ -373,6 +373,7 @@ export default function TodayScreen({ log, now, onLog, onUndo, onBack, readOnly 
               key={task.id}
               task={task}
               state={state}
+              entries={log.completions[task.id] ?? []}
               areaLabel={nameFor(task.area)}
               onLog={onLog}
               onUndo={onUndo}

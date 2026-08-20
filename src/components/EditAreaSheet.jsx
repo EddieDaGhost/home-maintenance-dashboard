@@ -5,6 +5,8 @@ import { ICON_NAMES, iconFor } from '../config/icons.js'
 import { DEFAULT_TASK_POINTS, MAX_POINTS, MIN_POINTS } from '../lib/custom.js'
 import { useNames } from '../state/NamesProvider.jsx'
 import { useAreas } from '../state/AreasProvider.jsx'
+import { usePeople } from '../state/PeopleProvider.jsx'
+import { ROTATE } from '../lib/turns.js'
 import { useTheme } from '../theme/ThemeProvider.jsx'
 import ScheduleFields, { SCHEDULE_DEFAULTS } from './ScheduleFields.jsx'
 import Sheet from './Sheet.jsx'
@@ -196,6 +198,8 @@ function AddTaskForm({ onAdd, onCancel }) {
  * is miserable on a phone.
  */
 function TaskSettings({ task, edited, onChange, onReset }) {
+  const { people, isShared } = usePeople()
+
   return (
     <div className="mt-2 space-y-3 rounded-xl border p-3" style={{ borderColor: 'var(--line)' }}>
       <ScheduleFields value={task.schedule} onChange={(schedule) => onChange({ schedule })} />
@@ -208,6 +212,33 @@ function TaskSettings({ task, edited, onChange, onReset }) {
         />
         points each time
       </label>
+
+      {/* Only worth the space once there's somebody to share with. Whatever is
+          chosen here is a hint on the card — it never stops anyone logging it. */}
+      {isShared ? (
+        <div>
+          <span className="label mb-1 block">Whose job</span>
+          <select
+            className="field"
+            aria-label={`Who does ${task.name}`}
+            value={task.assignee ?? ''}
+            onChange={(e) => onChange({ assignee: e.target.value || null })}
+          >
+            <option value="">Anybody</option>
+            {people.map((person) => (
+              <option key={person.id} value={person.id}>
+                {person.name}
+              </option>
+            ))}
+            <option value={ROTATE}>Take turns</option>
+          </select>
+          <p className="mt-1 text-xs" style={{ color: 'var(--ink-3)' }}>
+            {task.assignee === ROTATE
+              ? "Whoever didn't do it last time is up next. Anyone can still log it."
+              : 'A reminder of whose it is, not a lock — anyone can still log it.'}
+          </p>
+        </div>
+      ) : null}
 
       <label className="flex items-start gap-2.5 text-sm" style={{ color: 'var(--ink-2)' }}>
         <input
