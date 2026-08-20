@@ -200,7 +200,7 @@ and no horizontal overflow — the tests assert that last one.
 ## Testing
 
 ```bash
-npm run check              # everything: 652 checks
+npm run check              # everything: 659 checks
 npm run check -- logic     # just the fast pure-logic suite (no browser)
 ```
 
@@ -208,8 +208,9 @@ npm run check -- logic     # just the fast pure-logic suite (no browser)
 through `playwright-core` — no browser is downloaded at install time; the harness
 finds Chrome on your machine, or you point `CHROME_PATH` at one.
 
-**Run `npm run check` before pushing.** There is no CI on this repo, so it's the
-only safety net. If you change scheduling logic, the logic suite is the one that
+**Run `npm run check` before pushing.** `.github/workflows/check.yml` runs the
+same command on every push and pull request, but finding out locally is faster
+than finding out from a red tick. If you change scheduling logic, the logic suite is the one that
 catches you: it asserts things like "only one bathroom is deep-clean-active in a
 given week" and "a Monday scoop doesn't count for Wednesday."
 

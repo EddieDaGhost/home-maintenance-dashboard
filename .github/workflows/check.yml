@@ -1,0 +1,54 @@
+# The safety net, automated.
+#
+# `npm run check` was the only thing standing between a bad push and a broken
+# app, and it only ran when somebody remembered. Now it runs on every push and
+# every pull request.
+#
+# No browser is downloaded: tests/harness.mjs probes /usr/bin/google-chrome,
+# which the GitHub runner image already has. That is the same reason the repo
+# depends on playwright-core rather than playwright — see the note at the top
+# of tests/harness.mjs.
+
+name: check
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+# A second push supersedes the first; no point finishing a run nobody will read.
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      # The browser suites drive the built app from dist/, so this has to
+      # happen before the tests rather than alongside them.
+      - run: npm run build
+
+      - name: Confirm a browser is present
+        run: |
+          if [ ! -x /usr/bin/google-chrome ]; then
+            echo "No Chrome at /usr/bin/google-chrome — the runner image changed."
+            echo "Add browser-actions/setup-chrome and set CHROME_PATH."
+            exit 1
+          fi
+          /usr/bin/google-chrome --version
+
+      - run: npm run check
+        env:
+          CHROME_PATH: /usr/bin/google-chrome

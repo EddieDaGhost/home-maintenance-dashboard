@@ -68,7 +68,7 @@ Other commands:
 ```bash
 npm run build     # build the production version into dist/
 npm run preview   # preview that production build locally
-npm run check     # run the tests (652 checks)
+npm run check     # run the tests (659 checks)
 ```
 
 `npm run check` drives a real browser through the app — logging, persistence,
@@ -79,7 +79,8 @@ installed; no browser is downloaded during `npm install`. If it can't find one:
 CHROME_PATH="/path/to/chrome" npm run check
 ```
 
-Run it before pushing — there's no CI on this repo, so it's the safety net.
+Run it before pushing. GitHub Actions runs the same command on every push and
+pull request, but a red tick five minutes later is a slower way to learn.
 See [CLAUDE.md](CLAUDE.md) for how the code is organised.
 
 ---
