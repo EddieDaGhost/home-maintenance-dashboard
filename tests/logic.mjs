@@ -25,11 +25,13 @@ import {
 } from '../src/config/catalog.js'
 import { MOOD, creditsBalance, creditsEarned, owns, sceneMood } from '../src/lib/credits.js'
 import {
+  LOOKS,
   buyCompanion,
   buyItem,
   buyTreat,
   entryFor,
   equip,
+  lookFor,
   normalizeEstate,
   renameCompanion,
 } from '../src/lib/estate.js'
@@ -266,28 +268,60 @@ export default async function run({ check }) {
   is('nobody earns for nobody', creditsEarned(shared, ALL_TASKS, null, ROSTER), 0)
 
   // --- spending ---
+  // One wallet, three scenes: what you own is per look, but the credits come
+  // out of the same pot however you spend them.
+  const HOME = 'home'
+  const SHIP = 'starship'
   const fern = itemById('vessel-fern')
+  const shelf = (e, look = HOME) => lookFor(entryFor(e, 'eddie'), look)
+
   let estate = {}
-  estate = buyItem(estate, 'eddie', fern, 40)
+  estate = buyItem(estate, 'eddie', HOME, fern, 40)
   is('a purchase you cannot afford is refused', Object.keys(estate).length, 0)
 
-  estate = buyItem(estate, 'eddie', fern, 200)
+  estate = buyItem(estate, 'eddie', HOME, fern, 200)
   is('buying records the spend', entryFor(estate, 'eddie').spent, fern.cost)
-  is('buying wears it straight away', entryFor(estate, 'eddie').equipped.vessel, 'vessel-fern')
-  is('and it is owned', owns(entryFor(estate, 'eddie'), 'vessel-fern'), true)
+  is('buying wears it straight away', shelf(estate).equipped.vessel, 'vessel-fern')
+  is('and it is owned', owns(shelf(estate), 'vessel-fern'), true)
 
-  estate = buyItem(estate, 'eddie', fern, 200)
+  // The thing this whole shape exists for: a ship is not a cat.
+  is('but not in another look', owns(shelf(estate, SHIP), 'vessel-fern'), false)
+  is('and nothing is worn there', shelf(estate, SHIP).equipped.vessel, undefined)
+  is('a look nobody has touched is simply empty', shelf(estate, 'cats').owned.length, 0)
+
+  estate = buyItem(estate, 'eddie', HOME, fern, 200)
   is('buying the same thing twice charges once', entryFor(estate, 'eddie').spent, fern.cost)
 
-  estate = equip(estate, 'eddie', 'vessel-fern')
-  is('equipping what is worn takes it off', entryFor(estate, 'eddie').equipped.vessel, undefined)
-  estate = equip(estate, 'eddie', 'vessel-monstera')
-  is('you cannot wear what you do not own', entryFor(estate, 'eddie').equipped.vessel, undefined)
+  // Buying the same item in another look is a second purchase, at full price —
+  // that is what makes choosing which scene to dress mean something.
+  let both = buyItem(estate, 'eddie', SHIP, fern, 200)
+  is('the same item in another look is bought again', owns(lookFor(entryFor(both, 'eddie'), SHIP), 'vessel-fern'), true)
+  is('and charged again, from the one pot', entryFor(both, 'eddie').spent, fern.cost * 2)
+
+  estate = equip(estate, 'eddie', HOME, 'vessel-fern')
+  is('equipping what is worn takes it off', shelf(estate).equipped.vessel, undefined)
+  estate = equip(estate, 'eddie', HOME, 'vessel-monstera')
+  is('you cannot wear what you do not own', shelf(estate).equipped.vessel, undefined)
+  estate = equip(estate, 'eddie', SHIP, 'vessel-fern')
+  is('nor wear it in a look you did not buy it in', lookFor(entryFor(estate, 'eddie'), SHIP).equipped.vessel, undefined)
 
   is("one person's spending is their own", entryFor(estate, 'yas').spent, 0)
 
   const bigLog = { completions: { 'kitchen-dishes': Array.from({ length: 30 }, (_, i) => ({ at: daysAgo(i), by: 'eddie' })) } }
   is('balance is earned minus spent', creditsBalance(bigLog, ALL_TASKS, 'eddie', ROSTER, entryFor(estate, 'eddie')), 120 - fern.cost)
+  // 120 earned, 160 spent across two looks: one pot, and it is empty. Dressing
+  // the ship really is money not spent on the windowsill.
+  is(
+    'and spending in one look comes off the balance in all of them',
+    creditsBalance(bigLog, ALL_TASKS, 'eddie', ROSTER, entryFor(both, 'eddie')),
+    0,
+  )
+  is(
+    'the second look is not a second allowance',
+    creditsBalance(bigLog, ALL_TASKS, 'eddie', ROSTER, entryFor(both, 'eddie')) <
+      creditsBalance(bigLog, ALL_TASKS, 'eddie', ROSTER, entryFor(estate, 'eddie')),
+    true,
+  )
   is(
     'balance never goes negative',
     creditsBalance({ completions: {} }, ALL_TASKS, 'eddie', ROSTER, { spent: 9999 }),
@@ -296,13 +330,14 @@ export default async function run({ check }) {
 
   // --- companions and the consumable ---
   let many = {}
-  for (let i = 0; i < MAX_COMPANIONS + 2; i += 1) many = buyCompanion(many, 'eddie', COMPANION_COST, 99999)
-  is('companions stop at the cap', entryFor(many, 'eddie').companions.length, MAX_COMPANIONS)
-  is('companions start unnamed', entryFor(many, 'eddie').companions[0].name, '')
-  const named = renameCompanion(many, 'eddie', entryFor(many, 'eddie').companions[0].id, '  Bruce  ')
-  is('and can be named', entryFor(named, 'eddie').companions[0].name, 'Bruce')
-  is('naming one leaves the others alone', entryFor(named, 'eddie').companions[1].name, '')
-  is('a name survives being read back', normalizeEstate(named).eddie.companions[0].name, 'Bruce')
+  for (let i = 0; i < MAX_COMPANIONS + 2; i += 1) many = buyCompanion(many, 'eddie', HOME, COMPANION_COST, 99999)
+  is('companions stop at the cap', shelf(many).companions.length, MAX_COMPANIONS)
+  is('companions start unnamed', shelf(many).companions[0].name, '')
+  is('and belong to the look they were bought in', shelf(many, SHIP).companions.length, 0)
+  const named = renameCompanion(many, 'eddie', HOME, shelf(many).companions[0].id, '  Bruce  ')
+  is('and can be named', shelf(named).companions[0].name, 'Bruce')
+  is('naming one leaves the others alone', shelf(named).companions[1].name, '')
+  is('a name survives being read back', normalizeEstate(named).eddie.looks[HOME].companions[0].name, 'Bruce')
   is('and only the ones bought were charged', entryFor(many, 'eddie').spent, MAX_COMPANIONS * COMPANION_COST)
 
   const T0 = MON.getTime()
@@ -312,6 +347,8 @@ export default async function run({ check }) {
   is('a treat lasts its full run', entryFor(treated, 'eddie').boostUntil, T0 + TREAT_HOURS * 3600000)
   treated = buyTreat(treated, 'eddie', TREAT_COST, 500, T0)
   is('buying again extends rather than replaces', entryFor(treated, 'eddie').boostUntil, T0 + 2 * TREAT_HOURS * 3600000)
+  // A treat is a mood, not a possession — it lights up whichever scene you open.
+  is('and it is not tied to one look', entryFor(treated, 'eddie').boostUntil > 0, true)
 
   // --- how the scene feels ---
   const behind = { completions: { 'chickens-checkin': [daysAgo(5)] } }
@@ -332,11 +369,41 @@ export default async function run({ check }) {
   is('rubbish normalises to nothing', Object.keys(normalizeEstate('nope')).length, 0)
   is('an empty person is dropped', Object.keys(normalizeEstate({ eddie: {} })).length, 0)
   const salvaged = normalizeEstate({
-    eddie: { owned: ['vessel-fern', 'not-a-thing'], equipped: { vessel: 'vessel-orchid', flair: 'vessel-fern' }, spent: 80 },
+    eddie: {
+      looks: {
+        home: { owned: ['vessel-fern', 'not-a-thing'], equipped: { vessel: 'vessel-orchid', flair: 'vessel-fern' } },
+      },
+      spent: 80,
+    },
   })
-  is('an unknown purchase is kept, not dropped', salvaged.eddie.owned.length, 2)
-  is('but something unowned is never worn', salvaged.eddie.equipped.vessel, undefined)
-  is('and nothing is worn in the wrong slot', salvaged.eddie.equipped.flair, undefined)
+  is('an unknown purchase is kept, not dropped', salvaged.eddie.looks.home.owned.length, 2)
+  is('but something unowned is never worn', salvaged.eddie.looks.home.equipped.vessel, undefined)
+  is('and nothing is worn in the wrong slot', salvaged.eddie.looks.home.equipped.flair, undefined)
+
+  // --- the migration: nothing anybody owns is ever taken away ---
+  // Purchases made before ownership was per look become theirs in every look.
+  // Design rule 2 — you can lose credits you spent, never a thing you own.
+  const legacy = normalizeEstate({
+    eddie: {
+      owned: ['vessel-fern', 'finish-brass'],
+      equipped: { vessel: 'vessel-fern' },
+      companions: [{ id: 'c1', name: 'Bruce' }],
+      spent: 210,
+      boostUntil: 0,
+    },
+  })
+  is('an old estate keeps its spend', legacy.eddie.spent, 210)
+  is('and lands in every look', LOOKS.every((id) => legacy.eddie.looks[id]?.owned.length === 2), true)
+  is('wearing what it was wearing', LOOKS.every((id) => legacy.eddie.looks[id].equipped.vessel === 'vessel-fern'), true)
+  is('with its companions intact', legacy.eddie.looks.starship.companions[0].name, 'Bruce')
+  is('the catalogue covers every look it was granted in', LOOKS.length, THEME_LIST.length)
+  // Once migrated it is the new shape, so a second read changes nothing.
+  is('and re-reading it is a no-op', JSON.stringify(normalizeEstate(legacy)), JSON.stringify(legacy))
+  is(
+    'an old estate that bought nothing stays nothing',
+    Object.keys(normalizeEstate({ eddie: { owned: [], equipped: {}, companions: [] } })).length,
+    0,
+  )
 
   // --- backups carry it ---
   const restored = parseBackup(JSON.stringify(buildBackup(shared, {}, null, null, estate)))

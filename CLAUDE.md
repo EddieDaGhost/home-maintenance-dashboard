@@ -202,7 +202,7 @@ and no horizontal overflow — the tests assert that last one.
 ## Testing
 
 ```bash
-npm run check              # everything: 714 checks
+npm run check              # everything: 736 checks
 npm run check -- logic     # just the fast pure-logic suite (no browser)
 ```
 
@@ -340,10 +340,19 @@ on the estate screen.
   Entries logged before the household feature existed have no `by` and are
   credited to the **first person on the roster**, which makes a long solo history
   count as that person's rather than nobody's.
-- **One catalogue, three costumes.** An item is the same purchase in every look;
-  only its name and its drawing change. `labels` in `src/config/catalog.js` must
-  cover **all three** themes — the logic suite fails a half-added item, and the
-  slot needs art in all three scene components too.
+- **One catalogue, three shelves, one wallet.** The catalogue is shared and
+  `labels` in `src/config/catalog.js` must still cover **all three** themes — the
+  logic suite fails a half-added item, and the slot needs art in all three scene
+  components. But **what you own is per look**: `estate[person].looks[themeId]`
+  holds `owned`, `equipped` and `companions`. Buying the freighter used to hand
+  you the Maine Coon, which made a price mean nothing.
+  What stays at the person level is `spent` — one pot of credits, earned once
+  from your chores, so dressing the ship is money not spent on the cats — and
+  `boostUntil`, because a treat is a mood and should light whichever scene you
+  open.
+  **The old flat shape is migrated, not wiped.** `normalizeEstate()` grants a
+  pre-existing `owned` list in all three looks: design rule 2 says nothing you
+  own is ever taken away. Only what's bought from here on is per look.
 - **Weather has to change the light**, not sit on top of it. Rain falling past a
   bright sun reads as a sun-shower, which is not what anybody bought — so the
   weather item drives the sky colour and the sunbeam as well as drawing itself.

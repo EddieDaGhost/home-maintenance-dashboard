@@ -68,7 +68,7 @@ Other commands:
 ```bash
 npm run build     # build the production version into dist/
 npm run preview   # preview that production build locally
-npm run check     # run the tests (714 checks)
+npm run check     # run the tests (736 checks)
 ```
 
 `npm run check` drives a real browser through the app — logging, persistence,

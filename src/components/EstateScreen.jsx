@@ -128,7 +128,7 @@ export default function EstateScreen({ log, now, onBack, onToast, readOnly = fal
   const { themeId, theme, copy } = useTheme()
   const { allTasks } = useAreas()
   const { activePerson, activeId, people, isShared } = usePeople()
-  const { entry, buyItem, equip, buyCompanion, renameCompanion, buyTreat } = useEstate()
+  const { entry, look, buyItem, equip, buyCompanion, renameCompanion, buyTreat } = useEstate()
   const { away } = useAway()
 
   const earned = creditsEarned(log, allTasks, activeId, people)
@@ -156,10 +156,10 @@ export default function EstateScreen({ log, now, onBack, onToast, readOnly = fal
   // What the scene draws: what you own, with the thing you're trying laid over
   // the top. Companions and the treat are scene inputs too, so they preview by
   // adding one to the list and by forcing the lively mood.
-  const shown = equippedItems(entry)
+  const shown = equippedItems(look)
   if (trying?.slot) shown[trying.slot] = trying
   const shownCompanions =
-    tryingId === COMPANION_ID ? [...entry.companions, { id: 'preview', name: '' }] : entry.companions
+    tryingId === COMPANION_ID ? [...look.companions, { id: 'preview', name: '' }] : look.companions
   const shownMood = tryingId === TREAT_ID ? MOOD.LIVELY : mood
 
   const buy = (item) => {
@@ -181,7 +181,7 @@ export default function EstateScreen({ log, now, onBack, onToast, readOnly = fal
   const treatLabel = itemLabel(TREAT, themeId)
   const companionAffordable = balance >= COMPANION_COST
   const treatAffordable = balance >= TREAT_COST
-  const roomForMore = entry.companions.length < MAX_COMPANIONS
+  const roomForMore = look.companions.length < MAX_COMPANIONS
 
   return (
     <div className="space-y-5 pb-10">
@@ -367,11 +367,11 @@ export default function EstateScreen({ log, now, onBack, onToast, readOnly = fal
       </section>
 
       {/* --- naming what you've collected ---------------------------------- */}
-      {entry.companions.length ? (
+      {look.companions.length ? (
         <section>
           <h2 className="section-title mb-2.5 px-1">{copy.shelfTitle}</h2>
           <div className="panel space-y-2 p-3.5">
-            {entry.companions.map((companion, index) => (
+            {look.companions.map((companion, index) => (
               <label key={companion.id} className="flex items-center gap-3">
                 <span className="w-6 shrink-0 text-center text-xs" style={{ color: 'var(--ink-3)' }}>
                   {index + 1}
@@ -405,8 +405,8 @@ export default function EstateScreen({ log, now, onBack, onToast, readOnly = fal
                 themeId={themeId}
                 balance={balance}
                 unit={unit}
-                owned={owns(entry, item.id)}
-                equipped={entry.equipped[slot] === item.id}
+                owned={owns(look, item.id)}
+                equipped={look.equipped[slot] === item.id}
                 trying={tryingId === item.id}
                 onBuy={buy}
                 onEquip={equip}
