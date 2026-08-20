@@ -92,6 +92,7 @@ import {
 } from '../src/lib/custom.js'
 import { composeAreas } from '../src/lib/compose.js'
 import { hardReset, resetSummary } from '../src/lib/reset.js'
+import { applyImport, parseImport, parseSchedule } from '../src/lib/importTasks.js'
 import { mergeCompletions } from '../src/lib/sync.js'
 import { ROTATE, isTurnOf, lastLoggedBy, mineOf, turnLabel, whoseTurn } from '../src/lib/turns.js'
 import { THEME_LIST } from '../src/config/themes.js'
@@ -698,6 +699,119 @@ export default async function run({ check }) {
     1,
   )
   is('and a null reset changes nothing', mergeCompletions(stale, [], null)['kitchen-dishes'].length, 2)
+
+  // =========================================================================
+  // Importing a list
+  // =========================================================================
+
+  // It has to accept what scheduleLabel() prints, so a list copied out of the
+  // app goes straight back in.
+  const sched = (text) => JSON.stringify(parseSchedule(text))
+  is('every day', sched('Every day'), JSON.stringify({ kind: 'daily' }))
+  is('daily', sched('daily'), JSON.stringify({ kind: 'daily' }))
+  is('once a week', sched('Once a week'), JSON.stringify({ kind: 'weekly' }))
+  is('weekends', sched('Saturday or Sunday'), JSON.stringify({ kind: 'weekend' }))
+  is('a few times a week', sched('2x per week'), JSON.stringify({ kind: 'timesPerWeek', times: 2 }))
+  is('spelled out', sched('3 times a week'), JSON.stringify({ kind: 'timesPerWeek', times: 3 }))
+  is('every n days', sched('Every 10 days'), JSON.stringify({ kind: 'everyNDays', days: 10 }))
+  is('weeks become days', sched('every 2 weeks'), JSON.stringify({ kind: 'everyNDays', days: 14 }))
+  is('fortnightly too', sched('fortnightly'), JSON.stringify({ kind: 'everyNDays', days: 14 }))
+  is('every n months', sched('Every 3 months'), JSON.stringify({ kind: 'everyNMonths', months: 3 }))
+  is('quarterly', sched('quarterly'), JSON.stringify({ kind: 'everyNMonths', months: 3 }))
+  is('a list of days', sched('Mon · Wed · Fri'), JSON.stringify({ kind: 'weekdays', days: [1, 3, 5] }))
+  is('however it is punctuated', sched('mon and fri'), JSON.stringify({ kind: 'weekdays', days: [1, 5] }))
+  is('one day is a weekly', sched('Every Friday'), JSON.stringify({ kind: 'weeklyOn', day: 5 }))
+  is('plural too', sched('tuesdays'), JSON.stringify({ kind: 'weeklyOn', day: 2 }))
+  is('and nonsense is nothing', parseSchedule('when I feel like it'), null)
+  is('so is an empty string', parseSchedule('   '), null)
+  // Every kind the form can build has to be reachable by typing.
+  is(
+    'every schedule the form offers can be typed',
+    ['Every day', 'Mon · Wed · Fri', '2x per week', 'Once a week', 'Every Friday', 'Saturday or Sunday', 'Every 10 days', 'Every 3 months']
+      .map((text) => parseSchedule(text)?.kind)
+      .join(),
+    'daily,weekdays,timesPerWeek,weekly,weeklyOn,weekend,everyNDays,everyNMonths',
+  )
+
+  // --- reading a list ---
+  const built = composeAreas(emptyCustom)
+  const listed = parseImport(
+    [
+      '# a comment, ignored',
+      'Kitchen: Wipe counters, 2x per week, 3',
+      'Mop the floor, weekly, 5',
+      'Garage: Sweep the floor, every 2 weeks',
+      '',
+      'Tidy the bench, 7',
+    ].join('\n'),
+    built,
+  )
+  is('the room carries down the list', listed.tasks[1].room, 'Kitchen')
+  is('until another is named', listed.tasks[2].room, 'Garage')
+  is('and keeps carrying', listed.tasks[3].room, 'Garage')
+  is('a comment is not a task', listed.tasks.length, 4)
+  is('a blank line is not a task either', listed.skipped.length, 0)
+  is('an existing room is matched, not created', listed.tasks[0].areaId, 'kitchen')
+  is('a new one is flagged for creating', listed.rooms.join(), 'Garage')
+  is('points are read', listed.tasks[0].points, 3)
+  is('schedules are read', listed.tasks[0].schedule.kind, 'timesPerWeek')
+  is('and either may be left out', listed.tasks[3].schedule, null)
+  is('order between them does not matter', parseImport('Kitchen: A thing, 4, daily', built).tasks[0].schedule.kind, 'daily')
+  is('and points still land', parseImport('Kitchen: A thing, 4, daily', built).tasks[0].points, 4)
+
+  // --- a task that already exists is updated, never duplicated ---
+  const existing = parseImport('Kitchen: Dishes, daily, 12', built)
+  is('an existing chore is recognised', existing.tasks[0].existingId, 'kitchen-dishes')
+  is('and counted as an update', existing.updated, 1)
+  is('not as an addition', existing.added, 0)
+
+  // --- bad lines are named and skipped, never fatal ---
+  const messy = parseImport(['Kitchen: Fine, daily, 2', 'Kitchen: Broken, whenever I like'].join('\n'), built)
+  is('the good line still lands', messy.tasks.length, 1)
+  is('the bad one is reported', messy.skipped.length, 1)
+  is('by line number', messy.skipped[0].line, 2)
+  is('and says why', /isn't a schedule/.test(messy.skipped[0].why), true)
+  // A line before any room is named has nowhere to go; one after inherits the
+  // room above it, which is how people actually write a list.
+  const roomless = parseImport('A task with no room at all\nKitchen: Dishes\nAnother one', built)
+  is('a line before any room is caught', /No room yet/.test(roomless.skipped[0].why), true)
+  is('but one after inherits the room above it', roomless.tasks[1].room, 'Kitchen')
+  is('the same task twice is only imported once', parseImport('Kitchen: A, daily\nKitchen: A, weekly', built).tasks.length, 1)
+  is('a room with nothing in it is not created', parseImport('Nowhere: , ,', built).rooms.length, 0)
+  is('an empty list does nothing', parseImport('', built).tasks.length, 0)
+  is('and neither does no list at all', parseImport(null, built).tasks.length, 0)
+  is('out-of-range points are clamped, not refused', parseImport('Kitchen: A, 5000', built).tasks[0].points, 999)
+
+  // --- applying it ---
+  const imported = applyImport(emptyCustom, listed, [])
+  const composedAfter = composeAreas(imported)
+  const flatAfter = composedAfter.flatMap((area) => area.tasks)
+  is('the new room exists', composedAfter.some((area) => area.name === 'Garage'), true)
+  is('with its tasks in it', composedAfter.find((area) => area.name === 'Garage').tasks.length, 2)
+  is('and the existing room gained its own', flatAfter.some((t) => t.name === 'Wipe counters'), true)
+  is('a task with no schedule gets the default', flatAfter.find((t) => t.name === 'Tidy the bench').schedule.kind, 'weekly')
+  is('and keeps the points it was given', flatAfter.find((t) => t.name === 'Tidy the bench').points, 7)
+
+  // The rule that matters: an existing task is edited, so its id never moves.
+  const updated = applyImport(emptyCustom, existing, [])
+  is('an existing task is not duplicated', composeAreas(updated).flatMap((a) => a.tasks).filter((t) => t.id === 'kitchen-dishes').length, 1)
+  is('its id is untouched', composeAreas(updated).flatMap((a) => a.tasks).find((t) => t.name === 'Dishes').id, 'kitchen-dishes')
+  is('and it is worth what the list said', composeAreas(updated).flatMap((a) => a.tasks).find((t) => t.id === 'kitchen-dishes').points, 12)
+  is('through the same override map as editing by hand', updated.taskSettings['kitchen-dishes'].points, 12)
+  is('no new room was invented for it', updated.areas.length, 0)
+
+  // Importing the same list twice must not double anything.
+  const onceOver = applyImport(emptyCustom, listed, [])
+  const twiceOver = applyImport(
+    onceOver,
+    parseImport('Garage: Sweep the floor, every 2 weeks', composeAreas(onceOver)),
+    [],
+  )
+  is(
+    'importing the same line twice adds nothing the second time',
+    composeAreas(twiceOver).find((a) => a.name === 'Garage').tasks.length,
+    2,
+  )
 
   // =========================================================================
   // Today: the place, the drive, and the scratch list

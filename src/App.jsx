@@ -308,6 +308,7 @@ function AppShell() {
               window.scrollTo({ top: 0 })
             }}
             onReset={handleReset}
+            onToast={showToast}
             onOpenToday={() => {
               setTodayOpen(true)
               window.scrollTo({ top: 0 })

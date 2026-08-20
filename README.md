@@ -68,7 +68,7 @@ Other commands:
 ```bash
 npm run build     # build the production version into dist/
 npm run preview   # preview that production build locally
-npm run check     # run the tests (796 checks)
+npm run check     # run the tests (877 checks)
 ```
 
 `npm run check` drives a real browser through the app — logging, persistence,
@@ -320,6 +320,33 @@ feed"). Those typed items are just a list: they earn no points, they never
 touch your streak, nothing about them is ever called late, and they stay on the
 device you wrote them on. Tick one off and it drops to the bottom; it clears
 itself the next day.
+
+---
+
+## Importing a list
+
+**Setup → Import a list.** For when you'd rather type the whole house in at once
+than tap through the form thirty times. One chore per line:
+
+```
+Kitchen: Wipe the counters, 2x per week, 3
+Mop the floor, weekly, 5
+Garage: Sweep the floor, every 2 weeks
+Tidy the bench, 7
+```
+
+The room carries down until you name another one. How often and how many points
+are both optional — leave them out and it's once a week, worth 3.
+
+It understands *daily*, *weekly*, *weekends*, *2x per week*, *every 3 days*,
+*every 2 weeks*, *monthly*, *every 6 months*, *mon · wed · fri* and *every
+Friday* — the same words the app prints, so a list copied out of it goes
+straight back in.
+
+**You see exactly what will happen before it happens**, including which lines it
+couldn't read and why. **A chore you already have is updated, not duplicated** —
+its history stays attached and only what it's worth and how often it comes round
+change. Nothing is written until you tap the button.
 
 ---
 

@@ -113,6 +113,7 @@ src/
 │   ├── turns.js     Whose job a chore is, and whose turn it is next
 │   ├── away.js      Trips: the days nothing is due and the streak carries over
 │   ├── reset.js     Starting over: what it clears and what it keeps
+│   ├── importTasks.js  Reading a pasted list into rooms and tasks
 │   ├── credits.js   Credits earned/spent, and how lively the scene is
 │   ├── estate.js    What each person has bought, keyed by person id
 │   ├── places.js    Your town and your work address
@@ -203,7 +204,7 @@ and no horizontal overflow — the tests assert that last one.
 ## Testing
 
 ```bash
-npm run check              # everything: 796 checks
+npm run check              # everything: 877 checks
 npm run check -- logic     # just the fast pure-logic suite (no browser)
 ```
 
@@ -367,6 +368,36 @@ on the estate screen.
   — the scene and the task list must not be able to disagree.
 - **Removing a person leaves their estate in the map**, unreachable but intact,
   matching how a removed room keeps its history.
+
+---
+
+## Importing a list
+
+`src/lib/importTasks.js`. Thirty chores through the form is thirty rounds of
+tap-type-pick-save; this takes a list somebody typed in Notes.
+
+    Kitchen: Wipe counters, 2x per week, 3
+    Mop the floor, weekly, 5
+
+- **It produces the same structures the form does.** `applyImport()` calls
+  `addArea`, `addTask` and `updateTaskSettings` — there is no second way for a
+  task to exist, and nothing here can invent a shape the rest of the app
+  doesn't know.
+- **A task that already exists is *updated*, never added again.** It goes
+  through `taskSettings` exactly as editing it by hand does, so its id — and
+  the history filed under it — never moves. Same for rooms, matched by display
+  name.
+- **It accepts what `scheduleLabel()` prints.** A list copied out of the app
+  goes straight back in. If you add a schedule kind, add its words here too or
+  the round trip breaks.
+- **One pure transform, not a loop of provider calls.** A new room has to exist
+  before its tasks can go in it and its id isn't known until it does — and one
+  `setCustom` means one settings-clock stamp and one sync instead of thirty.
+- **The preview is the feature, not decoration.** Nothing is written until the
+  button below the list of exactly what will change. A bulk edit you can't see
+  first is how somebody ends up with forty duplicated chores.
+- **A bad line is named by number and skipped**, never fatal, and a room only
+  gets created if something actually lands in it.
 
 ---
 

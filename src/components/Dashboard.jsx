@@ -11,6 +11,7 @@ import {
   History,
   Info,
   Link2,
+  ListPlus,
   Nfc,
   PartyPopper,
   PlaneTakeoff,
@@ -54,6 +55,7 @@ import AwaySheet from './AwaySheet.jsx'
 import FreshStartSheet from './FreshStartSheet.jsx'
 import PlaceSheet from './PlaceSheet.jsx'
 import ResetSheet from './ResetSheet.jsx'
+import ImportSheet from './ImportSheet.jsx'
 
 function greeting(now) {
   const hour = now.getHours()
@@ -160,6 +162,7 @@ export default function Dashboard({
   onOpenEstate,
   onOpenToday,
   onReset,
+  onToast,
   sync,
   readOnly = false,
 }) {
@@ -183,6 +186,7 @@ export default function Dashboard({
   const [placeOpen, setPlaceOpen] = useState(false)
   const [mineOnly, setMineOnly] = useState(false)
   const [resetOpen, setResetOpen] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
   const fileInput = useRef(null)
 
   const streak = currentStreak(log, now, allTasks, away)
@@ -346,8 +350,8 @@ export default function Dashboard({
               className="ml-auto rounded-full px-2.5 py-1 font-sans text-xs font-semibold tracking-normal normal-case transition active:scale-95"
               style={
                 mineOnly
-                  ? { background: 'var(--accent)', color: 'var(--accent-ink)' }
-                  : { background: 'var(--surface-2)', color: 'var(--ink-2)' }
+                  ? { background: 'var(--accent)', color: 'var(--accent-ink)', border: '1px solid var(--accent)' }
+                  : { background: 'var(--surface)', color: 'var(--ink-2)', border: '1px solid var(--line)' }
               }
             >
               Mine
@@ -462,6 +466,12 @@ export default function Dashboard({
             label="History"
             detail="Streaks, heatmap, every entry"
             onClick={() => setHistoryOpen(true)}
+          />
+          <SettingsRow
+            icon={ListPlus}
+            label="Import a list"
+            detail="Paste a whole house in at once"
+            onClick={() => setImportOpen(true)}
           />
           <SettingsRow
             icon={CloudSun}
@@ -586,6 +596,7 @@ export default function Dashboard({
       <AboutSheet open={aboutOpen} onClose={() => setAboutOpen(false)} />
       <AwaySheet open={awayOpen} onClose={() => setAwayOpen(false)} now={now} />
       <PlaceSheet open={placeOpen} onClose={() => setPlaceOpen(false)} />
+      <ImportSheet open={importOpen} onClose={() => setImportOpen(false)} onToast={onToast} />
       <ResetSheet
         open={resetOpen}
         onClose={() => setResetOpen(false)}
