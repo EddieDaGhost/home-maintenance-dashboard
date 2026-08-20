@@ -18,7 +18,7 @@ const LINK_KEY = 'home-maintenance-dashboard/sync/v1'
 // The link this device holds
 // ---------------------------------------------------------------------------
 
-export const emptyLink = { householdId: null, key: null, lastSyncAt: null }
+export const emptyLink = { householdId: null, key: null, lastSyncAt: null, resetAt: null }
 
 export function loadLink() {
   if (typeof window === 'undefined') return emptyLink
@@ -31,6 +31,8 @@ export function loadLink() {
       householdId: parsed.householdId,
       key: parsed.key,
       lastSyncAt: Number.isFinite(parsed.lastSyncAt) ? parsed.lastSyncAt : null,
+      // The last household-wide reset this device has already applied.
+      resetAt: Number.isFinite(parsed.resetAt) ? parsed.resetAt : null,
     }
   } catch {
     return emptyLink
@@ -103,6 +105,31 @@ export async function pushAndPull({ householdId, key, events, state, stateUpdate
   )
 }
 
+/**
+ * Clear the household's completions on the server.
+ *
+ * Needed because hm_sync merges by union: a phone that wipes itself and then
+ * syncs is handed its own history straight back. Without this a reset silently
+ * undoes itself, which is worse than not offering one.
+ *
+ * Throws a recognisable error when the household predates this function, so the
+ * UI can say "re-run supabase/schema.sql" rather than a raw Postgres message.
+ */
+export async function resetHousehold({ householdId, key }, options) {
+  try {
+    return await rpc('hm_reset', { p_household: householdId, p_key: key }, options)
+  } catch (error) {
+    if (/hm_reset|404|not find|does not exist/i.test(error.message)) {
+      const problem = new Error(
+        'The shared copy still has this history. Re-run supabase/schema.sql in the Supabase SQL editor, then reset again.',
+      )
+      problem.code = 'no-reset-function'
+      throw problem
+    }
+    throw error
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Turning local data into events and back
 // ---------------------------------------------------------------------------
@@ -123,11 +150,18 @@ export function toEvents(log) {
 /**
  * Union the server's completions into the local ones. Same task at the same
  * instant is the same event, so nothing duplicates however often this runs.
+ *
+ * `resetAt` is the one thing that ever removes an entry. Somebody in the
+ * household started over, and a phone that was asleep at the time is otherwise
+ * the one device still holding the history — and, because merging is a union,
+ * the one that puts it all back on its next push. Anything logged *since* the
+ * reset survives: a phone that was offline for a week keeps this week's work.
  */
-export function mergeCompletions(localCompletions, remoteEvents) {
+export function mergeCompletions(localCompletions, remoteEvents, resetAt = null) {
   const merged = {}
   for (const [taskId, entries] of Object.entries(localCompletions ?? {})) {
-    merged[taskId] = [...entries]
+    const kept = resetAt ? entries.filter((entry) => timeOf(entry) > resetAt) : [...entries]
+    if (kept.length) merged[taskId] = kept
   }
 
   for (const event of remoteEvents ?? []) {

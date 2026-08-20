@@ -9,6 +9,7 @@ import { EstateProvider, useEstate } from './state/EstateProvider.jsx'
 import { AwayProvider, useAway } from './state/AwayProvider.jsx'
 import { PlacesProvider, usePlaces } from './state/PlacesProvider.jsx'
 import { downloadBackup, parseBackup } from './lib/backup.js'
+import { hardReset } from './lib/reset.js'
 import { claimDevice, loadDevice, looksSetUp } from './lib/device.js'
 import { parseJoinHash } from './lib/sync.js'
 import { useSync } from './state/useSync.js'
@@ -199,6 +200,27 @@ function AppShell() {
     [setNames, setHousehold, setCustom, setEstate, setAway, setPlaces, setDaily, showToast],
   )
 
+  /**
+   * Start over. Clears what you did; keeps what you set up.
+   *
+   * The shared copy goes first. hm_sync merges completions by union, so wiping
+   * this phone while the household still holds its history achieves nothing —
+   * the next sync hands it all straight back. If the server refuses, nothing
+   * local is touched and the sheet says why.
+   */
+  const handleReset = useCallback(async () => {
+    const shared = await sync.resetShared()
+    if (!shared.ok) return shared
+
+    const fresh = hardReset({ away })
+    setLog(fresh.log)
+    setEstate(fresh.estate)
+    setAway(fresh.away)
+    setNow(new Date())
+    showToast('Back to zero')
+    return { ok: true }
+  }, [sync, away, setEstate, setAway, showToast])
+
   const area = useMemo(() => (areaId ? (areasById[areaId] ?? null) : null), [areaId, areasById])
 
   const handleClaim = useCallback(() => {
@@ -285,6 +307,7 @@ function AppShell() {
               setEstateOpen(true)
               window.scrollTo({ top: 0 })
             }}
+            onReset={handleReset}
             onOpenToday={() => {
               setTodayOpen(true)
               window.scrollTo({ top: 0 })

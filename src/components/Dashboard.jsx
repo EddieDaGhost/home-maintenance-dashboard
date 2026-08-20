@@ -5,6 +5,7 @@ import {
   CloudSun,
   Coins,
   Download,
+  Eraser,
   Flame,
   Flower2,
   History,
@@ -52,6 +53,7 @@ import HouseholdSheet, { PersonAvatar } from './HouseholdSheet.jsx'
 import AwaySheet from './AwaySheet.jsx'
 import FreshStartSheet from './FreshStartSheet.jsx'
 import PlaceSheet from './PlaceSheet.jsx'
+import ResetSheet from './ResetSheet.jsx'
 
 function greeting(now) {
   const hour = now.getHours()
@@ -157,6 +159,7 @@ export default function Dashboard({
   onRestore,
   onOpenEstate,
   onOpenToday,
+  onReset,
   sync,
   readOnly = false,
 }) {
@@ -179,6 +182,7 @@ export default function Dashboard({
   const [shareOpen, setShareOpen] = useState(false)
   const [placeOpen, setPlaceOpen] = useState(false)
   const [mineOnly, setMineOnly] = useState(false)
+  const [resetOpen, setResetOpen] = useState(false)
   const fileInput = useRef(null)
 
   const streak = currentStreak(log, now, allTasks, away)
@@ -547,6 +551,14 @@ export default function Dashboard({
             detail="Replaces what's on this device"
             onClick={() => fileInput.current?.click()}
           />
+          {/* Last in the list on purpose: it's the only one that takes
+              something away, and the only one worded in --alert-*. */}
+          <SettingsRow
+            icon={Eraser}
+            label="Start over"
+            detail="Clear every log and purchase — your rooms and tasks stay"
+            onClick={() => setResetOpen(true)}
+          />
         </div>
 
         <input
@@ -574,6 +586,14 @@ export default function Dashboard({
       <AboutSheet open={aboutOpen} onClose={() => setAboutOpen(false)} />
       <AwaySheet open={awayOpen} onClose={() => setAwayOpen(false)} now={now} />
       <PlaceSheet open={placeOpen} onClose={() => setPlaceOpen(false)} />
+      <ResetSheet
+        open={resetOpen}
+        onClose={() => setResetOpen(false)}
+        log={log}
+        onReset={onReset}
+        onBackup={onBackup}
+        sharing={sync.isSharing}
+      />
       <FreshStartSheet open={freshOpen} onClose={() => setFreshOpen(false)} now={now} />
       {sync ? <ShareSheet open={shareOpen} onClose={() => setShareOpen(false)} sync={sync} /> : null}
       <TagSetup open={tagsOpen} onClose={() => setTagsOpen(false)} />

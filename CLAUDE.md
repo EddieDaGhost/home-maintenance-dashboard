@@ -112,6 +112,7 @@ src/
 │   ├── people.js    Household, who's logging
 │   ├── turns.js     Whose job a chore is, and whose turn it is next
 │   ├── away.js      Trips: the days nothing is due and the streak carries over
+│   ├── reset.js     Starting over: what it clears and what it keeps
 │   ├── credits.js   Credits earned/spent, and how lively the scene is
 │   ├── estate.js    What each person has bought, keyed by person id
 │   ├── places.js    Your town and your work address
@@ -202,7 +203,7 @@ and no horizontal overflow — the tests assert that last one.
 ## Testing
 
 ```bash
-npm run check              # everything: 736 checks
+npm run check              # everything: 796 checks
 npm run check -- logic     # just the fast pure-logic suite (no browser)
 ```
 
@@ -369,6 +370,30 @@ on the estate screen.
 
 ---
 
+## Starting over
+
+`src/lib/reset.js`. Everything else in this app is additive on purpose — hiding
+a room keeps its history, ending a trip early trims it, a fresh start logs
+nothing and deletes nothing. **This is the only thing that takes something
+away**, so:
+
+- **It clears what you did, keeps what you set up.** Completions and the estate
+  go; `custom` is not even read by `hardReset()`, which is the cheapest possible
+  guarantee that an added room or an edited task survives. Trips stay — they're
+  a record of where the household was, not of what it achieved — and the
+  fresh-start line goes, having nothing left to cover.
+- **It is the one screen allowed to use `--alert-*`.** CLAUDE.md reserves those
+  colours for things that take something away from you and everywhere else that
+  would be a lie. Here it isn't.
+- **Two taps, with the real numbers in between.** `resetSummary()` counts the
+  entries and purchases so the confirmation states the cost rather than being
+  vague about it, and a backup is offered right there.
+- **It has to reach the server** — see the `reset_at` note under sharing below.
+  Re-running `supabase/schema.sql` is a manual step; without it the reset works
+  locally and the sheet says why the shared copy came back.
+
+---
+
 ## Going away, and starting fresh
 
 `src/lib/away.js` holds the dates that soften the schedule, and `applyGrace()`
@@ -439,6 +464,16 @@ therefore grants nothing by itself.
 - **Completions are events**, keyed by `(household, task, instant)`. Merging is
   a union, so two phones logging offline both arrive and pushing the same event
   twice changes nothing. This is why sync needed no conflict resolution.
+- **`reset_at` is the one exception to the union**, and it exists because the
+  union is otherwise total. Wiping a phone locally achieves nothing while the
+  household still holds the history — the next sync hands it straight back — and
+  clearing the server isn't enough either, because the *other* phone still has
+  its copy and pushes it back. So `hm_reset` stamps the instant on the
+  household: `hm_sync` refuses incoming events older than it, and hands it back
+  so every device drops its own copy of what came before. Anything logged since
+  survives, so a phone that was offline all week keeps that week's work. This
+  was found by the two-phone test, which watched four rows reappear one
+  `hm_sync` after they were deleted.
 - **Settings are last-write-wins** — one JSON document holding names, rooms and
   the roster. The timestamp attached to a push comes from
   `src/lib/settingsClock.js`, which the providers stamp on real user actions.

@@ -25,6 +25,7 @@ const SUITES = [
   { name: 'assign', file: './assign.mjs', browser: true },
   { name: 'away', file: './away.mjs', browser: true },
   { name: 'fresh-start', file: './fresh-start.mjs', browser: true },
+  { name: 'reset', file: './reset.mjs', browser: true },
   { name: 'offline', file: './offline.mjs', browser: true },
   { name: 'sync', file: './sync.mjs', browser: true, ownContexts: true },
 ]

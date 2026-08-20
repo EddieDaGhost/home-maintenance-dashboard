@@ -91,6 +91,8 @@ import {
   updateTaskSettings,
 } from '../src/lib/custom.js'
 import { composeAreas } from '../src/lib/compose.js'
+import { hardReset, resetSummary } from '../src/lib/reset.js'
+import { mergeCompletions } from '../src/lib/sync.js'
 import { ROTATE, isTurnOf, lastLoggedBy, mineOf, turnLabel, whoseTurn } from '../src/lib/turns.js'
 import { THEME_LIST } from '../src/config/themes.js'
 
@@ -640,6 +642,62 @@ export default async function run({ check }) {
   is('unassigning takes the whole entry with it', Object.keys(updateTaskSettings(assigned, 'litter-scoop', { assignee: null }).taskSettings).length, 0)
   is('but leaves other overrides alone', updateTaskSettings(updateTaskSettings(assigned, 'litter-scoop', { points: 7 }), 'litter-scoop', { assignee: null }).taskSettings['litter-scoop'].points, 7)
   is('a non-string assignee is refused', normalizeCustom({ taskSettings: { x: { assignee: 42 } } }).taskSettings.x, undefined)
+
+  // =========================================================================
+  // Starting over
+  // =========================================================================
+
+  // Everything else in the app is additive. This is the one thing that takes
+  // something away, so what it does and doesn't touch is asserted exactly.
+  const setUp = updateTaskSettings(
+    addTaskFixture(),
+    'kitchen-dishes',
+    { points: 9, assignee: 'yas', repeatable: true },
+  )
+  const setUpBefore = JSON.stringify(setUp)
+  const busyLog = { version: 2, completions: { 'kitchen-dishes': [daysAgo(0), daysAgo(1)], 'litter-scoop': [daysAgo(2)] } }
+  const spentEstate = buyItem({}, 'eddie', HOME, fern, 500)
+  const trips = addWindow(startFresh({}, MON), day(9).getTime(), day(5).getTime())
+
+  const wiped = hardReset({ away: trips })
+  is('every completion goes', Object.keys(wiped.log.completions).length, 0)
+  is('so does everything bought', Object.keys(wiped.estate).length, 0)
+  is('the fresh-start line goes with the backlog it covered', wiped.away.freshStartAt, 0)
+  is('but trips stay — they are where you were, not what you did', wiped.away.windows.length, 1)
+
+  is('the streak is zero afterwards', currentStreak(wiped.log, MON, ALL_TASKS), 0)
+  is('and so are the points', weeklyPoints(wiped.log, MON, ALL_TASKS), 0)
+  is('and the credits earned', creditsEarned(wiped.log, ALL_TASKS, 'eddie', ROSTER), 0)
+  is('and the balance', creditsBalance(wiped.log, ALL_TASKS, 'eddie', ROSTER, entryFor(wiped.estate, 'eddie')), 0)
+
+  // The load-bearing half: what you set up is not what you did.
+  is('nothing you set up is even readable from here', JSON.stringify(setUp), setUpBefore)
+  is('an added task is still there afterwards', composeAreas(setUp).flatMap((a) => a.tasks).some((t) => t.id === 'kitchen-my-thing'), true)
+  is('and an edited one keeps its points', composeAreas(setUp).flatMap((a) => a.tasks).find((t) => t.id === 'kitchen-dishes').points, 9)
+  is('and whose job it is', composeAreas(setUp).flatMap((a) => a.tasks).find((t) => t.id === 'kitchen-dishes').assignee, 'yas')
+  is('and that it repeats', composeAreas(setUp).flatMap((a) => a.tasks).find((t) => t.id === 'kitchen-dishes').repeatable, true)
+  is('a reset with nothing passed still works', Object.keys(hardReset().log.completions).length, 0)
+
+  // The confirmation has to state the real cost — nobody should have to guess
+  // at the size of something irreversible.
+  const cost = resetSummary(busyLog, spentEstate)
+  is('it counts every entry', cost.logged, 3)
+  is('across every task', cost.tasks, 2)
+  is('and what was bought', cost.bought, 1)
+  is('and what it cost', cost.spent, fern.cost)
+  is('an untouched app has nothing to clear', resetSummary({ completions: {} }, {}).logged, 0)
+
+  // A reset has to survive the other phone, which still holds all of it and
+  // would otherwise push it back — merging is a union in every other case.
+  const stale = { 'kitchen-dishes': [{ at: daysAgo(3) }, { at: daysAgo(1) }] }
+  is('without a reset, a union keeps everything', Object.keys(mergeCompletions(stale, [])).length, 1)
+  is('a reset drops what came before it', Object.keys(mergeCompletions(stale, [], daysAgo(0))).length, 0)
+  is(
+    'but keeps what was logged since',
+    mergeCompletions({ 'kitchen-dishes': [{ at: daysAgo(3) }, { at: MON.getTime() }] }, [], daysAgo(1))['kitchen-dishes'].length,
+    1,
+  )
+  is('and a null reset changes nothing', mergeCompletions(stale, [], null)['kitchen-dishes'].length, 2)
 
   // =========================================================================
   // Today: the place, the drive, and the scratch list

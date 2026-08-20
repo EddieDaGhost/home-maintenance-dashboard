@@ -10,8 +10,10 @@ import { randomUUID } from 'node:crypto'
 
 export function startFakeSupabase() {
   const households = new Map() // id -> key
+  const resets = new Map() // id -> instant the household last started over
   const completions = new Map() // id -> Map("task|at" -> {task_id, at, by})
   const state = new Map() // id -> { doc, updated_at }
+  const seen = []
 
   const server = createServer((req, res) => {
     const send = (code, body) => {
@@ -25,6 +27,9 @@ export function startFakeSupabase() {
     }
 
     if (req.method === 'OPTIONS') return send(204, null)
+    // Which functions got called, in order — the fastest way to work out why
+    // a sync did or didn't do what a suite expected.
+    seen.push(req.url.split('/rpc/')[1] ?? req.url)
 
     let raw = ''
     req.on('data', (chunk) => (raw += chunk))
@@ -53,9 +58,13 @@ export function startFakeSupabase() {
         }
 
         const rows = completions.get(id)
+        const resetAt = resets.get(id) ?? null
         for (const event of p_events ?? []) {
           if (!event?.task_id || !event?.at) continue
           const at = new Date(event.at).toISOString()
+          // Anything from before the household started over is refused, the
+          // same as the guard in supabase/schema.sql.
+          if (resetAt && new Date(at).getTime() <= resetAt) continue
           const natural = `${event.task_id}|${at}` // the composite primary key
           if (!rows.has(natural)) {
             rows.set(natural, { task_id: event.task_id, at, by: event.by || null })
@@ -75,7 +84,22 @@ export function startFakeSupabase() {
           completions: [...rows.values()],
           state: stored?.doc ?? {},
           state_updated_at: stored ? new Date(stored.updated_at).toISOString() : null,
+          reset_at: resetAt ? new Date(resetAt).toISOString() : null,
         })
+      }
+
+      if (req.url.endsWith('/rpc/hm_reset')) {
+        const { p_household: id, p_key: key } = body
+        if (!households.has(id) || households.get(id) !== key) {
+          return send(400, { message: 'unknown household' })
+        }
+        // Completions only — the state doc holds the rooms and tasks a reset is
+        // meant to keep. Same contract as supabase/schema.sql.
+        const rows = completions.get(id)
+        const deleted = rows.size
+        rows.clear()
+        resets.set(id, Date.now())
+        return send(200, { deleted })
       }
 
       return send(404, { message: 'no such function' })
@@ -91,6 +115,8 @@ export function startFakeSupabase() {
         households,
         completions,
         state,
+        resets,
+        seen,
       })
     })
   })

@@ -68,7 +68,7 @@ Other commands:
 ```bash
 npm run build     # build the production version into dist/
 npm run preview   # preview that production build locally
-npm run check     # run the tests (736 checks)
+npm run check     # run the tests (796 checks)
 ```
 
 `npm run check` drives a real browser through the app — logging, persistence,
@@ -320,6 +320,27 @@ feed"). Those typed items are just a list: they earn no points, they never
 touch your streak, nothing about them is ever called late, and they stay on the
 device you wrote them on. Tick one off and it drops to the bottom; it clears
 itself the next day.
+
+---
+
+## Starting over
+
+**Setup → Start over.** Puts the scoreboard back to zero: every logged
+completion, every purchase, your streak, your points and your credit balance.
+
+What it does **not** touch is everything you set up — every room and task you
+added, every task you edited (points, schedule, repeat, whose job it is), your
+household, your names, your town and your trips. You're not rebuilding the app,
+you're clearing the score.
+
+It states the exact number of entries and purchases before you commit, offers a
+backup first, and needs two taps. It cannot be undone.
+
+If sharing is on it clears the household's shared copy too, and every phone in
+the household starts over — otherwise the other one would simply hand it all
+back on the next sync. That needs `supabase/schema.sql` re-run once in the
+Supabase SQL editor; until it is, the app will tell you the shared copy is still
+there rather than pretending.
 
 ---
 
