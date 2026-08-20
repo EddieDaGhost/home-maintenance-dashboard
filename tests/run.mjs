@@ -21,6 +21,7 @@ const SUITES = [
   { name: 'naming', file: './naming.mjs', browser: true, clipboard: true },
   { name: 'rooms', file: './rooms.mjs', browser: true },
   { name: 'estate', file: './estate.mjs', browser: true },
+  { name: 'today', file: './today.mjs', browser: true, ownContexts: true },
   { name: 'away', file: './away.mjs', browser: true },
   { name: 'fresh-start', file: './fresh-start.mjs', browser: true },
   { name: 'offline', file: './offline.mjs', browser: true },

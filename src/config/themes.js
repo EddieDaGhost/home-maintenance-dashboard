@@ -53,6 +53,14 @@ export const THEMES = {
       exported: 'Calendar file downloaded',
       themeButtonLabel: 'Change look',
 
+      // --- the today screen ---
+      todayNav: 'Today',
+      todayNavDetail: 'Weather, the drive, and what needs doing',
+      todayTitle: 'Today',
+      todayListTitle: 'On the plate',
+      todayEmpty: 'Nothing on the plate',
+      todayDoneTitle: 'Ticked off',
+
       // --- the credits screen ---
       estateNav: 'Your windowsill',
       estateNavDetail: 'Spend credits on something nice',
@@ -107,6 +115,13 @@ export const THEMES = {
       exported: 'Mission log exported',
       themeButtonLabel: 'Change look',
 
+      todayNav: 'Today',
+      todayNavDetail: 'Conditions, the run to work, and the queue',
+      todayTitle: 'Today',
+      todayListTitle: 'The queue',
+      todayEmpty: 'The queue is empty',
+      todayDoneTitle: 'Cleared',
+
       estateNav: 'Your ship',
       estateNavDetail: 'Spend credits on the hull',
       estateTitle: 'The ship',
@@ -156,6 +171,13 @@ export const THEMES = {
       undone: 'Undone',
       exported: 'Calendar file downloaded',
       themeButtonLabel: 'Change look',
+
+      todayNav: 'Today',
+      todayNavDetail: 'Weather, the drive, and what wants doing',
+      todayTitle: 'Today',
+      todayListTitle: 'Wants doing',
+      todayEmpty: 'Nothing wants doing',
+      todayDoneTitle: 'Ticked off',
 
       estateNav: 'Your cats',
       estateNavDetail: 'Spend credits on the cats',

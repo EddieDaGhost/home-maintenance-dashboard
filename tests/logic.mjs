@@ -34,6 +34,41 @@ import {
   renameCompanion,
 } from '../src/lib/estate.js'
 import { buildBackup, parseBackup } from '../src/lib/backup.js'
+import { MAPS_NAMES, buildMapsLink, otherMaps, preferredMaps } from '../src/lib/maps.js'
+import {
+  UNITS,
+  clearHome,
+  clearWork,
+  defaultUnits,
+  emptyPlaces,
+  hasPlaces,
+  normalizePlaces,
+  setHome,
+  setUnits,
+  setWork,
+} from '../src/lib/places.js'
+import {
+  MAX_TEXT,
+  addItem,
+  doneItems,
+  emptyDaily,
+  normalizeDaily,
+  openItems,
+  pruneDaily,
+  removeItem,
+  toggleItem,
+} from '../src/lib/daily.js'
+import {
+  ALL_CODES,
+  STALE_MS,
+  cacheKey,
+  describeCode,
+  formatTemp,
+  isStale,
+  placeLabel,
+  readingFrom,
+  unitSymbol,
+} from '../src/lib/forecast.js'
 import {
   addWindow,
   awayUntilLabel,
@@ -196,6 +231,16 @@ export default async function run({ check }) {
     'every look has the estate copy it needs',
     THEME_LIST.every((t) => t.copy.estateTitle && t.copy.shopTitle && t.copy.creditsUnit),
     true,
+  )
+  // A half-added string shows up as a blank space in one look and nowhere else,
+  // which is exactly the kind of thing nobody notices until a screenshot.
+  is(
+    'every look says all the same things',
+    (() => {
+      const keys = THEME_LIST.map((t) => Object.keys(t.copy).sort().join('|'))
+      return new Set(keys).size
+    })(),
+    1,
   )
   is(
     'every look names a scene that exists',
@@ -453,7 +498,171 @@ export default async function run({ check }) {
   is('a fresh start survives being stored', normalizeAway(fresh).freshStartAt, fresh.freshStartAt)
   is('and rides alongside a trip', hasFreshStart(addWindow(fresh, day(3).getTime(), day(1).getTime())), true)
   is('while the trip still works', isAway(addWindow(fresh, day(1).getTime(), day(-1).getTime()), MON), true)
+
+  // =========================================================================
+  // Today: the place, the drive, and the scratch list
+  // =========================================================================
+
+  // --- the maps link ------------------------------------------------------
+
+  is('an Apple phone gets Apple Maps', preferredMaps('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0)'), 'apple')
+  is('an iPad too', preferredMaps('Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X)'), 'apple')
+  is('everything else gets Google', preferredMaps('Mozilla/5.0 (Linux; Android 14; Pixel 8)'), 'google')
+  is('and so does an unknown agent', preferredMaps(''), 'google')
+  is('the other one is the other one', otherMaps('apple'), 'google')
+  is('both ways round', otherMaps('google'), 'apple')
+  is('both are named', `${MAPS_NAMES.apple}/${MAPS_NAMES.google}`, 'Apple Maps/Google Maps')
+
+  is(
+    'the Apple link asks for driving directions',
+    buildMapsLink('100 Main St, Kalamazoo MI', 'apple'),
+    'https://maps.apple.com/?daddr=100%20Main%20St%2C%20Kalamazoo%20MI&dirflg=d',
+  )
+  is(
+    'the Google link does too',
+    buildMapsLink('100 Main St', 'google'),
+    'https://www.google.com/maps/dir/?api=1&destination=100%20Main%20St&travelmode=driving',
+  )
+  // The origin is deliberately absent so the maps app uses current location.
+  is('neither link carries an origin', /saddr|[?&]origin=/.test(buildMapsLink('x', 'apple') + buildMapsLink('x', 'google')), false)
+
+  // An ampersand or a hash in an address would otherwise cut the URL in half.
+  const awkward = 'Unit 3 & 4, Apt #2, Kalamazoo'
+  const awkwardLink = buildMapsLink(awkward, 'google')
+  is('an awkward address is encoded, not truncated', awkwardLink.includes('%26') && awkwardLink.includes('%232'), true)
+  is('and survives the round trip', decodeURIComponent(new URL(awkwardLink).searchParams.get('destination')), awkward)
+  is('an empty destination has no link', buildMapsLink('   ', 'apple'), null)
+  is('and neither does a missing one', buildMapsLink(null), null)
+
+  // --- the places store ---------------------------------------------------
+
+  is('nothing is set by default', hasPlaces(emptyPlaces), false)
+  is('junk normalises to empty', JSON.stringify(normalizePlaces('nonsense')), JSON.stringify(emptyPlaces))
+  is('and so does a null', JSON.stringify(normalizePlaces(null)), JSON.stringify(emptyPlaces))
+
+  const town = { query: 'Kalamazoo', label: 'Kalamazoo, Michigan', latitude: 42.29, longitude: -85.59, units: UNITS.F }
+  const withHome = setHome(emptyPlaces, town)
+  is('a home is kept', withHome.home.label, 'Kalamazoo, Michigan')
+  is('a home without coordinates is not', setHome(emptyPlaces, { query: 'Nowhere' }).home, null)
+  is('a home with no name is not either', setHome(emptyPlaces, { latitude: 1, longitude: 2 }).home, null)
+  is('the units follow the home', setUnits(withHome, UNITS.C).home.units, UNITS.C)
+  is('and a nonsense unit falls back', normalizePlaces({ home: { ...town, units: 'kelvin' } }).home.units, defaultUnits())
+  is('US English wants Fahrenheit', defaultUnits('en-US'), UNITS.F)
+  is('everyone else wants Celsius', defaultUnits('en-GB'), UNITS.C)
+
+  const withWork = setWork(withHome, '  100 Main St  ')
+  is('a work address is trimmed', withWork.work, '100 Main St')
+  is('an empty one is dropped', setWork(withHome, '   ').work, null)
+  is('forgetting the town keeps the work address', clearHome(withWork).work, '100 Main St')
+  is('and forgetting work keeps the town', clearWork(withWork).home.label, 'Kalamazoo, Michigan')
+  is('both gone means nothing set', hasPlaces(clearWork(clearHome(withWork))), false)
+
+  // --- the scratch list ---------------------------------------------------
+
+  is('the list starts empty', openItems(emptyDaily).length, 0)
+  is('junk normalises to empty', normalizeDaily(42).items.length, 0)
+  is('a blank item is not an item', addItem(emptyDaily, '   ').items.length, 0)
+
+  const list1 = addItem(addItem(emptyDaily, 'Call the vet'), 'Pick up feed')
+  is('two items go on', list1.items.length, 2)
+  is('in the order they were written', list1.items[0].text, 'Call the vet')
+  is('each gets its own id', new Set(list1.items.map((i) => i.id)).size, 2)
+  is('long text is cut, not rejected', addItem(emptyDaily, 'x'.repeat(400)).items[0].text.length, MAX_TEXT)
+
+  const ticked = toggleItem(list1, list1.items[0].id, MON.getTime())
+  is('ticking moves it out of the open list', openItems(ticked).length, 1)
+  is('and into the done one', doneItems(ticked)[0].text, 'Call the vet')
+  is('unticking puts it back', openItems(toggleItem(ticked, list1.items[0].id)).length, 2)
+  is('removing takes it away', removeItem(list1, list1.items[0].id).items.length, 1)
+  is('removing something absent is harmless', removeItem(list1, 'nope').items.length, 2)
+
+  // Ticked yesterday, gone today. Untouched items wait as long as they like —
+  // nothing here is ever called late.
+  const yesterday = { items: [
+    { id: 'a', text: 'Ticked yesterday', at: daysAgo(1), doneAt: daysAgo(1) },
+    { id: 'b', text: 'Still waiting', at: daysAgo(9), doneAt: 0 },
+  ] }
+  const pruned = pruneDaily(yesterday, MON)
+  is('a ticked item from yesterday is pruned', pruned.items.length, 1)
+  is('an untouched old one stays', pruned.items[0].text, 'Still waiting')
+  is('and is never labelled late', /late|overdue|missed/i.test(JSON.stringify(pruned)), false)
+  is('ticked today survives the prune', pruneDaily({ items: [{ id: 'c', text: 'Done', at: MON.getTime(), doneAt: MON.getTime() }] }, MON).items.length, 1)
+  is('the list is capped', addManyItems(60).items.length, 40)
+
+  // The load-bearing claim: a scratch list cannot move a single number.
+  const beforeList = JSON.stringify({ completions: { 'kitchen-dishes': [daysAgo(0), daysAgo(1)] } })
+  const listLog = JSON.parse(beforeList)
+  const pointsBefore = weeklyPoints(listLog, MON, ALL_TASKS)
+  const streakBefore = currentStreak(listLog, MON, ALL_TASKS)
+  const creditsBefore = creditsEarned(listLog, ALL_TASKS, 'me', [{ id: 'me' }])
+  addItem(addItem(emptyDaily, 'Call the vet'), 'Pick up feed')
+  is('the history is untouched by the list', JSON.stringify(listLog), beforeList)
+  is('and so are the points', weeklyPoints(listLog, MON, ALL_TASKS), pointsBefore)
+  is('and the streak', currentStreak(listLog, MON, ALL_TASKS), streakBefore)
+  is('and the credits', creditsEarned(listLog, ALL_TASKS, 'me', [{ id: 'me' }]), creditsBefore)
+
+  // --- the forecast -------------------------------------------------------
+
+  is('every WMO code has a label', ALL_CODES.every((code) => typeof describeCode(code).label === 'string' && describeCode(code).label), true)
+  is('every WMO code has an icon', ALL_CODES.every((code) => Boolean(describeCode(code).icon)), true)
+  is('an unknown code is still weather', describeCode(1234).label, 'Weather')
+  is('clear is clear', describeCode(0).label, 'Clear')
+  is('95 is a thunderstorm', describeCode(95).label, 'Thunderstorm')
+  is('the code set is complete', ALL_CODES.length, 28)
+
+  is('Fahrenheit rounds and signs', formatTemp(63.6, UNITS.F), '64°F')
+  is('so does Celsius', formatTemp(17.4, UNITS.C), '17°C')
+  is('a missing reading is a dash, never NaN', formatTemp(undefined, UNITS.F), '—')
+  is('the symbols are right', `${unitSymbol(UNITS.F)}${unitSymbol(UNITS.C)}`, '°F°C')
+
+  is('a place reads as town and region', placeLabel({ name: 'Kalamazoo', admin1: 'Michigan', country_code: 'US' }), 'Kalamazoo, Michigan')
+  is('a bare town still reads', placeLabel({ name: 'Kalamazoo' }), 'Kalamazoo')
+
+  const reading = readingFrom(
+    {
+      current: { temperature_2m: 64, weather_code: 3, is_day: 1 },
+      daily: { weather_code: [61], temperature_2m_max: [70], temperature_2m_min: [50], precipitation_probability_max: [40] },
+    },
+    UNITS.F,
+  )
+  is('the reading takes the current temperature', reading.temperature, 64)
+  is('and today\'s high', reading.high, 70)
+  is('and the chance of rain', reading.rainChance, 40)
+  is('an empty response does not throw', readingFrom({}, UNITS.F).temperature, null)
+
+  is('a reading with no timestamp is stale', isStale(null), true)
+  is('a fresh one is not', isStale({ at: Date.now() }), false)
+  is('an old one is', isStale({ at: Date.now() - STALE_MS - 1 }), true)
+  is('the boundary counts as stale', isStale({ at: 1000 }, 1000 + STALE_MS), true)
+  is('a cache key includes the units', cacheKey(town).endsWith(UNITS.F), true)
+  is('changing units changes the key', cacheKey(setUnits(withHome, UNITS.C).home) === cacheKey(town), false)
+  is('no home means no key', cacheKey(null), null)
+
+  // --- backups carry both -------------------------------------------------
+
+  const carried = parseBackup(
+    JSON.stringify(buildBackup({ completions: {} }, {}, null, null, null, null, withWork, list1)),
+  )
+  is('a backup carries the town', carried.places.home.label, 'Kalamazoo, Michigan')
+  is('and the work address', carried.places.work, '100 Main St')
+  is('and today\'s list', carried.daily.items.length, 2)
+
+  // A file from before this feature existed restores to empty, not undefined.
+  const older = JSON.parse(JSON.stringify(buildBackup({ completions: {} }, {}, null, null, null, null)))
+  delete older.places
+  delete older.daily
+  const restoredOld = parseBackup(JSON.stringify(older))
+  is('an older backup has no places', restoredOld.places.home, null)
+  is('and an empty list', restoredOld.daily.items.length, 0)
 }
+
+/** Enough items to test the cap without writing sixty lines. */
+function addManyItems(count) {
+  let list = emptyDaily
+  for (let i = 0; i < count; i += 1) list = addItem(list, `Item ${i}`)
+  return list
+}
+
 
 /** A one-task custom store, so the "same map for both kinds" claim is tested. */
 function addTaskFixture() {

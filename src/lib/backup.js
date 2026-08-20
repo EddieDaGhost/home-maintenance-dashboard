@@ -9,13 +9,15 @@ import { normalizePeople, DEFAULT_PEOPLE } from './people.js'
 import { normalizeCustom, emptyCustom } from './custom.js'
 import { normalizeEstate, emptyEstate } from './estate.js'
 import { normalizeAway, emptyAway } from './away.js'
+import { normalizePlaces, emptyPlaces } from './places.js'
+import { normalizeDaily, emptyDaily } from './daily.js'
 
 const APP_ID = 'home-maintenance-dashboard'
 
-export function buildBackup(log, names, household, custom, estate, away) {
+export function buildBackup(log, names, household, custom, estate, away, places, daily) {
   return {
     app: APP_ID,
-    version: 4,
+    version: 5,
     exportedAt: new Date().toISOString(),
     completions: log?.completions ?? {},
     names: names ?? {},
@@ -23,11 +25,28 @@ export function buildBackup(log, names, household, custom, estate, away) {
     custom: custom ?? emptyCustom,
     estate: estate ?? emptyEstate,
     away: away ?? emptyAway,
+    places: places ?? emptyPlaces,
+    // Today's scratch list doesn't sync, so a backup is the only way it moves.
+    daily: daily ?? emptyDaily,
   }
 }
 
-export function downloadBackup(log, names, household, custom, estate, away, now = new Date()) {
-  const json = JSON.stringify(buildBackup(log, names, household, custom, estate, away), null, 2)
+export function downloadBackup(
+  log,
+  names,
+  household,
+  custom,
+  estate,
+  away,
+  places,
+  daily,
+  now = new Date(),
+) {
+  const json = JSON.stringify(
+    buildBackup(log, names, household, custom, estate, away, places, daily),
+    null,
+    2,
+  )
   const blob = new Blob([json], { type: 'application/json' })
   const url = URL.createObjectURL(blob)
   const date = now.toISOString().slice(0, 10)
@@ -74,10 +93,12 @@ export function parseBackup(text) {
     names,
     household: data.household ? normalizePeople(data.household) : DEFAULT_PEOPLE,
     custom: data.custom ? normalizeCustom(data.custom) : emptyCustom,
-    // Version 1 and 2 files predate the estate, and 3 predates away windows;
-    // an empty one is the right answer either way.
+    // Version 1 and 2 files predate the estate, 3 predates away windows and 4
+    // predates the today screen; an empty one is the right answer either way.
     estate: data.estate ? normalizeEstate(data.estate) : emptyEstate,
     away: data.away ? normalizeAway(data.away) : emptyAway,
+    places: data.places ? normalizePlaces(data.places) : emptyPlaces,
+    daily: data.daily ? normalizeDaily(data.daily) : emptyDaily,
     total,
   }
 }

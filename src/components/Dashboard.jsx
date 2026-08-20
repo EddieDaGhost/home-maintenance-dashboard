@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import {
   CalendarPlus,
   ChevronRight,
+  CloudSun,
   Coins,
   Download,
   Flame,
@@ -34,7 +35,10 @@ import { useAreas } from '../state/AreasProvider.jsx'
 import { usePeople } from '../state/PeopleProvider.jsx'
 import { useEstate } from '../state/EstateProvider.jsx'
 import { useAway } from '../state/AwayProvider.jsx'
+import { usePlaces } from '../state/PlacesProvider.jsx'
 import { creditsBalance } from '../lib/credits.js'
+import { describeCode, formatTemp, isStale, loadReading } from '../lib/forecast.js'
+import { openItems } from '../lib/daily.js'
 import ProgressBar from './ProgressBar.jsx'
 import TaskCard from './TaskCard.jsx'
 import ThemePicker from './ThemePicker.jsx'
@@ -46,6 +50,7 @@ import HistorySheet from './HistorySheet.jsx'
 import HouseholdSheet, { PersonAvatar } from './HouseholdSheet.jsx'
 import AwaySheet from './AwaySheet.jsx'
 import FreshStartSheet from './FreshStartSheet.jsx'
+import PlaceSheet from './PlaceSheet.jsx'
 
 function greeting(now) {
   const hour = now.getHours()
@@ -150,6 +155,7 @@ export default function Dashboard({
   onBackup,
   onRestore,
   onOpenEstate,
+  onOpenToday,
   sync,
   readOnly = false,
 }) {
@@ -159,6 +165,7 @@ export default function Dashboard({
   const { activePerson, activeId, people, isShared } = usePeople()
   const { entry } = useEstate()
   const { away, isAway, untilLabel, endNow, hasFreshStart, freshStartLabel } = useAway()
+  const { places, daily } = usePlaces()
 
   const [pickerOpen, setPickerOpen] = useState(false)
   const [tagsOpen, setTagsOpen] = useState(false)
@@ -169,6 +176,7 @@ export default function Dashboard({
   const [awayOpen, setAwayOpen] = useState(false)
   const [freshOpen, setFreshOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
+  const [placeOpen, setPlaceOpen] = useState(false)
   const fileInput = useRef(null)
 
   const streak = currentStreak(log, now, allTasks, away)
@@ -179,6 +187,14 @@ export default function Dashboard({
   const credits = creditsBalance(log, allTasks, activeId, people, entry)
   const travelling = isAway(now)
   const shortlist = attention.slice(0, 5)
+  // Read straight from the cache — the dashboard never fetches. Whatever the
+  // Today screen last saw is good enough for a one-line summary, and a card
+  // that waits on the network has no business on the first screen.
+  // A reading from six hours ago isn't "now", so it falls back to the plain
+  // label rather than quietly presenting old weather as current.
+  const cached = loadReading(places.home)
+  const reading = cached && !isStale(cached, now.getTime()) ? cached : null
+  const onThePlate = attention.length + openItems(daily).length
   const ThemeIcon = theme.icon
 
   return (
@@ -226,6 +242,27 @@ export default function Dashboard({
         <StatTile icon={Trophy} label={copy.pointsLabel} value={points} tone="#f59e0b" />
         <StatTile icon={PartyPopper} label={copy.todayLabel} value={today} tone="var(--good)" />
       </section>
+
+      <button
+        type="button"
+        onClick={onOpenToday}
+        className="panel flex w-full items-center gap-3 p-3.5 text-left transition active:scale-[0.99]"
+      >
+        <CloudSun className="h-5 w-5 shrink-0" style={{ color: 'var(--accent)' }} />
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+            {reading
+              ? `${formatTemp(reading.temperature, reading.units)} · ${describeCode(reading.code).label}`
+              : copy.todayNav}
+          </span>
+          <span className="block text-xs" style={{ color: 'var(--ink-3)' }}>
+            {onThePlate === 0
+              ? copy.todayEmpty
+              : `${onThePlate} ${onThePlate === 1 ? 'thing' : 'things'} on the plate`}
+          </span>
+        </span>
+        <ChevronRight className="h-4 w-4 shrink-0" style={{ color: 'var(--ink-3)' }} />
+      </button>
 
       {/* Deliberately not a fourth tile — four across a 390px phone is cramped,
           and this should read as an invitation rather than another number. */}
@@ -401,6 +438,18 @@ export default function Dashboard({
             onClick={() => setHistoryOpen(true)}
           />
           <SettingsRow
+            icon={CloudSun}
+            label="Weather and the drive"
+            detail={
+              places.home
+                ? places.work
+                  ? `${places.home.label}, and the run to work`
+                  : places.home.label
+                : 'Add your town and where you work'
+            }
+            onClick={() => setPlaceOpen(true)}
+          />
+          <SettingsRow
             icon={Flower2}
             label={copy.estateNav}
             detail={copy.estateNavDetail}
@@ -502,6 +551,7 @@ export default function Dashboard({
       <ThemePicker open={pickerOpen} onClose={() => setPickerOpen(false)} />
       <AboutSheet open={aboutOpen} onClose={() => setAboutOpen(false)} />
       <AwaySheet open={awayOpen} onClose={() => setAwayOpen(false)} now={now} />
+      <PlaceSheet open={placeOpen} onClose={() => setPlaceOpen(false)} />
       <FreshStartSheet open={freshOpen} onClose={() => setFreshOpen(false)} now={now} />
       {sync ? <ShareSheet open={shareOpen} onClose={() => setShareOpen(false)} sync={sync} /> : null}
       <TagSetup open={tagsOpen} onClose={() => setTagsOpen(false)} />

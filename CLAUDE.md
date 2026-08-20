@@ -54,6 +54,12 @@ so and ask rather than "improving" it:
 6. **The user's data is theirs.** It stays in their browser unless they turn on
    sharing, and even then it goes only to their own Supabase project. Don't add
    analytics, telemetry, or third-party scripts.
+   The **one** exception is the town typed into the Today screen, which is sent
+   to Open-Meteo for a forecast — opt-in, never until the user fills it in, and
+   said out loud in the form itself. Nothing from open-meteo.com *runs* in the
+   page: it is a plain `fetch`, not a script tag, so the rule above still holds
+   as written. Anything new that would send something off the device gets the
+   same treatment or doesn't ship.
 7. **Local-first, always.** Tapping Log writes to this device and returns
    immediately; syncing happens afterwards. Nothing in the logging path may
    wait on the network — see the offline rule below.
@@ -93,6 +99,7 @@ src/
 │   │                what a NEW browser sees. Users override it at runtime.
 │   ├── themes.js    Theme definitions + every user-facing string per theme
 │   ├── catalog.js   The shop: every item credits can buy, named per theme
+│   ├── forecast.js  The two Open-Meteo endpoints (no key, no env var)
 │   └── icons.js     Icons offerable in the room picker
 ├── lib/             Pure functions, no React. Test these in tests/logic.mjs.
 │   ├── date.js      Week math (Monday-first), DST-safe day differences
@@ -106,6 +113,10 @@ src/
 │   ├── away.js      Trips: the days nothing is due and the streak carries over
 │   ├── credits.js   Credits earned/spent, and how lively the scene is
 │   ├── estate.js    What each person has bought, keyed by person id
+│   ├── places.js    Your town and your work address
+│   ├── forecast.js  Today's weather, cached so it works with no signal
+│   ├── maps.js      The directions deep link — no API, no key
+│   ├── daily.js     Today's free-text list. Earns nothing, syncs nowhere.
 │   ├── backup.js    Export/import JSON
 │   └── calendar.js  .ics builder
 ├── state/           React context providers (Names, Areas, People, Estate, Away)
@@ -124,6 +135,7 @@ src/
 - Changing what credits buy → `src/config/catalog.js`
 - Changing what "away" suppresses → `applyGrace()` in `src/lib/schedule.js`
 - Changing what a task is worth → it's an override; see `taskSettings` below
+- Changing the weather source → `src/config/forecast.js`, and read the rule below first
 
 ---
 
@@ -188,7 +200,7 @@ and no horizontal overflow — the tests assert that last one.
 ## Testing
 
 ```bash
-npm run check              # everything: 525 checks
+npm run check              # everything: 652 checks
 npm run check -- logic     # just the fast pure-logic suite (no browser)
 ```
 
@@ -233,6 +245,52 @@ TEST_URL=https://homemaintenance.app npm run check
   stacking onto merged history.
 - Commit messages: explain *why*, not just what. Note anything that was verified
   and anything that wasn't.
+
+---
+
+## Today
+
+One screen, three blocks, and each one exists in the shape it does because of a
+constraint rather than a preference.
+
+- **The weather is Open-Meteo, over plain `fetch`.** Free, no API key, no
+  signup, CORS-friendly, and it does the place lookup too — so one service and
+  **no environment variable**, which is what DEPLOYMENT.md asks for. Its
+  geocoder resolves towns and postcodes, not street addresses; the form says so
+  rather than pretending otherwise.
+- **The reading is cached and the fetch is allowed to fail.** `loadReading()`
+  paints first, the refresh happens behind it, and with no signal you get this
+  morning's numbers plus the time they were taken. When `navigator.onLine` is
+  already false it doesn't even ask. Nothing on this screen may gate on the
+  network — same rule as design rule 7, one screen over.
+- **Travel time is a deep link, not an API.** Every routing service that knows
+  about live traffic wants an account and a token. `src/lib/maps.js` builds a
+  directions URL instead, and **deliberately omits the origin** so the maps app
+  uses current location — more accurate than any address we could store, one
+  less thing kept, and right whether you're leaving home or leaving work. The
+  address is `encodeURIComponent`'d: an `&` or a `#` in a street address would
+  otherwise cut the URL in half.
+- **The free-text list earns nothing and is never late.** It never touches
+  `log.completions`, so it cannot move points, the streak, or the credit
+  balance — credits are derived from `task.points` over completions, and a note
+  with no task has no business in that sum. It has no schedule, so nothing on
+  screen shows its age.
+- **The list is the one store that doesn't sync**, on purpose. Settings are
+  last-write-wins, and the note on purchases below already concedes that two
+  devices writing within seconds can cost one of them a write. Losing a purchase
+  is a refunded credit; losing today's list is the whole feature. It rides in
+  backups and stays put otherwise. If it ever has to be shared, model it the way
+  completions are modelled.
+- **The town and the work address are settings**, so they ride in the sync
+  document, go in the backup, and are stamped with `touching()` like every other
+  provider.
+- **Six chores, then "show the other N".** Opening a fresh phone to thirteen
+  cards is the wall this app exists to avoid. Nothing is hidden — it just isn't
+  the first thing you see.
+
+`tests/fake-forecast.mjs` stands in for Open-Meteo the way
+`tests/fake-supabase.mjs` stands in for Supabase, so `npm run check` exercises
+the real request shapes and never leaves the machine.
 
 ---
 

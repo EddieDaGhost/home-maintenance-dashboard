@@ -68,7 +68,7 @@ Other commands:
 ```bash
 npm run build     # build the production version into dist/
 npm run preview   # preview that production build locally
-npm run check     # run the tests (525 checks)
+npm run check     # run the tests (652 checks)
 ```
 
 `npm run check` drives a real browser through the app — logging, persistence,
@@ -292,6 +292,36 @@ for things that actually take something away from you.
 
 ---
 
+## Today
+
+One screen for the morning, reached from **Today** on the dashboard. Three
+things, in this order:
+
+**The weather** for wherever you are. Type a town or a ZIP into
+**Weather and the drive** and it's saved for good; the forecast comes from
+[Open-Meteo](https://open-meteo.com), which needs no account and no API key.
+The last reading is kept on your phone, so with no signal you get this
+morning's numbers and the time they were taken rather than an error — and if
+you never fill this in, nothing is ever looked up.
+
+It resolves **towns and postcodes, not street addresses**, which is all a
+forecast needs.
+
+**The drive to work.** Put your work address in the same form and you get a
+**Drive to work** button that opens Apple or Google Maps with directions
+already set, live traffic and all. There's no routing API behind it and no key
+to get: your address only ever goes into the maps app, and the route starts
+from wherever you actually are rather than from a stored home address.
+
+**What's on the plate** — the chores that are due, exactly as the front page
+ranks them, plus anything you type in yourself ("call the vet", "pick up
+feed"). Those typed items are just a list: they earn no points, they never
+touch your streak, nothing about them is ever called late, and they stay on the
+device you wrote them on. Tick one off and it drops to the bottom; it clears
+itself the next day.
+
+---
+
 ## Going away
 
 **Setup → Away.** Pick two dates, or tap *This weekend* / *A week*. While you're
@@ -387,6 +417,9 @@ Everything is stored in your browser's `localStorage` — your completions under
 `home-maintenance-dashboard/theme`. That means:
 
 - ✅ No account, no server, no one else can see it.
+- ✅ No analytics, no telemetry, no third-party scripts. The **only** thing that
+  ever leaves your phone is the town you type into the Today screen, sent to
+  Open-Meteo for the forecast — and only once you've filled it in.
 - ⚠️ It's **per browser and per device.** Logging on your phone won't show up on
   your laptop, and clearing your browser data erases your history.
 
