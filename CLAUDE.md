@@ -110,7 +110,10 @@ src/
 │   ├── custom.js    User-added rooms/tasks, hidden built-ins, task overrides
 │   ├── compose.js   Built-ins + your rooms + your overrides, merged into one list
 │   ├── people.js    Household, who's logging
+│   ├── turns.js     Whose job a chore is, and whose turn it is next
 │   ├── away.js      Trips: the days nothing is due and the streak carries over
+│   ├── reset.js     Starting over: what it clears and what it keeps
+│   ├── importTasks.js  Reading a pasted list into rooms and tasks
 │   ├── credits.js   Credits earned/spent, and how lively the scene is
 │   ├── estate.js    What each person has bought, keyed by person id
 │   ├── places.js    Your town and your work address
@@ -134,6 +137,7 @@ src/
 - Changing wording → `src/config/themes.js` (`copy` object, per theme)
 - Changing what credits buy → `src/config/catalog.js`
 - Changing what "away" suppresses → `applyGrace()` in `src/lib/schedule.js`
+- Changing whose job a chore is → it's an override too; see `turns.js`
 - Changing what a task is worth → it's an override; see `taskSettings` below
 - Changing the weather source → `src/config/forecast.js`, and read the rule below first
 
@@ -200,7 +204,7 @@ and no horizontal overflow — the tests assert that last one.
 ## Testing
 
 ```bash
-npm run check              # everything: 652 checks
+npm run check              # everything: 878 checks
 npm run check -- logic     # just the fast pure-logic suite (no browser)
 ```
 
@@ -208,8 +212,9 @@ npm run check -- logic     # just the fast pure-logic suite (no browser)
 through `playwright-core` — no browser is downloaded at install time; the harness
 finds Chrome on your machine, or you point `CHROME_PATH` at one.
 
-**Run `npm run check` before pushing.** There is no CI on this repo, so it's the
-only safety net. If you change scheduling logic, the logic suite is the one that
+**Run `npm run check` before pushing.** `.github/workflows/check.yml` runs the
+same command on every push and pull request, but finding out locally is faster
+than finding out from a red tick. If you change scheduling logic, the logic suite is the one that
 catches you: it asserts things like "only one bathroom is deep-clean-active in a
 given week" and "a Monday scoop doesn't count for Wednesday."
 
@@ -245,6 +250,33 @@ TEST_URL=https://homemaintenance.app npm run check
   stacking onto merged history.
 - Commit messages: explain *why*, not just what. Note anything that was verified
   and anything that wasn't.
+
+---
+
+## Whose job is it
+
+A chore belongs to one person, rotates round the household, or belongs to
+nobody — which is what every chore was before this existed and what most of them
+should stay.
+
+- **It's an override, not a store.** `assignee` is in `SETTABLE` in
+  `src/lib/custom.js`, so it lives in `taskSettings` keyed by task id alongside
+  points and schedule. Ids never move, and it syncs and backs up for free.
+- **A rotation is derived, never stored.** `whoseTurn()` in `src/lib/turns.js`
+  reads the `by` on the newest completion — the same field `creditsEarned()`
+  reads. A stored pointer would be a second opinion, and it would drift the
+  first time somebody logged from the other phone while offline.
+- **It is a hint and never a lock.** Anyone can log anything in one tap whoever
+  it belongs to, and `tests/assign.mjs` asserts exactly that. The moment
+  assignment can stop a tap, design rule 4 is gone.
+- **It never becomes a scolding.** The card says whose turn it is; nothing
+  anywhere says somebody missed theirs. No new colour — certainly not
+  `--alert-*`.
+- **Somebody who has left isn't whose turn it is.** A task assigned to a removed
+  person reads as unassigned rather than as a name nobody recognises, and a
+  rotation whose last logger has gone starts again at the top.
+- **"Mine" keeps what nobody has claimed.** An unassigned chore is everybody's
+  to worry about, not nobody's, so it stays in the filtered list.
 
 ---
 
@@ -310,10 +342,19 @@ on the estate screen.
   Entries logged before the household feature existed have no `by` and are
   credited to the **first person on the roster**, which makes a long solo history
   count as that person's rather than nobody's.
-- **One catalogue, three costumes.** An item is the same purchase in every look;
-  only its name and its drawing change. `labels` in `src/config/catalog.js` must
-  cover **all three** themes — the logic suite fails a half-added item, and the
-  slot needs art in all three scene components too.
+- **One catalogue, three shelves, one wallet.** The catalogue is shared and
+  `labels` in `src/config/catalog.js` must still cover **all three** themes — the
+  logic suite fails a half-added item, and the slot needs art in all three scene
+  components. But **what you own is per look**: `estate[person].looks[themeId]`
+  holds `owned`, `equipped` and `companions`. Buying the freighter used to hand
+  you the Maine Coon, which made a price mean nothing.
+  What stays at the person level is `spent` — one pot of credits, earned once
+  from your chores, so dressing the ship is money not spent on the cats — and
+  `boostUntil`, because a treat is a mood and should light whichever scene you
+  open.
+  **The old flat shape is migrated, not wiped.** `normalizeEstate()` grants a
+  pre-existing `owned` list in all three looks: design rule 2 says nothing you
+  own is ever taken away. Only what's bought from here on is per look.
 - **Weather has to change the light**, not sit on top of it. Rain falling past a
   bright sun reads as a sun-shower, which is not what anybody bought — so the
   weather item drives the sky colour and the sunbeam as well as drawing itself.
@@ -327,6 +368,60 @@ on the estate screen.
   — the scene and the task list must not be able to disagree.
 - **Removing a person leaves their estate in the map**, unreachable but intact,
   matching how a removed room keeps its history.
+
+---
+
+## Importing a list
+
+`src/lib/importTasks.js`. Thirty chores through the form is thirty rounds of
+tap-type-pick-save; this takes a list somebody typed in Notes.
+
+    Kitchen: Wipe counters, 2x per week, 3
+    Mop the floor, weekly, 5
+
+- **It produces the same structures the form does.** `applyImport()` calls
+  `addArea`, `addTask` and `updateTaskSettings` — there is no second way for a
+  task to exist, and nothing here can invent a shape the rest of the app
+  doesn't know.
+- **A task that already exists is *updated*, never added again.** It goes
+  through `taskSettings` exactly as editing it by hand does, so its id — and
+  the history filed under it — never moves. Same for rooms, matched by display
+  name.
+- **It accepts what `scheduleLabel()` prints.** A list copied out of the app
+  goes straight back in. If you add a schedule kind, add its words here too or
+  the round trip breaks.
+- **One pure transform, not a loop of provider calls.** A new room has to exist
+  before its tasks can go in it and its id isn't known until it does — and one
+  `setCustom` means one settings-clock stamp and one sync instead of thirty.
+- **The preview is the feature, not decoration.** Nothing is written until the
+  button below the list of exactly what will change. A bulk edit you can't see
+  first is how somebody ends up with forty duplicated chores.
+- **A bad line is named by number and skipped**, never fatal, and a room only
+  gets created if something actually lands in it.
+
+---
+
+## Starting over
+
+`src/lib/reset.js`. Everything else in this app is additive on purpose — hiding
+a room keeps its history, ending a trip early trims it, a fresh start logs
+nothing and deletes nothing. **This is the only thing that takes something
+away**, so:
+
+- **It clears what you did, keeps what you set up.** Completions and the estate
+  go; `custom` is not even read by `hardReset()`, which is the cheapest possible
+  guarantee that an added room or an edited task survives. Trips stay — they're
+  a record of where the household was, not of what it achieved — and the
+  fresh-start line goes, having nothing left to cover.
+- **It is the one screen allowed to use `--alert-*`.** CLAUDE.md reserves those
+  colours for things that take something away from you and everywhere else that
+  would be a lie. Here it isn't.
+- **Two taps, with the real numbers in between.** `resetSummary()` counts the
+  entries and purchases so the confirmation states the cost rather than being
+  vague about it, and a backup is offered right there.
+- **It has to reach the server** — see the `reset_at` note under sharing below.
+  Re-running `supabase/schema.sql` is a manual step; without it the reset works
+  locally and the sheet says why the shared copy came back.
 
 ---
 
@@ -400,6 +495,16 @@ therefore grants nothing by itself.
 - **Completions are events**, keyed by `(household, task, instant)`. Merging is
   a union, so two phones logging offline both arrive and pushing the same event
   twice changes nothing. This is why sync needed no conflict resolution.
+- **`reset_at` is the one exception to the union**, and it exists because the
+  union is otherwise total. Wiping a phone locally achieves nothing while the
+  household still holds the history — the next sync hands it straight back — and
+  clearing the server isn't enough either, because the *other* phone still has
+  its copy and pushes it back. So `hm_reset` stamps the instant on the
+  household: `hm_sync` refuses incoming events older than it, and hands it back
+  so every device drops its own copy of what came before. Anything logged since
+  survives, so a phone that was offline all week keeps that week's work. This
+  was found by the two-phone test, which watched four rows reappear one
+  `hm_sync` after they were deleted.
 - **Settings are last-write-wins** — one JSON document holding names, rooms and
   the roster. The timestamp attached to a push comes from
   `src/lib/settingsClock.js`, which the providers stamp on real user actions.

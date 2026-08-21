@@ -107,5 +107,17 @@ export default async function run({ page, context, check, errors, URL }) {
   const manifestHref = await page.getAttribute('link[rel="manifest"]', 'href')
   check('a web app manifest is linked', Boolean(manifestHref), manifestHref ?? 'missing')
 
-  check('no console or page errors', errors.length === 0, errors.join(' | '))
+  // Being disconnected is the whole point of this suite, so the browser's own
+  // "net::ERR_INTERNET_DISCONNECTED" for a request made while offline is the
+  // condition under test rather than a defect — the service worker's
+  // network-first fetch for index.html is *supposed* to try and fall back to
+  // the cache, and every check above is what proves the app coped. Anything
+  // else still fails.
+  const unexpected = errors.filter((error) => !/net::ERR_/.test(error))
+  check('no console or page errors', unexpected.length === 0, unexpected.join(' | '))
+  check(
+    'and the only network failures were the deliberate ones',
+    errors.every((error) => /net::ERR_INTERNET_DISCONNECTED|net::ERR_NETWORK_CHANGED|net::ERR_FAILED/.test(error)),
+    errors.join(' | '),
+  )
 }

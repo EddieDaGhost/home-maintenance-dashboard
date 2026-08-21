@@ -223,7 +223,39 @@ export default async function run({ browser, page, check, errors, URL, tmp }) {
   check('the row opens', (await kitchen.getByLabel('Points for Dishes').count()) === 1)
   check('showing what it ships with', (await kitchen.getByLabel('Points for Dishes').inputValue()) === '4')
 
-  await kitchen.getByLabel('Points for Dishes').fill('9')
+  // The points box has to be typeable, which means clearing it has to leave it
+  // clear. The obvious controlled-input version puts a 1 straight back and you
+  // end up fighting the field to enter anything but a single digit.
+  const dishPoints = kitchen.getByLabel('Points for Dishes')
+  await dishPoints.click()
+  await page.keyboard.press('Control+A')
+  await page.keyboard.press('Backspace')
+  check('the field can actually be emptied', (await dishPoints.inputValue()) === '', await dishPoints.inputValue())
+  await page.keyboard.type('25')
+  check('and a two-digit number typed into it', (await dishPoints.inputValue()) === '25', await dishPoints.inputValue())
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(250)
+  check('Enter commits it', (await dishPoints.inputValue()) === '25', await dishPoints.inputValue())
+
+  // Big jobs are allowed to be big, but not silly.
+  await dishPoints.click()
+  await page.keyboard.press('Control+A')
+  await page.keyboard.type('9999')
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(250)
+  check('and it caps at 999 rather than refusing', (await dishPoints.inputValue()) === '999', await dishPoints.inputValue())
+
+  // Emptying an existing task's points means "leave it alone", not "worth zero".
+  await dishPoints.click()
+  await page.keyboard.press('Control+A')
+  await page.keyboard.press('Backspace')
+  await kitchen.getByRole('button', { name: 'Settings for Dishes' }).click()
+  await page.waitForTimeout(250)
+  await kitchen.getByRole('button', { name: 'Settings for Dishes' }).click()
+  await page.waitForTimeout(250)
+  check('clearing it puts the old value back', (await dishPoints.inputValue()) === '999', await dishPoints.inputValue())
+
+  await dishPoints.fill('9')
   await kitchen.getByLabel('Let Dishes be logged more than once').check()
   await page.waitForTimeout(300)
   await page.keyboard.press('Escape')

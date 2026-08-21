@@ -200,6 +200,66 @@ export default async function run({ browser, check, URL }) {
     await b.page.keyboard.press('Escape')
     await b.page.waitForTimeout(300)
 
+    // ---- starting over has to reach the server ----
+    // The trap this exists for: hm_sync merges by union, so a phone that wipes
+    // itself and then syncs is handed its own history straight back. If the
+    // reset didn't clear the household, it would silently undo itself.
+    const serverRows = () => [...server.completions.values()][0]?.size ?? 0
+    check('the household holds the history', serverRows() > 0, `${serverRows()} rows`)
+
+    await a.page.goto(URL, { waitUntil: 'networkidle' })
+    await a.page.getByRole('button', { name: /^Start over/ }).click()
+    await a.page.waitForTimeout(400)
+    const resetSheet = a.page.getByRole('dialog', { name: 'Start over' })
+    check('it says the shared copy goes too', (await resetSheet.getByText(/clears the household/).count()) === 1)
+    check('and it does not offer the button straight away', (await resetSheet.getByRole('button', { name: /^Yes — clear/ }).count()) === 0)
+
+    await resetSheet.getByRole('button', { name: 'Reset everything' }).click()
+    await a.page.waitForTimeout(250)
+    await resetSheet.getByRole('button', { name: /^Yes — clear/ }).click()
+    await a.page.waitForTimeout(1500)
+
+    check('the household history is gone from the server', serverRows() === 0, `${serverRows()} rows`)
+
+    // The trap this really guards: phone B still holds all of it, and merging
+    // is a union, so its next push would put the whole lot back. It doesn't,
+    // because the reset instant is stamped on the household and hm_sync refuses
+    // anything older.
+    await b.page.goto(URL, { waitUntil: 'networkidle' })
+    await b.page.waitForTimeout(3500)
+    check('the other phone cannot push it back', serverRows() === 0, `${serverRows()} rows`)
+
+    const countOn = (phone) =>
+      phone.evaluate((key) => {
+        const raw = localStorage.getItem(key)
+        if (!raw) return 0
+        return Object.values(JSON.parse(raw).completions).reduce((n, list) => n + list.length, 0)
+      }, LOG_KEY)
+
+    check('and it clears its own copy too', (await countOn(b.page)) === 0, `${await countOn(b.page)} completions`)
+
+    await a.page.goto(URL, { waitUntil: 'networkidle' })
+    await a.page.waitForTimeout(3000)
+    check('and nothing comes back on the phone that reset', (await countOn(a.page)) === 0, `${await countOn(a.page)} completions`)
+
+    // Work logged after the reset is not swept up by it.
+    await a.page.goto(`${URL}/#kitchen`, { waitUntil: 'networkidle' })
+    await a.page.getByRole('button', { name: /^Log Dishes/ }).click()
+    await a.page.waitForTimeout(3500)
+    check('but a chore logged since the reset survives', (await countOn(a.page)) === 1, `${await countOn(a.page)} completions`)
+    check('and reaches the household', serverRows() === 1, `${serverRows()} rows`)
+    await a.page.goto(`${URL}/#kitchen`, { waitUntil: 'networkidle' })
+    await a.page.getByRole('button', { name: 'Edit room' }).click()
+    await a.page.waitForTimeout(300)
+    await a.page.getByRole('dialog', { name: 'Edit room' }).getByRole('button', { name: 'Settings for Dishes' }).click()
+    await a.page.waitForTimeout(250)
+    check(
+      'and so did what it was edited to be worth',
+      (await a.page.getByRole('dialog', { name: 'Edit room' }).getByLabel('Points for Dishes').inputValue()) === '11',
+    )
+    await a.page.keyboard.press('Escape')
+    await a.page.waitForTimeout(300)
+
     // ---- a wrong key is refused ----
     // Probed from the test process, not the page: a deliberate 400 inside the
     // browser would show up as a console error and fail the check below.

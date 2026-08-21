@@ -49,19 +49,23 @@ export function canAfford(balance, item) {
   return Boolean(item) && balance >= item.cost
 }
 
-/** True when this person already owns a one-off item. */
-export function owns(estateEntry, itemId) {
-  return (estateEntry?.owned ?? []).includes(itemId)
+/**
+ * True when this person already owns a one-off item **in this look**. Owning
+ * the freighter says nothing about owning the Maine Coon — see the note at the
+ * top of src/lib/estate.js.
+ */
+export function owns(look, itemId) {
+  return (look?.owned ?? []).includes(itemId)
 }
 
-export function equippedItem(estateEntry, slot) {
-  const id = estateEntry?.equipped?.[slot]
+export function equippedItem(look, slot) {
+  const id = look?.equipped?.[slot]
   return id ? itemById(id) : null
 }
 
 /** What the scene should be drawn from: the equipped item per slot. */
-export function equippedItems(estateEntry) {
-  return Object.fromEntries(ALL_SLOTS.map((slot) => [slot, equippedItem(estateEntry, slot)]))
+export function equippedItems(look) {
+  return Object.fromEntries(ALL_SLOTS.map((slot) => [slot, equippedItem(look, slot)]))
 }
 
 export function boostActive(estateEntry, now = Date.now()) {

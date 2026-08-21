@@ -10,7 +10,17 @@ const STORAGE_KEY = 'home-maintenance-dashboard/custom/v1'
 export const emptyCustom = { areas: [], tasks: {}, hidden: [], appearance: {}, taskSettings: {} }
 
 /** What you're allowed to change about a task after it exists. */
-const SETTABLE = ['points', 'repeatable', 'schedule']
+const SETTABLE = ['points', 'repeatable', 'schedule', 'assignee']
+
+/**
+ * The range a task can be worth. Exported so the input and the validator agree —
+ * a field that accepts what the store then throws away is worse than no field.
+ */
+export const MIN_POINTS = 1
+export const MAX_POINTS = 999
+
+/** What a new task is worth when you don't say. */
+export const DEFAULT_TASK_POINTS = 3
 
 function makeId(prefix, name, taken) {
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || prefix
@@ -49,11 +59,16 @@ export function normalizeCustom(data) {
   for (const [taskId, value] of Object.entries(data.taskSettings ?? {})) {
     if (!value || typeof value !== 'object') continue
     const entry = {}
-    if (Number.isFinite(value.points) && value.points >= 1 && value.points <= 99) {
+    if (Number.isFinite(value.points) && value.points >= MIN_POINTS && value.points <= MAX_POINTS) {
       entry.points = Math.round(value.points)
     }
     if (typeof value.repeatable === 'boolean') entry.repeatable = value.repeatable
     if (value.schedule?.kind) entry.schedule = value.schedule
+    // A person id or 'rotate'. Not checked against the roster here: the roster
+    // isn't in scope, and a sync can land an assignment a moment before the
+    // person it names. whoseTurn() reads an unknown id as unassigned, which is
+    // the right answer either way.
+    if (typeof value.assignee === 'string' && value.assignee) entry.assignee = value.assignee
     if (Object.keys(entry).length) taskSettings[taskId] = entry
   }
 
@@ -140,7 +155,7 @@ export function addTask(custom, areaId, task, takenIds = []) {
     name: task.name.trim(),
     note: task.note?.trim() || undefined,
     schedule: task.schedule,
-    points: task.points ?? 3,
+    points: task.points ?? DEFAULT_TASK_POINTS,
   }
   return { ...custom, tasks: { ...custom.tasks, [areaId]: [...existing, entry] } }
 }
@@ -169,7 +184,12 @@ export function removeTask(custom, areaId, taskId) {
 export function updateTaskSettings(custom, taskId, patch) {
   const entry = { ...(custom.taskSettings?.[taskId] ?? {}) }
   for (const key of SETTABLE) {
-    if (key in patch) entry[key] = patch[key]
+    if (!(key in patch)) continue
+    // null means "stop overriding this" — unassigning a chore, say. Deleting
+    // the key rather than storing a null is what lets the last override
+    // removed take the whole entry with it below.
+    if (patch[key] === null || patch[key] === undefined) delete entry[key]
+    else entry[key] = patch[key]
   }
   const taskSettings = { ...(custom.taskSettings ?? {}) }
   if (Object.keys(entry).length === 0) delete taskSettings[taskId]

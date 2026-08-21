@@ -1,8 +1,10 @@
-import { AlertCircle, Check, Circle, Clock, Moon, RotateCw, Undo2 } from 'lucide-react'
+import { AlertCircle, Check, Circle, Clock, Moon, RotateCw, Undo2, UserRound } from 'lucide-react'
 import { STATUS, scheduleLabel } from '../lib/schedule.js'
 import { friendlyDate } from '../lib/date.js'
 import { useTheme } from '../theme/ThemeProvider.jsx'
 import { useNames } from '../state/NamesProvider.jsx'
+import { usePeople } from '../state/PeopleProvider.jsx'
+import { turnLabel } from '../lib/turns.js'
 
 // Each status recolors the card by overriding the surface and border variables
 // that .panel reads — so it lands correctly in whichever theme is active.
@@ -53,9 +55,10 @@ function CountDots({ done, target }) {
   )
 }
 
-export default function TaskCard({ task, state, areaLabel, onLog, onUndo, readOnly = false }) {
+export default function TaskCard({ task, state, areaLabel, entries = [], onLog, onUndo, readOnly = false }) {
   const { copy } = useTheme()
   const { nameFor } = useNames()
+  const { people, activeId, isShared, nameOf } = usePeople()
   const name = nameFor(task)
   const style = STATUS_STYLES[state.status] ?? STATUS_STYLES[STATUS.DUE]
   const { Icon } = style
@@ -63,6 +66,9 @@ export default function TaskCard({ task, state, areaLabel, onLog, onUndo, readOn
   // A repeatable task still reads DONE — it shouldn't keep nagging — but the
   // Log button stays available, and every tap counts again.
   const canRepeat = Boolean(task.repeatable)
+  // Whose job it is only earns space once somebody else exists to do it. It is
+  // a hint and never a lock: the Log button below is identical either way.
+  const turn = isShared ? turnLabel(task, entries, people, activeId, nameOf) : null
 
   return (
     <div className="panel flex items-center gap-3 p-3.5" style={style.card}>
@@ -97,6 +103,12 @@ export default function TaskCard({ task, state, areaLabel, onLog, onUndo, readOn
           </span>
           <span style={{ color: 'var(--ink-3)' }}> · {scheduleLabel(task.schedule)}</span>
         </p>
+        {turn ? (
+          <p className="mt-1 flex items-center gap-1 text-xs" style={{ color: 'var(--ink-3)' }}>
+            <UserRound className="h-3 w-3 shrink-0" />
+            {turn}
+          </p>
+        ) : null}
         {task.note && !isDone ? (
           <p className="mt-1 text-xs leading-snug" style={{ color: 'var(--ink-3)' }}>
             {task.note}

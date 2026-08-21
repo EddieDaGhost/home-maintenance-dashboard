@@ -68,7 +68,7 @@ Other commands:
 ```bash
 npm run build     # build the production version into dist/
 npm run preview   # preview that production build locally
-npm run check     # run the tests (652 checks)
+npm run check     # run the tests (878 checks)
 ```
 
 `npm run check` drives a real browser through the app — logging, persistence,
@@ -79,7 +79,8 @@ installed; no browser is downloaded during `npm install`. If it can't find one:
 CHROME_PATH="/path/to/chrome" npm run check
 ```
 
-Run it before pushing — there's no CI on this repo, so it's the safety net.
+Run it before pushing. GitHub Actions runs the same command on every push and
+pull request, but a red tick five minutes later is a slower way to learn.
 See [CLAUDE.md](CLAUDE.md) for how the code is organised.
 
 ---
@@ -322,6 +323,54 @@ itself the next day.
 
 ---
 
+## Importing a list
+
+**Setup → Import a list.** For when you'd rather type the whole house in at once
+than tap through the form thirty times. One chore per line:
+
+```
+Kitchen: Wipe the counters, 2x per week, 3
+Mop the floor, weekly, 5
+Garage: Sweep the floor, every 2 weeks
+Tidy the bench, 7
+```
+
+The room carries down until you name another one. How often and how many points
+are both optional — leave them out and it's once a week, worth 3.
+
+It understands *daily*, *weekly*, *weekends*, *2x per week*, *every 3 days*,
+*every 2 weeks*, *monthly*, *every 6 months*, *mon · wed · fri* and *every
+Friday* — the same words the app prints, so a list copied out of it goes
+straight back in.
+
+**You see exactly what will happen before it happens**, including which lines it
+couldn't read and why. **A chore you already have is updated, not duplicated** —
+its history stays attached and only what it's worth and how often it comes round
+change. Nothing is written until you tap the button.
+
+---
+
+## Starting over
+
+**Setup → Start over.** Puts the scoreboard back to zero: every logged
+completion, every purchase, your streak, your points and your credit balance.
+
+What it does **not** touch is everything you set up — every room and task you
+added, every task you edited (points, schedule, repeat, whose job it is), your
+household, your names, your town and your trips. You're not rebuilding the app,
+you're clearing the score.
+
+It states the exact number of entries and purchases before you commit, offers a
+backup first, and needs two taps. It cannot be undone.
+
+If sharing is on it clears the household's shared copy too, and every phone in
+the household starts over — otherwise the other one would simply hand it all
+back on the next sync. That needs `supabase/schema.sql` re-run once in the
+Supabase SQL editor; until it is, the app will tell you the shared copy is still
+there rather than pretending.
+
+---
+
 ## Going away
 
 **Setup → Away.** Pick two dates, or tap *This weekend* / *A week*. While you're
@@ -372,6 +421,25 @@ Three things it deliberately does *not* do:
 - **Credits are per person, not per phone.** Yours are built from what *you*
   logged, so you and your fiancée each build your own scene and it follows you to
   whichever phone you pick up.
+
+---
+
+## Whose job is it
+
+Once there's more than one person in the household, every chore can be given to
+somebody. Open a room, tap **Edit room**, open a task, and pick under **Whose
+job**:
+
+- **Anybody** — the default, and where most chores should stay.
+- **A person** — their name shows on the card.
+- **Take turns** — whoever didn't do it last time is up next. It's worked out
+  from who actually logged it, so it stays right even if you both do it out of
+  order.
+
+**It's a reminder, not a lock.** Anyone can still log anything in one tap, and
+nothing anywhere says somebody missed their turn. There's a **Mine** button on
+the dashboard queue that narrows it to your chores — plus everything nobody has
+claimed, because that's still yours to worry about too.
 
 ---
 

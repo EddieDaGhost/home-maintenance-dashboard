@@ -202,13 +202,33 @@ export default async function run({ page, check, errors, URL }) {
     (await page.getByRole('button', { name: /Put .* away/ }).count()) === 0,
   )
 
-  // ---- the other looks wear the same purchases ----
+  // ---- each look has its own shelf, out of one wallet ----
+  // Buying a hull used to hand you a cat, because ownership was one list and
+  // only the drawing changed. Dressing one scene now costs the credits that
+  // would have dressed another, which is the whole point of a price.
+  const beforeSwitch = await balance(page)
   await page.evaluate(([key]) => localStorage.setItem(key, 'starship'), [THEME_KEY])
   await page.reload({ waitUntil: 'networkidle' })
   await openEstate(page)
   check('the same screen renames itself', (await page.getByRole('heading', { level: 1 }).innerText()) === 'The ship')
   check('and so does the catalogue', (await page.getByText('Scout hull').count()) === 1)
   check('the scene still draws', (await page.locator('svg[role="img"]').count()) === 1)
+  check('the wallet came with you', (await balance(page)) === beforeSwitch, `${await balance(page)} vs ${beforeSwitch}`)
+  check(
+    'but nothing bought in the other look is owned here',
+    (await page.getByRole('button', { name: /^Put .* away$/ }).count()) === 0,
+  )
+
+  // Buy something here, and check it stays here.
+  const shipBuy = page.getByRole('button', { name: /^Buy Ship's cat for \d+ credits$/ })
+  if ((await shipBuy.count()) === 1) {
+    const before = Number((await balance(page)).replace(/\D/g, ''))
+    await shipBuy.click()
+    await page.waitForTimeout(400)
+    const after = Number((await balance(page)).replace(/\D/g, ''))
+    check('buying in this look charges the one wallet', after < before, `${before} -> ${after}`)
+    check('and it is worn here', (await page.getByRole('button', { name: /Put Ship's cat away/ }).count()) === 1)
+  }
 
   await page.evaluate(([key]) => localStorage.setItem(key, 'cats'), [THEME_KEY])
   await page.reload({ waitUntil: 'networkidle' })
@@ -216,6 +236,35 @@ export default async function run({ page, check, errors, URL }) {
   check('and again for the cats', (await page.getByRole('heading', { level: 1 }).innerText()) === 'The cats')
   check('with the cats catalogue', (await page.getByText('Maine Coon').count()) === 1)
   check('and a scene of its own', (await page.locator('svg[role="img"]').count()) === 1)
+  check(
+    'and buying a ship did not hand you a cat',
+    (await page.getByRole('button', { name: /^Put .* away$/ }).count()) === 0,
+  )
+
+  // ---- an estate from before this existed keeps everything it owned ----
+  // Design rule 2: you can lose credits you spent, never a thing you own.
+  // Seeded against whoever is currently logging — the suite has switched people
+  // by this point, and an estate belongs to a person.
+  await page.evaluate(
+    ([estateKey, peopleKey]) => {
+      const house = JSON.parse(localStorage.getItem(peopleKey) ?? 'null')
+      const who = house?.activeId ?? 'me'
+      localStorage.setItem(
+        estateKey,
+        JSON.stringify({
+          [who]: { owned: ['finish-terracotta'], equipped: { finish: 'finish-terracotta' }, spent: 60 },
+        }),
+      )
+    },
+    [ESTATE_KEY, 'home-maintenance-dashboard/people/v1'],
+  )
+  await page.reload({ waitUntil: 'networkidle' })
+  await openEstate(page)
+  check('an old purchase is still owned in the cats look', (await page.getByRole('button', { name: /^Put .* away$/ }).count()) === 1)
+  await page.evaluate(([key]) => localStorage.setItem(key, 'home'), [THEME_KEY])
+  await page.reload({ waitUntil: 'networkidle' })
+  await openEstate(page)
+  check('and in the one it was bought in', (await page.getByRole('button', { name: /^Put .* away$/ }).count()) === 1)
 
   // ---- an estate written by a newer version doesn't break this one ----
   await page.evaluate(

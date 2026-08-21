@@ -5,11 +5,13 @@ import {
   CloudSun,
   Coins,
   Download,
+  Eraser,
   Flame,
   Flower2,
   History,
   Info,
   Link2,
+  ListPlus,
   Nfc,
   PartyPopper,
   PlaneTakeoff,
@@ -39,6 +41,7 @@ import { usePlaces } from '../state/PlacesProvider.jsx'
 import { creditsBalance } from '../lib/credits.js'
 import { describeCode, formatTemp, isStale, loadReading } from '../lib/forecast.js'
 import { openItems } from '../lib/daily.js'
+import { mineOf } from '../lib/turns.js'
 import ProgressBar from './ProgressBar.jsx'
 import TaskCard from './TaskCard.jsx'
 import ThemePicker from './ThemePicker.jsx'
@@ -51,6 +54,8 @@ import HouseholdSheet, { PersonAvatar } from './HouseholdSheet.jsx'
 import AwaySheet from './AwaySheet.jsx'
 import FreshStartSheet from './FreshStartSheet.jsx'
 import PlaceSheet from './PlaceSheet.jsx'
+import ResetSheet from './ResetSheet.jsx'
+import ImportSheet from './ImportSheet.jsx'
 
 function greeting(now) {
   const hour = now.getHours()
@@ -156,6 +161,8 @@ export default function Dashboard({
   onRestore,
   onOpenEstate,
   onOpenToday,
+  onReset,
+  onToast,
   sync,
   readOnly = false,
 }) {
@@ -177,13 +184,19 @@ export default function Dashboard({
   const [freshOpen, setFreshOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
   const [placeOpen, setPlaceOpen] = useState(false)
+  const [mineOnly, setMineOnly] = useState(false)
+  const [resetOpen, setResetOpen] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
   const fileInput = useRef(null)
 
   const streak = currentStreak(log, now, allTasks, away)
   const points = weeklyPoints(log, now, allTasks)
   const goal = weeklyPointsGoal(now, allTasks)
   const today = completedToday(log, now)
-  const attention = tasksNeedingAttention(log, now, allTasks, away)
+  const everything = tasksNeedingAttention(log, now, allTasks, away)
+  // "Mine" keeps the chores nobody has claimed as well as your own — an
+  // unassigned chore is everybody's to worry about, not nobody's.
+  const attention = mineOnly ? mineOf(everything, log, people, activeId) : everything
   const credits = creditsBalance(log, allTasks, activeId, people, entry)
   const travelling = isAway(now)
   const shortlist = attention.slice(0, 5)
@@ -317,8 +330,8 @@ export default function Dashboard({
       ) : null}
 
       <section>
-        <h2 className="section-title mb-2.5 px-1">
-          {copy.queueTitle}
+        <h2 className="section-title mb-2.5 flex items-center gap-2 px-1">
+          <span>{copy.queueTitle}</span>
           {/* font-sans/tracking-normal opt this count out of the theme's heading styling */}
           {attention.length > shortlist.length ? (
             <span
@@ -327,6 +340,22 @@ export default function Dashboard({
             >
               showing {shortlist.length} of {attention.length}
             </span>
+          ) : null}
+          {/* Only earns its space once somebody else is in the household. */}
+          {isShared ? (
+            <button
+              type="button"
+              onClick={() => setMineOnly((on) => !on)}
+              aria-pressed={mineOnly}
+              className="ml-auto rounded-full px-2.5 py-1 font-sans text-xs font-semibold tracking-normal normal-case transition active:scale-95"
+              style={
+                mineOnly
+                  ? { background: 'var(--accent)', color: 'var(--accent-ink)', border: '1px solid var(--accent)' }
+                  : { background: 'var(--surface)', color: 'var(--ink-2)', border: '1px solid var(--line)' }
+              }
+            >
+              Mine
+            </button>
           ) : null}
         </h2>
 
@@ -350,6 +379,7 @@ export default function Dashboard({
                 key={task.id}
                 task={task}
                 state={state}
+                entries={log.completions[task.id] ?? []}
                 areaLabel={nameFor(task.area)}
                 onLog={onLog}
                 onUndo={onUndo}
@@ -436,6 +466,12 @@ export default function Dashboard({
             label="History"
             detail="Streaks, heatmap, every entry"
             onClick={() => setHistoryOpen(true)}
+          />
+          <SettingsRow
+            icon={ListPlus}
+            label="Import a list"
+            detail="Paste a whole house in at once"
+            onClick={() => setImportOpen(true)}
           />
           <SettingsRow
             icon={CloudSun}
@@ -525,6 +561,14 @@ export default function Dashboard({
             detail="Replaces what's on this device"
             onClick={() => fileInput.current?.click()}
           />
+          {/* Last in the list on purpose: it's the only one that takes
+              something away, and the only one worded in --alert-*. */}
+          <SettingsRow
+            icon={Eraser}
+            label="Start over"
+            detail="Clear every log and purchase — your rooms and tasks stay"
+            onClick={() => setResetOpen(true)}
+          />
         </div>
 
         <input
@@ -552,6 +596,15 @@ export default function Dashboard({
       <AboutSheet open={aboutOpen} onClose={() => setAboutOpen(false)} />
       <AwaySheet open={awayOpen} onClose={() => setAwayOpen(false)} now={now} />
       <PlaceSheet open={placeOpen} onClose={() => setPlaceOpen(false)} />
+      <ImportSheet open={importOpen} onClose={() => setImportOpen(false)} onToast={onToast} />
+      <ResetSheet
+        open={resetOpen}
+        onClose={() => setResetOpen(false)}
+        log={log}
+        onReset={onReset}
+        onBackup={onBackup}
+        sharing={sync.isSharing}
+      />
       <FreshStartSheet open={freshOpen} onClose={() => setFreshOpen(false)} now={now} />
       {sync ? <ShareSheet open={shareOpen} onClose={() => setShareOpen(false)} sync={sync} /> : null}
       <TagSetup open={tagsOpen} onClose={() => setTagsOpen(false)} />

@@ -11,9 +11,9 @@
 --   key, and knowing both is what grants access — the same idea as an unguessable
 --   share link. Row Level Security is enabled on every table with NO policies,
 --   so the public `anon` role cannot read or write any table directly. All
---   access goes through the two SECURITY DEFINER functions at the bottom, which
---   check the key before doing anything. That way a leaked anon key on its own
---   gets you precisely nothing.
+--   access goes through the three SECURITY DEFINER functions at the bottom,
+--   which check the key before doing anything. That way a leaked anon key on its
+--   own gets you precisely nothing.
 -- ===========================================================================
 
 -- ---------------------------------------------------------------------------
@@ -23,8 +23,14 @@
 create table if not exists public.households (
   id         uuid primary key default gen_random_uuid(),
   key        text        not null,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  -- When the household last started over. Completions from before this instant
+  -- are refused on the way in and dropped on the way out, which is what stops a
+  -- phone that hasn't caught up from resurrecting history somebody cleared.
+  reset_at   timestamptz
 );
+
+alter table public.households add column if not exists reset_at timestamptz;
 
 -- Completions are append-only events. The primary key is the natural one:
 -- the same task logged at the same instant is the same event, no matter which
@@ -56,7 +62,7 @@ alter table public.completions     enable row level security;
 alter table public.household_state enable row level security;
 
 -- ---------------------------------------------------------------------------
--- The only two doors in.
+-- The only three doors in.
 -- ---------------------------------------------------------------------------
 
 -- Create a household. The caller invents the key; we hand back the id.
@@ -96,16 +102,20 @@ security definer
 set search_path = public
 as $$
 declare
-  v_doc     jsonb;
-  v_updated timestamptz;
+  v_doc      jsonb;
+  v_updated  timestamptz;
+  v_reset_at timestamptz;
 begin
-  perform 1 from public.households
+  select reset_at into v_reset_at
+    from public.households
    where id = p_household and key = p_key;
   if not found then
     raise exception 'unknown household';
   end if;
 
   if p_events is not null and jsonb_typeof(p_events) = 'array' then
+    -- Anything from before the household started over is refused. Without this
+    -- a reset lasts exactly as long as it takes the other phone to sync.
     insert into public.completions (household_id, task_id, at, by)
     select p_household,
            e ->> 'task_id',
@@ -113,6 +123,7 @@ begin
            nullif(e ->> 'by', '')
       from jsonb_array_elements(p_events) as e
      where e ? 'task_id' and e ? 'at'
+       and (v_reset_at is null or (e ->> 'at')::timestamptz > v_reset_at)
     on conflict (household_id, task_id, at) do nothing;
   end if;
 
@@ -138,14 +149,59 @@ begin
       '[]'::jsonb
     ),
     'state', coalesce(v_doc, '{}'::jsonb),
-    'state_updated_at', v_updated
+    'state_updated_at', v_updated,
+    -- Handed back so a device that missed the reset can clear its own copy of
+    -- what came before it, rather than being the one phone still holding it.
+    'reset_at', v_reset_at
   );
 end;
 $$;
 
--- The public role may call these two functions and nothing else.
+-- Start over.
+--
+-- The only thing in this file that deletes anything, and it exists because
+-- hm_sync above merges by union: wiping a phone's history locally achieves
+-- nothing while the household still holds it, because the next sync hands it
+-- straight back. A reset has to reach the server or it silently undoes itself.
+--
+-- Completions only. The state document holds the rooms and tasks the reset is
+-- explicitly meant to keep, and deleting it here would risk a stale device
+-- winning the next last-write-wins round and taking them with it. The emptied
+-- estate travels the ordinary settings path instead.
+--
+-- Deleting the rows is only half of it. The instant is stamped on the household
+-- so hm_sync can refuse anything older on the way in and every other phone can
+-- drop its own copy on the way out. Without the stamp, a reset survives right
+-- up until the other phone syncs and pushes it all back.
+create or replace function public.hm_reset(p_household uuid, p_key text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_deleted integer;
+begin
+  perform 1 from public.households
+   where id = p_household and key = p_key;
+  if not found then
+    raise exception 'unknown household';
+  end if;
+
+  delete from public.completions where household_id = p_household;
+  get diagnostics v_deleted = row_count;
+
+  update public.households set reset_at = now() where id = p_household;
+
+  return jsonb_build_object('deleted', v_deleted);
+end;
+$$;
+
+-- The public role may call these three functions and nothing else.
 revoke all on function public.hm_create_household(text) from public;
 revoke all on function public.hm_sync(uuid, text, jsonb, jsonb, timestamptz) from public;
+revoke all on function public.hm_reset(uuid, text) from public;
 
 grant execute on function public.hm_create_household(text) to anon, authenticated;
 grant execute on function public.hm_sync(uuid, text, jsonb, jsonb, timestamptz) to anon, authenticated;
+grant execute on function public.hm_reset(uuid, text) to anon, authenticated;

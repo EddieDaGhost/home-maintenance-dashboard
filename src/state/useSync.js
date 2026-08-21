@@ -7,6 +7,7 @@ import {
   loadLink,
   mergeCompletions,
   pushAndPull,
+  resetHousehold,
   saveLink,
   toEvents,
 } from '../lib/sync.js'
@@ -94,8 +95,18 @@ export function useSync({
         stateUpdatedAt: shouldPush ? editedAt : null,
       })
 
-      const merged = mergeCompletions(currentLog.completions, result?.completions)
-      setLog((existing) => ({ ...existing, completions: mergeCompletions(existing.completions, result?.completions) }))
+      // A reset this device hasn't applied yet is the only thing that ever
+      // takes entries away. Applied once, then remembered, so a phone doesn't
+      // re-clear work it has legitimately logged since.
+      const householdReset = result?.reset_at ? new Date(result.reset_at).getTime() : null
+      const unapplied =
+        householdReset && householdReset > (link.resetAt ?? 0) ? householdReset : null
+
+      const merged = mergeCompletions(currentLog.completions, result?.completions, unapplied)
+      setLog((existing) => ({
+        ...existing,
+        completions: mergeCompletions(existing.completions, result?.completions, unapplied),
+      }))
 
       // Settings only come back down when the other device wrote them more
       // recently than this one did — the server decides, we just apply.
@@ -115,14 +126,14 @@ export function useSync({
       }
 
       const at = Date.now()
-      setLink((current) => ({ ...current, lastSyncAt: at }))
+      setLink((current) => ({ ...current, lastSyncAt: at, resetAt: householdReset ?? current.resetAt }))
       setStatus({ state: 'ok', error: null, at, count: Object.keys(merged).length })
     } catch (error) {
       setStatus({ state: 'error', error: error.message })
     } finally {
       inFlight.current = false
     }
-  }, [link.householdId, link.key, setLog, setNames, setCustom, setHousehold, setEstate, setAway, setPlaces])
+  }, [link.householdId, link.key, link.resetAt, setLog, setNames, setCustom, setHousehold, setEstate, setAway, setPlaces])
 
   /** Start sharing: mint a household and put this device in it. */
   const startSharing = useCallback(async () => {
@@ -147,6 +158,26 @@ export function useSync({
     setLink({ householdId, key, lastSyncAt: null })
     setStatus({ state: 'idle', error: null })
   }, [])
+
+  /**
+   * Wipe the household's completions server-side, so a local reset stays reset.
+   * Called before the local wipe: if the server refuses there is still
+   * something to tell the user about, and nothing has been destroyed yet.
+   */
+  const resetShared = useCallback(async () => {
+    if (!link.householdId) return { ok: true, shared: false }
+    try {
+      const result = await resetHousehold({ householdId: link.householdId, key: link.key })
+      // Anything this device knew about the household's settings is stale now.
+      remoteStateAt.current = null
+      // Record the reset as already applied here — this device is the one that
+      // asked for it, and it must not then clear work logged afterwards.
+      setLink((current) => ({ ...current, resetAt: Date.now() }))
+      return { ok: true, shared: true, deleted: result?.deleted ?? 0 }
+    } catch (error) {
+      return { ok: false, shared: true, error: error.message, code: error.code }
+    }
+  }, [link.householdId, link.key])
 
   const stopSharing = useCallback(() => {
     setLink(emptyLink)
@@ -193,5 +224,6 @@ export function useSync({
     startSharing,
     joinHousehold,
     stopSharing,
+    resetShared,
   }
 }

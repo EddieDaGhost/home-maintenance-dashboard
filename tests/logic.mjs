@@ -25,11 +25,13 @@ import {
 } from '../src/config/catalog.js'
 import { MOOD, creditsBalance, creditsEarned, owns, sceneMood } from '../src/lib/credits.js'
 import {
+  LOOKS,
   buyCompanion,
   buyItem,
   buyTreat,
   entryFor,
   equip,
+  lookFor,
   normalizeEstate,
   renameCompanion,
 } from '../src/lib/estate.js'
@@ -89,6 +91,10 @@ import {
   updateTaskSettings,
 } from '../src/lib/custom.js'
 import { composeAreas } from '../src/lib/compose.js'
+import { hardReset, resetSummary } from '../src/lib/reset.js'
+import { applyImport, parseImport, parseSchedule } from '../src/lib/importTasks.js'
+import { mergeCompletions } from '../src/lib/sync.js'
+import { ROTATE, isTurnOf, lastLoggedBy, mineOf, turnLabel, whoseTurn } from '../src/lib/turns.js'
 import { THEME_LIST } from '../src/config/themes.js'
 
 const ALL_TASKS = AREAS.flatMap((area) => area.tasks.map((task) => ({ ...task, area })))
@@ -265,28 +271,60 @@ export default async function run({ check }) {
   is('nobody earns for nobody', creditsEarned(shared, ALL_TASKS, null, ROSTER), 0)
 
   // --- spending ---
+  // One wallet, three scenes: what you own is per look, but the credits come
+  // out of the same pot however you spend them.
+  const HOME = 'home'
+  const SHIP = 'starship'
   const fern = itemById('vessel-fern')
+  const shelf = (e, look = HOME) => lookFor(entryFor(e, 'eddie'), look)
+
   let estate = {}
-  estate = buyItem(estate, 'eddie', fern, 40)
+  estate = buyItem(estate, 'eddie', HOME, fern, 40)
   is('a purchase you cannot afford is refused', Object.keys(estate).length, 0)
 
-  estate = buyItem(estate, 'eddie', fern, 200)
+  estate = buyItem(estate, 'eddie', HOME, fern, 200)
   is('buying records the spend', entryFor(estate, 'eddie').spent, fern.cost)
-  is('buying wears it straight away', entryFor(estate, 'eddie').equipped.vessel, 'vessel-fern')
-  is('and it is owned', owns(entryFor(estate, 'eddie'), 'vessel-fern'), true)
+  is('buying wears it straight away', shelf(estate).equipped.vessel, 'vessel-fern')
+  is('and it is owned', owns(shelf(estate), 'vessel-fern'), true)
 
-  estate = buyItem(estate, 'eddie', fern, 200)
+  // The thing this whole shape exists for: a ship is not a cat.
+  is('but not in another look', owns(shelf(estate, SHIP), 'vessel-fern'), false)
+  is('and nothing is worn there', shelf(estate, SHIP).equipped.vessel, undefined)
+  is('a look nobody has touched is simply empty', shelf(estate, 'cats').owned.length, 0)
+
+  estate = buyItem(estate, 'eddie', HOME, fern, 200)
   is('buying the same thing twice charges once', entryFor(estate, 'eddie').spent, fern.cost)
 
-  estate = equip(estate, 'eddie', 'vessel-fern')
-  is('equipping what is worn takes it off', entryFor(estate, 'eddie').equipped.vessel, undefined)
-  estate = equip(estate, 'eddie', 'vessel-monstera')
-  is('you cannot wear what you do not own', entryFor(estate, 'eddie').equipped.vessel, undefined)
+  // Buying the same item in another look is a second purchase, at full price —
+  // that is what makes choosing which scene to dress mean something.
+  let both = buyItem(estate, 'eddie', SHIP, fern, 200)
+  is('the same item in another look is bought again', owns(lookFor(entryFor(both, 'eddie'), SHIP), 'vessel-fern'), true)
+  is('and charged again, from the one pot', entryFor(both, 'eddie').spent, fern.cost * 2)
+
+  estate = equip(estate, 'eddie', HOME, 'vessel-fern')
+  is('equipping what is worn takes it off', shelf(estate).equipped.vessel, undefined)
+  estate = equip(estate, 'eddie', HOME, 'vessel-monstera')
+  is('you cannot wear what you do not own', shelf(estate).equipped.vessel, undefined)
+  estate = equip(estate, 'eddie', SHIP, 'vessel-fern')
+  is('nor wear it in a look you did not buy it in', lookFor(entryFor(estate, 'eddie'), SHIP).equipped.vessel, undefined)
 
   is("one person's spending is their own", entryFor(estate, 'yas').spent, 0)
 
   const bigLog = { completions: { 'kitchen-dishes': Array.from({ length: 30 }, (_, i) => ({ at: daysAgo(i), by: 'eddie' })) } }
   is('balance is earned minus spent', creditsBalance(bigLog, ALL_TASKS, 'eddie', ROSTER, entryFor(estate, 'eddie')), 120 - fern.cost)
+  // 120 earned, 160 spent across two looks: one pot, and it is empty. Dressing
+  // the ship really is money not spent on the windowsill.
+  is(
+    'and spending in one look comes off the balance in all of them',
+    creditsBalance(bigLog, ALL_TASKS, 'eddie', ROSTER, entryFor(both, 'eddie')),
+    0,
+  )
+  is(
+    'the second look is not a second allowance',
+    creditsBalance(bigLog, ALL_TASKS, 'eddie', ROSTER, entryFor(both, 'eddie')) <
+      creditsBalance(bigLog, ALL_TASKS, 'eddie', ROSTER, entryFor(estate, 'eddie')),
+    true,
+  )
   is(
     'balance never goes negative',
     creditsBalance({ completions: {} }, ALL_TASKS, 'eddie', ROSTER, { spent: 9999 }),
@@ -295,13 +333,14 @@ export default async function run({ check }) {
 
   // --- companions and the consumable ---
   let many = {}
-  for (let i = 0; i < MAX_COMPANIONS + 2; i += 1) many = buyCompanion(many, 'eddie', COMPANION_COST, 99999)
-  is('companions stop at the cap', entryFor(many, 'eddie').companions.length, MAX_COMPANIONS)
-  is('companions start unnamed', entryFor(many, 'eddie').companions[0].name, '')
-  const named = renameCompanion(many, 'eddie', entryFor(many, 'eddie').companions[0].id, '  Bruce  ')
-  is('and can be named', entryFor(named, 'eddie').companions[0].name, 'Bruce')
-  is('naming one leaves the others alone', entryFor(named, 'eddie').companions[1].name, '')
-  is('a name survives being read back', normalizeEstate(named).eddie.companions[0].name, 'Bruce')
+  for (let i = 0; i < MAX_COMPANIONS + 2; i += 1) many = buyCompanion(many, 'eddie', HOME, COMPANION_COST, 99999)
+  is('companions stop at the cap', shelf(many).companions.length, MAX_COMPANIONS)
+  is('companions start unnamed', shelf(many).companions[0].name, '')
+  is('and belong to the look they were bought in', shelf(many, SHIP).companions.length, 0)
+  const named = renameCompanion(many, 'eddie', HOME, shelf(many).companions[0].id, '  Bruce  ')
+  is('and can be named', shelf(named).companions[0].name, 'Bruce')
+  is('naming one leaves the others alone', shelf(named).companions[1].name, '')
+  is('a name survives being read back', normalizeEstate(named).eddie.looks[HOME].companions[0].name, 'Bruce')
   is('and only the ones bought were charged', entryFor(many, 'eddie').spent, MAX_COMPANIONS * COMPANION_COST)
 
   const T0 = MON.getTime()
@@ -311,6 +350,8 @@ export default async function run({ check }) {
   is('a treat lasts its full run', entryFor(treated, 'eddie').boostUntil, T0 + TREAT_HOURS * 3600000)
   treated = buyTreat(treated, 'eddie', TREAT_COST, 500, T0)
   is('buying again extends rather than replaces', entryFor(treated, 'eddie').boostUntil, T0 + 2 * TREAT_HOURS * 3600000)
+  // A treat is a mood, not a possession — it lights up whichever scene you open.
+  is('and it is not tied to one look', entryFor(treated, 'eddie').boostUntil > 0, true)
 
   // --- how the scene feels ---
   const behind = { completions: { 'chickens-checkin': [daysAgo(5)] } }
@@ -331,11 +372,41 @@ export default async function run({ check }) {
   is('rubbish normalises to nothing', Object.keys(normalizeEstate('nope')).length, 0)
   is('an empty person is dropped', Object.keys(normalizeEstate({ eddie: {} })).length, 0)
   const salvaged = normalizeEstate({
-    eddie: { owned: ['vessel-fern', 'not-a-thing'], equipped: { vessel: 'vessel-orchid', flair: 'vessel-fern' }, spent: 80 },
+    eddie: {
+      looks: {
+        home: { owned: ['vessel-fern', 'not-a-thing'], equipped: { vessel: 'vessel-orchid', flair: 'vessel-fern' } },
+      },
+      spent: 80,
+    },
   })
-  is('an unknown purchase is kept, not dropped', salvaged.eddie.owned.length, 2)
-  is('but something unowned is never worn', salvaged.eddie.equipped.vessel, undefined)
-  is('and nothing is worn in the wrong slot', salvaged.eddie.equipped.flair, undefined)
+  is('an unknown purchase is kept, not dropped', salvaged.eddie.looks.home.owned.length, 2)
+  is('but something unowned is never worn', salvaged.eddie.looks.home.equipped.vessel, undefined)
+  is('and nothing is worn in the wrong slot', salvaged.eddie.looks.home.equipped.flair, undefined)
+
+  // --- the migration: nothing anybody owns is ever taken away ---
+  // Purchases made before ownership was per look become theirs in every look.
+  // Design rule 2 — you can lose credits you spent, never a thing you own.
+  const legacy = normalizeEstate({
+    eddie: {
+      owned: ['vessel-fern', 'finish-brass'],
+      equipped: { vessel: 'vessel-fern' },
+      companions: [{ id: 'c1', name: 'Bruce' }],
+      spent: 210,
+      boostUntil: 0,
+    },
+  })
+  is('an old estate keeps its spend', legacy.eddie.spent, 210)
+  is('and lands in every look', LOOKS.every((id) => legacy.eddie.looks[id]?.owned.length === 2), true)
+  is('wearing what it was wearing', LOOKS.every((id) => legacy.eddie.looks[id].equipped.vessel === 'vessel-fern'), true)
+  is('with its companions intact', legacy.eddie.looks.starship.companions[0].name, 'Bruce')
+  is('the catalogue covers every look it was granted in', LOOKS.length, THEME_LIST.length)
+  // Once migrated it is the new shape, so a second read changes nothing.
+  is('and re-reading it is a no-op', JSON.stringify(normalizeEstate(legacy)), JSON.stringify(legacy))
+  is(
+    'an old estate that bought nothing stays nothing',
+    Object.keys(normalizeEstate({ eddie: { owned: [], equipped: {}, companions: [] } })).length,
+    0,
+  )
 
   // --- backups carry it ---
   const restored = parseBackup(JSON.stringify(buildBackup(shared, {}, null, null, estate)))
@@ -468,7 +539,9 @@ export default async function run({ check }) {
   is('a custom task edits the same way', taskIn(mine, 'kitchen-my-thing').points, 12)
 
   is('rubbish settings normalise away', Object.keys(normalizeCustom({ taskSettings: { x: { points: 'lots' } } }).taskSettings).length, 0)
-  is('and so do out-of-range points', Object.keys(normalizeCustom({ taskSettings: { x: { points: 500 } } }).taskSettings).length, 0)
+  is('and so do out-of-range points', Object.keys(normalizeCustom({ taskSettings: { x: { points: 1000 } } }).taskSettings).length, 0)
+  is('zero is out of range too', Object.keys(normalizeCustom({ taskSettings: { x: { points: 0 } } }).taskSettings).length, 0)
+  is('but a big job is allowed to be a big job', normalizeCustom({ taskSettings: { x: { points: 999 } } }).taskSettings.x.points, 999)
   is('a real setting survives the round trip', normalizeCustom(edited).taskSettings['kitchen-dishes'].points, 9)
 
   // =========================================================================
@@ -498,6 +571,247 @@ export default async function run({ check }) {
   is('a fresh start survives being stored', normalizeAway(fresh).freshStartAt, fresh.freshStartAt)
   is('and rides alongside a trip', hasFreshStart(addWindow(fresh, day(3).getTime(), day(1).getTime())), true)
   is('while the trip still works', isAway(addWindow(fresh, day(1).getTime(), day(-1).getTime()), MON), true)
+
+  // =========================================================================
+  // Whose job is it
+  // =========================================================================
+
+  const HOUSE = [{ id: 'eddie', name: 'Eddie' }, { id: 'yas', name: 'Yasmine' }]
+  const nameOf = (id) => HOUSE.find((p) => p.id === id)?.name ?? 'Someone'
+  const chore = (assignee) => ({ id: 'litter-scoop', assignee })
+
+  is('an unassigned chore is nobody in particular', whoseTurn(chore(undefined), [], HOUSE), null)
+  is('and stays that way however much it is logged', whoseTurn(chore(null), [{ at: MON.getTime(), by: 'yas' }], HOUSE), null)
+  is('an assigned chore is that person', whoseTurn(chore('yas'), [], HOUSE), 'yas')
+  is('logging it does not move it', whoseTurn(chore('yas'), [{ at: MON.getTime(), by: 'eddie' }], HOUSE), 'yas')
+
+  // A rotation is worked out from the log, not stored — one record of who did
+  // what, so the scene, the credits and this can never disagree.
+  is('a rotation nobody has done starts at the top', whoseTurn(chore(ROTATE), [], HOUSE), 'eddie')
+  is('after Eddie it is Yasmine', whoseTurn(chore(ROTATE), [{ at: MON.getTime(), by: 'eddie' }], HOUSE), 'yas')
+  is('after Yasmine it is Eddie again', whoseTurn(chore(ROTATE), [{ at: MON.getTime(), by: 'yas' }], HOUSE), 'eddie')
+  is(
+    'only the most recent log decides',
+    whoseTurn(chore(ROTATE), [{ at: daysAgo(4), by: 'yas' }, { at: daysAgo(0), by: 'eddie' }], HOUSE),
+    'yas',
+  )
+  is('an entry with no by is nobody, so it starts over', whoseTurn(chore(ROTATE), [MON.getTime()], HOUSE), 'eddie')
+  is('the newest entry is found whatever order they arrive in', lastLoggedBy([{ at: daysAgo(0), by: 'eddie' }, { at: daysAgo(9), by: 'yas' }]), 'eddie')
+
+  // Somebody who has left is not whose turn it is any more.
+  is('a chore assigned to someone gone reads as unassigned', whoseTurn(chore('ghost'), [], HOUSE), null)
+  is('and a rotation past them starts over', whoseTurn(chore(ROTATE), [{ at: MON.getTime(), by: 'ghost' }], HOUSE), 'eddie')
+  is('a one-person house rotates to itself', whoseTurn(chore(ROTATE), [{ at: MON.getTime(), by: 'me' }], [{ id: 'me', name: 'Me' }]), 'me')
+  is('an empty roster is nobody', whoseTurn(chore(ROTATE), [], []), null)
+
+  is('isTurnOf agrees', isTurnOf(chore('yas'), [], HOUSE, 'yas'), true)
+  is('and disagrees', isTurnOf(chore('yas'), [], HOUSE, 'eddie'), false)
+  is('nobody has a turn on an unassigned chore', isTurnOf(chore(null), [], HOUSE, 'eddie'), false)
+
+  // Wording: whose turn it is, never that somebody missed theirs.
+  is('your own reads as yours', turnLabel(chore('eddie'), [], HOUSE, 'eddie', nameOf), 'Yours')
+  is('somebody else reads as their name', turnLabel(chore('yas'), [], HOUSE, 'eddie', nameOf), 'Yasmine')
+  is('a rotation on you reads as your turn', turnLabel(chore(ROTATE), [], HOUSE, 'eddie', nameOf), 'Your turn')
+  is('a rotation on them says whose turn', turnLabel(chore(ROTATE), [{ at: MON.getTime(), by: 'eddie' }], HOUSE, 'eddie', nameOf), "Yasmine's turn")
+  is('unassigned says nothing at all', turnLabel(chore(null), [], HOUSE, 'eddie', nameOf), null)
+  is(
+    'and none of it is ever a telling off',
+    /late|overdue|missed|failed|behind/i.test(
+      [
+        turnLabel(chore('yas'), [], HOUSE, 'eddie', nameOf),
+        turnLabel(chore(ROTATE), [], HOUSE, 'eddie', nameOf),
+      ].join(' '),
+    ),
+    false,
+  )
+
+  // "Mine" keeps what nobody has claimed — an unassigned chore is everybody's.
+  const queue = [
+    { task: chore('eddie') },
+    { task: { id: 'kitchen-dishes', assignee: 'yas' } },
+    { task: { id: 'chickens-checkin' } },
+  ]
+  is('mine keeps mine and the unclaimed', mineOf(queue, { completions: {} }, HOUSE, 'eddie').length, 2)
+  is('and drops what is squarely theirs', mineOf(queue, { completions: {} }, HOUSE, 'eddie').some((q) => q.task.id === 'kitchen-dishes'), false)
+  is('with no active person nothing is filtered', mineOf(queue, { completions: {} }, HOUSE, null).length, 3)
+
+  // Assignment is an override like any other, so it cannot move an id.
+  const assigned = updateTaskSettings(emptyCustom, 'litter-scoop', { assignee: 'yas' })
+  is('assignment stores against the task id', assigned.taskSettings['litter-scoop'].assignee, 'yas')
+  is('and survives being written out', normalizeCustom(assigned).taskSettings['litter-scoop'].assignee, 'yas')
+  is('it reaches the task through compose', composeAreas(assigned).flatMap((a) => a.tasks).find((t) => t.id === 'litter-scoop').assignee, 'yas')
+  is('unassigning takes the whole entry with it', Object.keys(updateTaskSettings(assigned, 'litter-scoop', { assignee: null }).taskSettings).length, 0)
+  is('but leaves other overrides alone', updateTaskSettings(updateTaskSettings(assigned, 'litter-scoop', { points: 7 }), 'litter-scoop', { assignee: null }).taskSettings['litter-scoop'].points, 7)
+  is('a non-string assignee is refused', normalizeCustom({ taskSettings: { x: { assignee: 42 } } }).taskSettings.x, undefined)
+
+  // =========================================================================
+  // Starting over
+  // =========================================================================
+
+  // Everything else in the app is additive. This is the one thing that takes
+  // something away, so what it does and doesn't touch is asserted exactly.
+  const setUp = updateTaskSettings(
+    addTaskFixture(),
+    'kitchen-dishes',
+    { points: 9, assignee: 'yas', repeatable: true },
+  )
+  const setUpBefore = JSON.stringify(setUp)
+  const busyLog = { version: 2, completions: { 'kitchen-dishes': [daysAgo(0), daysAgo(1)], 'litter-scoop': [daysAgo(2)] } }
+  const spentEstate = buyItem({}, 'eddie', HOME, fern, 500)
+  const trips = addWindow(startFresh({}, MON), day(9).getTime(), day(5).getTime())
+
+  const wiped = hardReset({ away: trips })
+  is('every completion goes', Object.keys(wiped.log.completions).length, 0)
+  is('so does everything bought', Object.keys(wiped.estate).length, 0)
+  is('the fresh-start line goes with the backlog it covered', wiped.away.freshStartAt, 0)
+  is('but trips stay — they are where you were, not what you did', wiped.away.windows.length, 1)
+
+  is('the streak is zero afterwards', currentStreak(wiped.log, MON, ALL_TASKS), 0)
+  is('and so are the points', weeklyPoints(wiped.log, MON, ALL_TASKS), 0)
+  is('and the credits earned', creditsEarned(wiped.log, ALL_TASKS, 'eddie', ROSTER), 0)
+  is('and the balance', creditsBalance(wiped.log, ALL_TASKS, 'eddie', ROSTER, entryFor(wiped.estate, 'eddie')), 0)
+
+  // The load-bearing half: what you set up is not what you did.
+  is('nothing you set up is even readable from here', JSON.stringify(setUp), setUpBefore)
+  is('an added task is still there afterwards', composeAreas(setUp).flatMap((a) => a.tasks).some((t) => t.id === 'kitchen-my-thing'), true)
+  is('and an edited one keeps its points', composeAreas(setUp).flatMap((a) => a.tasks).find((t) => t.id === 'kitchen-dishes').points, 9)
+  is('and whose job it is', composeAreas(setUp).flatMap((a) => a.tasks).find((t) => t.id === 'kitchen-dishes').assignee, 'yas')
+  is('and that it repeats', composeAreas(setUp).flatMap((a) => a.tasks).find((t) => t.id === 'kitchen-dishes').repeatable, true)
+  is('a reset with nothing passed still works', Object.keys(hardReset().log.completions).length, 0)
+
+  // The confirmation has to state the real cost — nobody should have to guess
+  // at the size of something irreversible.
+  const cost = resetSummary(busyLog, spentEstate)
+  is('it counts every entry', cost.logged, 3)
+  is('across every task', cost.tasks, 2)
+  is('and what was bought', cost.bought, 1)
+  is('and what it cost', cost.spent, fern.cost)
+  is('an untouched app has nothing to clear', resetSummary({ completions: {} }, {}).logged, 0)
+
+  // A reset has to survive the other phone, which still holds all of it and
+  // would otherwise push it back — merging is a union in every other case.
+  const stale = { 'kitchen-dishes': [{ at: daysAgo(3) }, { at: daysAgo(1) }] }
+  is('without a reset, a union keeps everything', Object.keys(mergeCompletions(stale, [])).length, 1)
+  is('a reset drops what came before it', Object.keys(mergeCompletions(stale, [], daysAgo(0))).length, 0)
+  is(
+    'but keeps what was logged since',
+    mergeCompletions({ 'kitchen-dishes': [{ at: daysAgo(3) }, { at: MON.getTime() }] }, [], daysAgo(1))['kitchen-dishes'].length,
+    1,
+  )
+  is('and a null reset changes nothing', mergeCompletions(stale, [], null)['kitchen-dishes'].length, 2)
+
+  // =========================================================================
+  // Importing a list
+  // =========================================================================
+
+  // It has to accept what scheduleLabel() prints, so a list copied out of the
+  // app goes straight back in.
+  const sched = (text) => JSON.stringify(parseSchedule(text))
+  is('every day', sched('Every day'), JSON.stringify({ kind: 'daily' }))
+  is('daily', sched('daily'), JSON.stringify({ kind: 'daily' }))
+  is('once a week', sched('Once a week'), JSON.stringify({ kind: 'weekly' }))
+  is('weekends', sched('Saturday or Sunday'), JSON.stringify({ kind: 'weekend' }))
+  is('a few times a week', sched('2x per week'), JSON.stringify({ kind: 'timesPerWeek', times: 2 }))
+  is('spelled out', sched('3 times a week'), JSON.stringify({ kind: 'timesPerWeek', times: 3 }))
+  is('every n days', sched('Every 10 days'), JSON.stringify({ kind: 'everyNDays', days: 10 }))
+  is('weeks become days', sched('every 2 weeks'), JSON.stringify({ kind: 'everyNDays', days: 14 }))
+  is('fortnightly too', sched('fortnightly'), JSON.stringify({ kind: 'everyNDays', days: 14 }))
+  is('every n months', sched('Every 3 months'), JSON.stringify({ kind: 'everyNMonths', months: 3 }))
+  is('quarterly', sched('quarterly'), JSON.stringify({ kind: 'everyNMonths', months: 3 }))
+  is('a list of days', sched('Mon · Wed · Fri'), JSON.stringify({ kind: 'weekdays', days: [1, 3, 5] }))
+  is('however it is punctuated', sched('mon and fri'), JSON.stringify({ kind: 'weekdays', days: [1, 5] }))
+  is('one day is a weekly', sched('Every Friday'), JSON.stringify({ kind: 'weeklyOn', day: 5 }))
+  is('plural too', sched('tuesdays'), JSON.stringify({ kind: 'weeklyOn', day: 2 }))
+  is('and nonsense is nothing', parseSchedule('when I feel like it'), null)
+  is('so is an empty string', parseSchedule('   '), null)
+  // Every kind the form can build has to be reachable by typing.
+  is(
+    'every schedule the form offers can be typed',
+    ['Every day', 'Mon · Wed · Fri', '2x per week', 'Once a week', 'Every Friday', 'Saturday or Sunday', 'Every 10 days', 'Every 3 months']
+      .map((text) => parseSchedule(text)?.kind)
+      .join(),
+    'daily,weekdays,timesPerWeek,weekly,weeklyOn,weekend,everyNDays,everyNMonths',
+  )
+
+  // --- reading a list ---
+  const built = composeAreas(emptyCustom)
+  const listed = parseImport(
+    [
+      '# a comment, ignored',
+      'Kitchen: Wipe counters, 2x per week, 3',
+      'Mop the floor, weekly, 5',
+      'Garage: Sweep the floor, every 2 weeks',
+      '',
+      'Tidy the bench, 7',
+    ].join('\n'),
+    built,
+  )
+  is('the room carries down the list', listed.tasks[1].room, 'Kitchen')
+  is('until another is named', listed.tasks[2].room, 'Garage')
+  is('and keeps carrying', listed.tasks[3].room, 'Garage')
+  is('a comment is not a task', listed.tasks.length, 4)
+  is('a blank line is not a task either', listed.skipped.length, 0)
+  is('an existing room is matched, not created', listed.tasks[0].areaId, 'kitchen')
+  is('a new one is flagged for creating', listed.rooms.join(), 'Garage')
+  is('points are read', listed.tasks[0].points, 3)
+  is('schedules are read', listed.tasks[0].schedule.kind, 'timesPerWeek')
+  is('and either may be left out', listed.tasks[3].schedule, null)
+  is('order between them does not matter', parseImport('Kitchen: A thing, 4, daily', built).tasks[0].schedule.kind, 'daily')
+  is('and points still land', parseImport('Kitchen: A thing, 4, daily', built).tasks[0].points, 4)
+
+  // --- a task that already exists is updated, never duplicated ---
+  const existing = parseImport('Kitchen: Dishes, daily, 12', built)
+  is('an existing chore is recognised', existing.tasks[0].existingId, 'kitchen-dishes')
+  is('and counted as an update', existing.updated, 1)
+  is('not as an addition', existing.added, 0)
+
+  // --- bad lines are named and skipped, never fatal ---
+  const messy = parseImport(['Kitchen: Fine, daily, 2', 'Kitchen: Broken, whenever I like'].join('\n'), built)
+  is('the good line still lands', messy.tasks.length, 1)
+  is('the bad one is reported', messy.skipped.length, 1)
+  is('by line number', messy.skipped[0].line, 2)
+  is('and says why', /isn't a schedule/.test(messy.skipped[0].why), true)
+  // A line before any room is named has nowhere to go; one after inherits the
+  // room above it, which is how people actually write a list.
+  const roomless = parseImport('A task with no room at all\nKitchen: Dishes\nAnother one', built)
+  is('a line before any room is caught', /No room yet/.test(roomless.skipped[0].why), true)
+  is('but one after inherits the room above it', roomless.tasks[1].room, 'Kitchen')
+  is('the same task twice is only imported once', parseImport('Kitchen: A, daily\nKitchen: A, weekly', built).tasks.length, 1)
+  is('a room with nothing in it is not created', parseImport('Nowhere: , ,', built).rooms.length, 0)
+  is('an empty list does nothing', parseImport('', built).tasks.length, 0)
+  is('and neither does no list at all', parseImport(null, built).tasks.length, 0)
+  is('out-of-range points are clamped, not refused', parseImport('Kitchen: A, 5000', built).tasks[0].points, 999)
+
+  // --- applying it ---
+  const imported = applyImport(emptyCustom, listed, [])
+  const composedAfter = composeAreas(imported)
+  const flatAfter = composedAfter.flatMap((area) => area.tasks)
+  is('the new room exists', composedAfter.some((area) => area.name === 'Garage'), true)
+  is('with its tasks in it', composedAfter.find((area) => area.name === 'Garage').tasks.length, 2)
+  is('and the existing room gained its own', flatAfter.some((t) => t.name === 'Wipe counters'), true)
+  is('a task with no schedule gets the default', flatAfter.find((t) => t.name === 'Tidy the bench').schedule.kind, 'weekly')
+  is('and keeps the points it was given', flatAfter.find((t) => t.name === 'Tidy the bench').points, 7)
+
+  // The rule that matters: an existing task is edited, so its id never moves.
+  const updated = applyImport(emptyCustom, existing, [])
+  is('an existing task is not duplicated', composeAreas(updated).flatMap((a) => a.tasks).filter((t) => t.id === 'kitchen-dishes').length, 1)
+  is('its id is untouched', composeAreas(updated).flatMap((a) => a.tasks).find((t) => t.name === 'Dishes').id, 'kitchen-dishes')
+  is('and it is worth what the list said', composeAreas(updated).flatMap((a) => a.tasks).find((t) => t.id === 'kitchen-dishes').points, 12)
+  is('through the same override map as editing by hand', updated.taskSettings['kitchen-dishes'].points, 12)
+  is('no new room was invented for it', updated.areas.length, 0)
+
+  // Importing the same list twice must not double anything.
+  const onceOver = applyImport(emptyCustom, listed, [])
+  const twiceOver = applyImport(
+    onceOver,
+    parseImport('Garage: Sweep the floor, every 2 weeks', composeAreas(onceOver)),
+    [],
+  )
+  is(
+    'importing the same line twice adds nothing the second time',
+    composeAreas(twiceOver).find((a) => a.name === 'Garage').tasks.length,
+    2,
+  )
 
   // =========================================================================
   // Today: the place, the drive, and the scratch list
