@@ -211,9 +211,11 @@ export default async function run({ browser, check, URL }) {
 
     await a.page.goto(URL, { waitUntil: 'networkidle' })
     await openSettings(a.page)
-    await a.page.getByRole('button', { name: /^Start over/ }).click()
+    await a.page.getByRole('button', { name: /^Start again/ }).click()
     await a.page.waitForTimeout(400)
-    const resetSheet = a.page.getByRole('dialog', { name: 'Start over' })
+    const resetSheet = a.page.getByRole('dialog', { name: 'Start again' })
+    await resetSheet.getByRole('button', { name: /^Clear the scoreboard/ }).click()
+    await a.page.waitForTimeout(250)
     check('it says the shared copy goes too', (await resetSheet.getByText(/clears the household/).count()) === 1)
     check('and it does not offer the button straight away', (await resetSheet.getByRole('button', { name: /^Yes — clear/ }).count()) === 0)
 

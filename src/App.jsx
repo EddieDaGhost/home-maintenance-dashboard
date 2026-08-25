@@ -9,7 +9,7 @@ import { EstateProvider, useEstate } from './state/EstateProvider.jsx'
 import { AwayProvider, useAway } from './state/AwayProvider.jsx'
 import { PlacesProvider, usePlaces } from './state/PlacesProvider.jsx'
 import { downloadBackup, parseBackup } from './lib/backup.js'
-import { hardReset } from './lib/reset.js'
+import { emptyHouse, hardReset } from './lib/reset.js'
 import { claimDevice, loadDevice, looksSetUp } from './lib/device.js'
 import { parseJoinHash } from './lib/sync.js'
 import { useSync } from './state/useSync.js'
@@ -224,6 +224,32 @@ function AppShell() {
     return { ok: true }
   }, [sync, away, setEstate, setAway, showToast])
 
+  /**
+   * Start from scratch — a genuinely new app, minus the look.
+   *
+   * Same order as the reset above: the shared copy first, so a refusal costs
+   * nothing. Everything after that is one emptied store per provider, and the
+   * emptied `custom` travels the ordinary last-write-wins settings path to the
+   * other phone.
+   */
+  const handleScratch = useCallback(async () => {
+    const shared = await sync.resetShared()
+    if (!shared.ok) return shared
+
+    const fresh = emptyHouse()
+    setLog(fresh.log)
+    setEstate(fresh.estate)
+    setAway(fresh.away)
+    setCustom(fresh.custom)
+    setHousehold(fresh.household)
+    setNames(fresh.names)
+    setPlaces(fresh.places)
+    setDaily(fresh.daily)
+    setNow(new Date())
+    showToast('An empty house')
+    return { ok: true }
+  }, [sync, setEstate, setAway, setCustom, setHousehold, setNames, setPlaces, setDaily, showToast])
+
   const area = useMemo(() => (areaId ? (areasById[areaId] ?? null) : null), [areaId, areasById])
 
   const handleClaim = useCallback(() => {
@@ -278,6 +304,7 @@ function AppShell() {
             onBackup={handleBackup}
             onRestore={handleRestore}
             onReset={handleReset}
+            onScratch={handleScratch}
             onToast={showToast}
             sync={sync}
           />

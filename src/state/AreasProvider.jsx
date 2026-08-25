@@ -37,6 +37,7 @@ export function AreasProvider({ children }) {
         updateArea: (areaId, patch) => setCustom((c) => customStore.updateArea(c, areaId, patch)),
         removeArea: (areaId) => setCustom((c) => customStore.removeArea(c, areaId)),
         restoreArea: (areaId) => setCustom((c) => customStore.restoreArea(c, areaId)),
+        restoreStarterRooms: () => setCustom((c) => customStore.restoreStarterRooms(c)),
 
         addTask: (areaId, task) => setCustom((c) => customStore.addTask(c, areaId, task, BUILT_IN_IDS)),
         updateTask: (taskId, patch) => setCustom((c) => customStore.updateTaskSettings(c, taskId, patch)),

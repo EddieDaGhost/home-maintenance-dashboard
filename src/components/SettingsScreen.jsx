@@ -89,12 +89,13 @@ export default function SettingsScreen({
   onBackup,
   onRestore,
   onReset,
+  onScratch,
   onToast,
   sync,
 }) {
   const { theme, copy } = useTheme()
   const { nameFor } = useNames()
-  const { hiddenAreas, restoreArea } = useAreas()
+  const { custom, hiddenAreas, restoreArea, restoreStarterRooms } = useAreas()
   const { activePerson, isShared } = usePeople()
   const { hasFreshStart, freshStartLabel } = useAway()
   const { places } = usePlaces()
@@ -159,6 +160,16 @@ export default function SettingsScreen({
             ))}
           </div>
         ) : null}
+        {/* Only offered once the starter home has been dismissed wholesale —
+            see the note on `fromScratch` in src/lib/custom.js. */}
+        {custom.fromScratch ? (
+          <SettingsRow
+            icon={RotateCcw}
+            label="Bring back the starter rooms"
+            detail="The seven the app came with"
+            onClick={restoreStarterRooms}
+          />
+        ) : null}
         <SettingsRow icon={Nfc} label="NFC tags" onClick={() => setTagsOpen(true)} />
       </Group>
 
@@ -220,8 +231,8 @@ export default function SettingsScreen({
             --alert-*. CLAUDE.md reserves those colours for exactly this. */}
         <SettingsRow
           icon={Eraser}
-          label="Start over"
-          detail="Clear every log and purchase"
+          label="Start again…"
+          detail="Clear the scoreboard, or empty the house"
           tone="var(--alert-ink)"
           onClick={() => setResetOpen(true)}
         />
@@ -264,6 +275,7 @@ export default function SettingsScreen({
         onClose={() => setResetOpen(false)}
         log={log}
         onReset={onReset}
+        onScratch={onScratch}
         onBackup={onBackup}
         sharing={sync?.isSharing}
       />

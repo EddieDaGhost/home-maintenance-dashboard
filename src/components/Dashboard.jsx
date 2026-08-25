@@ -148,7 +148,7 @@ export default function Dashboard({
 }) {
   const { themeId, theme, copy } = useTheme()
   const { nameFor, subtitleFor } = useNames()
-  const { areas, allTasks } = useAreas()
+  const { areas, allTasks, custom, restoreStarterRooms } = useAreas()
   const { activePerson, activeId, people, isShared } = usePeople()
   const { entry } = useEstate()
   const { away, isAway, untilLabel, endNow } = useAway()
@@ -337,7 +337,11 @@ export default function Dashboard({
           ) : null}
         </h2>
 
-        {shortlist.length === 0 ? (
+        {/* With no rooms at all there is nothing to be all-clear about — "the
+            house is handled" would be a strange thing to say to somebody who
+            hasn't built one yet. The empty-house block below says the useful
+            thing instead. */}
+        {areas.length === 0 ? null : shortlist.length === 0 ? (
           <div
             className="panel p-5 text-center"
             style={{ '--surface': 'var(--good-soft)', '--line': 'var(--good-line)' }}
@@ -386,7 +390,40 @@ export default function Dashboard({
             />
           ))}
 
-          {readOnly ? null : (
+          {/* An empty house is somebody's first minute in the app, not an
+              error — so it offers the two ways to fill it rather than a lone
+              dashed button. */}
+          {!readOnly && areas.length === 0 ? (
+            <div className="panel space-y-3 p-5 text-center">
+              <p className="font-semibold" style={{ color: 'var(--ink)' }}>
+                An empty house
+              </p>
+              <p className="text-sm leading-relaxed" style={{ color: 'var(--ink-2)' }}>
+                Build the list however suits you — paste one in all at once, or add a room at a
+                time.
+              </p>
+              <button type="button" onClick={onOpenSettings} className="btn-primary h-12 w-full text-sm">
+                Import a list
+              </button>
+              <button
+                type="button"
+                onClick={() => setAddRoomOpen(true)}
+                className="btn-secondary h-11 w-full text-sm"
+              >
+                Add a room
+              </button>
+              {custom.fromScratch ? (
+                <button
+                  type="button"
+                  onClick={restoreStarterRooms}
+                  className="text-xs font-semibold underline"
+                  style={{ color: 'var(--ink-3)' }}
+                >
+                  Bring back the starter rooms
+                </button>
+              ) : null}
+            </div>
+          ) : readOnly ? null : (
             <button
               type="button"
               onClick={() => setAddRoomOpen(true)}
