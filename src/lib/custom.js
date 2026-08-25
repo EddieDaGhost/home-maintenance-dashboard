@@ -7,7 +7,23 @@
 
 const STORAGE_KEY = 'home-maintenance-dashboard/custom/v1'
 
-export const emptyCustom = { areas: [], tasks: {}, hidden: [], appearance: {}, taskSettings: {} }
+export const emptyCustom = {
+  areas: [],
+  tasks: {},
+  hidden: [],
+  appearance: {},
+  taskSettings: {},
+  /**
+   * The house was emptied on purpose — see emptyHouse() in src/lib/reset.js.
+   *
+   * Deliberately *not* seven entries in `hidden`. Hiding a room one at a time
+   * means "I might want this back", and the settings screen offers every hidden
+   * room back by name. Dismissing the starter home wholesale means the opposite,
+   * and a brand-new user landing on a list of seven rooms asking to return is
+   * the exact wall this exists to avoid. One flag, one way back.
+   */
+  fromScratch: false,
+}
 
 /** What you're allowed to change about a task after it exists. */
 const SETTABLE = ['points', 'repeatable', 'schedule', 'assignee']
@@ -76,6 +92,7 @@ export function normalizeCustom(data) {
     areas,
     tasks,
     hidden: Array.isArray(data.hidden) ? data.hidden.filter((id) => typeof id === 'string') : [],
+    fromScratch: data.fromScratch === true,
     appearance: data.appearance && typeof data.appearance === 'object' ? data.appearance : {},
     taskSettings,
   }
@@ -87,7 +104,10 @@ function isEmptyCustom(custom) {
     custom.hidden.length === 0 &&
     Object.keys(custom.tasks).length === 0 &&
     Object.keys(custom.appearance).length === 0 &&
-    Object.keys(custom.taskSettings ?? {}).length === 0
+    Object.keys(custom.taskSettings ?? {}).length === 0 &&
+    // Without this the emptied house looks like a fresh install, saveCustom()
+    // removes the key, and all seven starter rooms come back on the next load.
+    !custom.fromScratch
   )
 }
 
@@ -214,4 +234,14 @@ export function restoreTask(custom, taskId) {
 
 export function isHidden(custom, id) {
   return custom.hidden.includes(id)
+}
+
+/** Put the starter rooms away wholesale. Everything you added is untouched. */
+export function startFromScratch(custom) {
+  return normalizeCustom({ ...custom, fromScratch: true })
+}
+
+/** Bring the starter home back, exactly as it shipped. */
+export function restoreStarterRooms(custom) {
+  return normalizeCustom({ ...custom, fromScratch: false })
 }

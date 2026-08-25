@@ -1,6 +1,8 @@
 // The visitor buffer: a device nobody has set up gets an explanation rather
 // than somebody else's chore list.
 
+import { openSettings } from './harness.mjs'
+
 export default async function run({ page, check, errors, URL }) {
   // ---- a brand-new device ----
   await page.goto(URL, { waitUntil: 'networkidle' })
@@ -74,9 +76,12 @@ export default async function run({ page, check, errors, URL }) {
 
   await page.goto(URL, { waitUntil: 'networkidle' })
   check('the dashboard is back', (await page.getByText('Day streak').count()) === 1)
-  check('setup is available to the owner', (await page.getByRole('button', { name: /Back up my data/ }).count()) === 1)
-  check('the owner can re-read the overview', (await page.getByRole('button', { name: /What this app is/ }).count()) === 1)
+  // Setup moved to its own screen; the dashboard keeps a way in.
+  check('setup is available to the owner', (await page.getByRole('button', { name: /^(Settings|Systems)\b/ }).count()) === 1)
 
+  await openSettings(page)
+  check('and holds the things a visitor never sees', (await page.getByRole('button', { name: /Back up my data/ }).count()) === 1)
+  check('the owner can re-read the overview', (await page.getByRole('button', { name: /What this app is/ }).count()) === 1)
   await page.getByRole('button', { name: /What this app is/ }).click()
   await page.waitForTimeout(300)
   check('the about sheet shows the visitor copy', (await page.getByRole('dialog', { name: 'What this app is' }).getByText('Tap a sticker').count()) === 1)

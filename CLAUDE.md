@@ -125,6 +125,9 @@ src/
 ├── state/           React context providers (Names, Areas, People, Estate, Away)
 ├── theme/           ThemeProvider
 ├── components/      All UI
+│   │                Screens: Dashboard, AreaView, TodayScreen, EstateScreen,
+│   │                SettingsScreen — switched by a flag in App.jsx, never a
+│   │                URL hash (hashes are NFC area ids)
 │   └── scenes/      The credits scene, one per look, sharing parts.jsx
 └── index.css        Every color in the app, as CSS variables per theme
 ```
@@ -204,7 +207,7 @@ and no horizontal overflow — the tests assert that last one.
 ## Testing
 
 ```bash
-npm run check              # everything: 878 checks
+npm run check              # everything: 920 checks
 npm run check -- logic     # just the fast pure-logic suite (no browser)
 ```
 
@@ -408,6 +411,19 @@ a room keeps its history, ending a trip early trims it, a fresh start logs
 nothing and deletes nothing. **This is the only thing that takes something
 away**, so:
 
+- **Two levels, chosen in one sheet.** *Clear the scoreboard* is the reset
+  below. *Empty the house* is `emptyHouse()`: everything the reset clears plus
+  every room and task, the roster, the names, your town and today's list — a
+  genuinely new app. The only thing kept is the look, which is a preference
+  rather than data.
+- **An emptied house is a flag, not seven hides.** `custom.fromScratch` makes
+  `composeAreas()` skip the built-ins entirely. Hiding them one at a time would
+  be wrong on its own terms — a hidden room is offered back *by name*, and
+  somebody starting over would land on a list of seven rooms asking to return,
+  which is the exact wall the feature exists to avoid. One flag, one way back.
+  **`isEmptyCustom()` has to count that flag**: without it an emptied house
+  looks like a fresh install, `saveCustom()` drops the key, and all seven come
+  back on the next load.
 - **It clears what you did, keeps what you set up.** Completions and the estate
   go; `custom` is not even read by `hardReset()`, which is the cheapest possible
   guarantee that an added room or an edited task survives. Trips stay — they're

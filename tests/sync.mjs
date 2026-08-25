@@ -5,7 +5,7 @@
 // on the other, including work done with the network off.
 
 import { startFakeSupabase } from './fake-supabase.mjs'
-import { newPhonePage } from './harness.mjs'
+import { newPhonePage, openSettings } from './harness.mjs'
 
 const ENDPOINT_KEY = 'home-maintenance-dashboard/sync-endpoint'
 const LOG_KEY = 'home-maintenance-dashboard/v1'
@@ -46,6 +46,7 @@ export default async function run({ browser, check, URL }) {
 
     // ---- A turns sharing on ----
     await a.page.goto(URL, { waitUntil: 'networkidle' })
+    await openSettings(a.page)
     await a.page.getByRole('button', { name: /Share with another device/ }).click()
     await a.page.waitForTimeout(300)
     const shareSheet = a.page.getByRole('dialog', { name: 'Share with another device' })
@@ -111,6 +112,7 @@ export default async function run({ browser, check, URL }) {
 
     // ---- syncing repeatedly must not duplicate anything ----
     await a.page.goto(URL, { waitUntil: 'networkidle' })
+    await openSettings(a.page)
     await a.page.getByRole('button', { name: /Shared with your household/ }).click()
     await a.page.waitForTimeout(300)
     const sheet = a.page.getByRole('dialog', { name: 'Share with another device' })
@@ -208,9 +210,12 @@ export default async function run({ browser, check, URL }) {
     check('the household holds the history', serverRows() > 0, `${serverRows()} rows`)
 
     await a.page.goto(URL, { waitUntil: 'networkidle' })
-    await a.page.getByRole('button', { name: /^Start over/ }).click()
+    await openSettings(a.page)
+    await a.page.getByRole('button', { name: /^Start again/ }).click()
     await a.page.waitForTimeout(400)
-    const resetSheet = a.page.getByRole('dialog', { name: 'Start over' })
+    const resetSheet = a.page.getByRole('dialog', { name: 'Start again' })
+    await resetSheet.getByRole('button', { name: /^Clear the scoreboard/ }).click()
+    await a.page.waitForTimeout(250)
     check('it says the shared copy goes too', (await resetSheet.getByText(/clears the household/).count()) === 1)
     check('and it does not offer the button straight away', (await resetSheet.getByRole('button', { name: /^Yes — clear/ }).count()) === 0)
 

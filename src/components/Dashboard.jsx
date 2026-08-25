@@ -1,26 +1,16 @@
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import {
-  CalendarPlus,
   ChevronRight,
   CloudSun,
   Coins,
-  Download,
-  Eraser,
   Flame,
-  Flower2,
   History,
   Info,
-  Link2,
-  ListPlus,
-  Nfc,
   PartyPopper,
   PlaneTakeoff,
   Plus,
-  RotateCcw,
-  Sunrise,
+  Settings2,
   Trophy,
-  Upload,
-  Users,
 } from 'lucide-react'
 import { areaStyle, paletteFor } from '../config/areas.js'
 import {
@@ -44,18 +34,12 @@ import { openItems } from '../lib/daily.js'
 import { mineOf } from '../lib/turns.js'
 import ProgressBar from './ProgressBar.jsx'
 import TaskCard from './TaskCard.jsx'
+import EditAreaSheet from './EditAreaSheet.jsx'
 import ThemePicker from './ThemePicker.jsx'
 import AboutSheet from './AboutSheet.jsx'
-import ShareSheet from './ShareSheet.jsx'
-import TagSetup from './TagSetup.jsx'
-import EditAreaSheet from './EditAreaSheet.jsx'
 import HistorySheet from './HistorySheet.jsx'
 import HouseholdSheet, { PersonAvatar } from './HouseholdSheet.jsx'
 import AwaySheet from './AwaySheet.jsx'
-import FreshStartSheet from './FreshStartSheet.jsx'
-import PlaceSheet from './PlaceSheet.jsx'
-import ResetSheet from './ResetSheet.jsx'
-import ImportSheet from './ImportSheet.jsx'
 
 function greeting(now) {
   const hour = now.getHours()
@@ -156,38 +140,32 @@ export default function Dashboard({
   onLog,
   onUndo,
   onOpenArea,
-  onExport,
-  onBackup,
-  onRestore,
   onOpenEstate,
   onOpenToday,
-  onReset,
-  onToast,
+  onOpenSettings,
   sync,
   readOnly = false,
 }) {
   const { themeId, theme, copy } = useTheme()
   const { nameFor, subtitleFor } = useNames()
-  const { areas, allTasks, hiddenAreas, restoreArea } = useAreas()
+  const { areas, allTasks, custom, restoreStarterRooms } = useAreas()
   const { activePerson, activeId, people, isShared } = usePeople()
   const { entry } = useEstate()
-  const { away, isAway, untilLabel, endNow, hasFreshStart, freshStartLabel } = useAway()
+  const { away, isAway, untilLabel, endNow } = useAway()
   const { places, daily } = usePlaces()
 
-  const [pickerOpen, setPickerOpen] = useState(false)
-  const [tagsOpen, setTagsOpen] = useState(false)
   const [addRoomOpen, setAddRoomOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
-  const [householdOpen, setHouseholdOpen] = useState(false)
+  // Kept here only for the read-only preview's "What is this?" button; an
+  // owner reaches the same sheet from the settings screen.
   const [aboutOpen, setAboutOpen] = useState(false)
+  // The look chip in the header is one tap from anywhere, which is the point of
+  // it — settings has the same picker for people who go looking there. Same for
+  // the avatar: you switch who's logging on the way to logging something.
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [householdOpen, setHouseholdOpen] = useState(false)
   const [awayOpen, setAwayOpen] = useState(false)
-  const [freshOpen, setFreshOpen] = useState(false)
-  const [shareOpen, setShareOpen] = useState(false)
-  const [placeOpen, setPlaceOpen] = useState(false)
   const [mineOnly, setMineOnly] = useState(false)
-  const [resetOpen, setResetOpen] = useState(false)
-  const [importOpen, setImportOpen] = useState(false)
-  const fileInput = useRef(null)
 
   const streak = currentStreak(log, now, allTasks, away)
   const points = weeklyPoints(log, now, allTasks)
@@ -198,6 +176,7 @@ export default function Dashboard({
   // unassigned chore is everybody's to worry about, not nobody's.
   const attention = mineOnly ? mineOf(everything, log, people, activeId) : everything
   const credits = creditsBalance(log, allTasks, activeId, people, entry)
+  const ThemeIcon = theme.icon
   const travelling = isAway(now)
   const shortlist = attention.slice(0, 5)
   // Read straight from the cache — the dashboard never fetches. Whatever the
@@ -208,7 +187,6 @@ export default function Dashboard({
   const cached = loadReading(places.home)
   const reading = cached && !isStale(cached, now.getTime()) ? cached : null
   const onThePlate = attention.length + openItems(daily).length
-  const ThemeIcon = theme.icon
 
   return (
     <div className="space-y-6 pb-10">
@@ -359,7 +337,11 @@ export default function Dashboard({
           ) : null}
         </h2>
 
-        {shortlist.length === 0 ? (
+        {/* With no rooms at all there is nothing to be all-clear about — "the
+            house is handled" would be a strange thing to say to somebody who
+            hasn't built one yet. The empty-house block below says the useful
+            thing instead. */}
+        {areas.length === 0 ? null : shortlist.length === 0 ? (
           <div
             className="panel p-5 text-center"
             style={{ '--surface': 'var(--good-soft)', '--line': 'var(--good-line)' }}
@@ -408,7 +390,40 @@ export default function Dashboard({
             />
           ))}
 
-          {readOnly ? null : (
+          {/* An empty house is somebody's first minute in the app, not an
+              error — so it offers the two ways to fill it rather than a lone
+              dashed button. */}
+          {!readOnly && areas.length === 0 ? (
+            <div className="panel space-y-3 p-5 text-center">
+              <p className="font-semibold" style={{ color: 'var(--ink)' }}>
+                An empty house
+              </p>
+              <p className="text-sm leading-relaxed" style={{ color: 'var(--ink-2)' }}>
+                Build the list however suits you — paste one in all at once, or add a room at a
+                time.
+              </p>
+              <button type="button" onClick={onOpenSettings} className="btn-primary h-12 w-full text-sm">
+                Import a list
+              </button>
+              <button
+                type="button"
+                onClick={() => setAddRoomOpen(true)}
+                className="btn-secondary h-11 w-full text-sm"
+              >
+                Add a room
+              </button>
+              {custom.fromScratch ? (
+                <button
+                  type="button"
+                  onClick={restoreStarterRooms}
+                  className="text-xs font-semibold underline"
+                  style={{ color: 'var(--ink-3)' }}
+                >
+                  Bring back the starter rooms
+                </button>
+              ) : null}
+            </div>
+          ) : readOnly ? null : (
             <button
               type="button"
               onClick={() => setAddRoomOpen(true)}
@@ -420,28 +435,6 @@ export default function Dashboard({
             </button>
           )}
 
-          {!readOnly && hiddenAreas.length > 0 ? (
-            <div className="panel p-3">
-              <p className="label mb-2">Put away</p>
-              <div className="space-y-1.5">
-                {hiddenAreas.map((area) => (
-                  <div key={area.id} className="flex items-center gap-2">
-                    <span className="min-w-0 flex-1 truncate text-sm" style={{ color: 'var(--ink-2)' }}>
-                      {nameFor(area)}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => restoreArea(area.id)}
-                      className="btn-secondary flex h-8 items-center gap-1.5 px-2.5 text-xs"
-                    >
-                      <RotateCcw className="h-3.5 w-3.5" />
-                      Bring back
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
         </div>
       </section>
 
@@ -460,6 +453,8 @@ export default function Dashboard({
       ) : (
       <section>
         <h2 className="section-title mb-2.5 px-1">Setup</h2>
+        {/* Three rows, not fifteen. Everything you set up once and leave alone
+            moved to its own screen — see src/components/SettingsScreen.jsx. */}
         <div className="panel settings-list overflow-hidden">
           <SettingsRow
             icon={History}
@@ -468,153 +463,31 @@ export default function Dashboard({
             onClick={() => setHistoryOpen(true)}
           />
           <SettingsRow
-            icon={ListPlus}
-            label="Import a list"
-            detail="Paste a whole house in at once"
-            onClick={() => setImportOpen(true)}
-          />
-          <SettingsRow
-            icon={CloudSun}
-            label="Weather and the drive"
-            detail={
-              places.home
-                ? places.work
-                  ? `${places.home.label}, and the run to work`
-                  : places.home.label
-                : 'Add your town and where you work'
-            }
-            onClick={() => setPlaceOpen(true)}
-          />
-          <SettingsRow
-            icon={Flower2}
-            label={copy.estateNav}
-            detail={copy.estateNavDetail}
-            onClick={onOpenEstate}
-          />
-          <SettingsRow
-            icon={Users}
-            label="Who's logging"
-            detail={isShared ? `Currently ${activePerson.name}` : 'Add the rest of the household'}
-            onClick={() => setHouseholdOpen(true)}
-          />
-          <SettingsRow
-            icon={Link2}
-            label={sync?.isSharing ? 'Shared with your household' : 'Share with another device'}
-            detail={
-              sync?.isSharing
-                ? sync.status.state === 'error'
-                  ? "Sharing on — couldn't reach the server"
-                  : 'Everyone sees the same history'
-                : 'One household across two phones'
-            }
-            onClick={() => setShareOpen(true)}
-          />
-          <SettingsRow
-            icon={Sunrise}
-            label="Start fresh"
-            detail={
-              hasFreshStart()
-                ? `Clean slate since ${freshStartLabel()}`
-                : 'Draw a line under a backlog you\'d rather not look at'
-            }
-            onClick={() => setFreshOpen(true)}
-          />
-          <SettingsRow
             icon={PlaneTakeoff}
             label="Away"
             detail={travelling ? untilLabel(now) : 'Pause everything while you travel'}
             onClick={() => setAwayOpen(true)}
           />
           <SettingsRow
-            icon={Nfc}
-            label="NFC tag setup"
-            detail="What to write on each tag"
-            onClick={() => setTagsOpen(true)}
-          />
-          <SettingsRow
-            icon={Info}
-            label="What this app is"
-            detail="The overview a visitor sees"
-            onClick={() => setAboutOpen(true)}
-          />
-          <SettingsRow
-            icon={CalendarPlus}
-            label={copy.exportLabel}
-            detail="Re-export any time — events update in place"
-            onClick={onExport}
-          />
-          <SettingsRow
-            icon={ThemeIcon}
-            label={`Look: ${theme.name}`}
-            detail={theme.tagline}
-            onClick={() => setPickerOpen(true)}
-          />
-          <SettingsRow
-            icon={Download}
-            label="Back up my data"
-            detail="Saves a file you can restore from"
-            onClick={onBackup}
-          />
-          <SettingsRow
-            icon={Upload}
-            label="Restore from a backup"
-            detail="Replaces what's on this device"
-            onClick={() => fileInput.current?.click()}
-          />
-          {/* Last in the list on purpose: it's the only one that takes
-              something away, and the only one worded in --alert-*. */}
-          <SettingsRow
-            icon={Eraser}
-            label="Start over"
-            detail="Clear every log and purchase — your rooms and tasks stay"
-            onClick={() => setResetOpen(true)}
+            icon={Settings2}
+            label={copy.settingsNav}
+            detail="Sharing, looks, backups and more"
+            onClick={onOpenSettings}
           />
         </div>
-
-        <input
-          ref={fileInput}
-          type="file"
-          accept="application/json,.json"
-          className="hidden"
-          aria-label="Choose a backup file"
-          onChange={(event) => {
-            const file = event.target.files?.[0]
-            if (file) onRestore(file)
-            // Clear it so choosing the same file twice still fires.
-            event.target.value = ''
-          }}
-        />
-
-        <p className="mt-3 px-1 text-xs leading-relaxed" style={{ color: 'var(--ink-3)' }}>
-          Your history lives only in this browser. Backing up now and then is the only way to
-          survive clearing your Safari data or moving to a new phone.
-        </p>
       </section>
       )}
 
       <ThemePicker open={pickerOpen} onClose={() => setPickerOpen(false)} />
-      <AboutSheet open={aboutOpen} onClose={() => setAboutOpen(false)} />
-      <AwaySheet open={awayOpen} onClose={() => setAwayOpen(false)} now={now} />
-      <PlaceSheet open={placeOpen} onClose={() => setPlaceOpen(false)} />
-      <ImportSheet open={importOpen} onClose={() => setImportOpen(false)} onToast={onToast} />
-      <ResetSheet
-        open={resetOpen}
-        onClose={() => setResetOpen(false)}
-        log={log}
-        onReset={onReset}
-        onBackup={onBackup}
-        sharing={sync.isSharing}
-      />
-      <FreshStartSheet open={freshOpen} onClose={() => setFreshOpen(false)} now={now} />
-      {sync ? <ShareSheet open={shareOpen} onClose={() => setShareOpen(false)} sync={sync} /> : null}
-      <TagSetup open={tagsOpen} onClose={() => setTagsOpen(false)} />
-      <HistorySheet open={historyOpen} onClose={() => setHistoryOpen(false)} log={log} now={now} />
       <HouseholdSheet
         open={householdOpen}
         onClose={() => setHouseholdOpen(false)}
         log={log}
         now={now}
       />
+      <AboutSheet open={aboutOpen} onClose={() => setAboutOpen(false)} />
+      <AwaySheet open={awayOpen} onClose={() => setAwayOpen(false)} now={now} />
+      <HistorySheet open={historyOpen} onClose={() => setHistoryOpen(false)} log={log} now={now} />
       <EditAreaSheet
         mode="create"
         area={null}

@@ -9,7 +9,7 @@ import { EstateProvider, useEstate } from './state/EstateProvider.jsx'
 import { AwayProvider, useAway } from './state/AwayProvider.jsx'
 import { PlacesProvider, usePlaces } from './state/PlacesProvider.jsx'
 import { downloadBackup, parseBackup } from './lib/backup.js'
-import { hardReset } from './lib/reset.js'
+import { emptyHouse, hardReset } from './lib/reset.js'
 import { claimDevice, loadDevice, looksSetUp } from './lib/device.js'
 import { parseJoinHash } from './lib/sync.js'
 import { useSync } from './state/useSync.js'
@@ -17,6 +17,7 @@ import Welcome from './components/Welcome.jsx'
 import Dashboard from './components/Dashboard.jsx'
 import AreaView from './components/AreaView.jsx'
 import EstateScreen from './components/EstateScreen.jsx'
+import SettingsScreen from './components/SettingsScreen.jsx'
 import TodayScreen from './components/TodayScreen.jsx'
 import SpaceBackdrop from './components/SpaceBackdrop.jsx'
 
@@ -56,6 +57,7 @@ function AppShell() {
   // Not a URL hash: hashes are NFC area ids, and #join= is already taken.
   const [estateOpen, setEstateOpen] = useState(false)
   const [todayOpen, setTodayOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [areaId, setAreaId] = useState(hashAreaId)
   const [now, setNow] = useState(() => new Date())
   const [toast, setToast] = useState(null)
@@ -153,6 +155,7 @@ function AppShell() {
     // from that room lands on the dashboard rather than somewhere unexpected.
     setEstateOpen(false)
     setTodayOpen(false)
+    setSettingsOpen(false)
     window.scrollTo({ top: 0 })
   }, [])
 
@@ -221,6 +224,32 @@ function AppShell() {
     return { ok: true }
   }, [sync, away, setEstate, setAway, showToast])
 
+  /**
+   * Start from scratch — a genuinely new app, minus the look.
+   *
+   * Same order as the reset above: the shared copy first, so a refusal costs
+   * nothing. Everything after that is one emptied store per provider, and the
+   * emptied `custom` travels the ordinary last-write-wins settings path to the
+   * other phone.
+   */
+  const handleScratch = useCallback(async () => {
+    const shared = await sync.resetShared()
+    if (!shared.ok) return shared
+
+    const fresh = emptyHouse()
+    setLog(fresh.log)
+    setEstate(fresh.estate)
+    setAway(fresh.away)
+    setCustom(fresh.custom)
+    setHousehold(fresh.household)
+    setNames(fresh.names)
+    setPlaces(fresh.places)
+    setDaily(fresh.daily)
+    setNow(new Date())
+    showToast('An empty house')
+    return { ok: true }
+  }, [sync, setEstate, setAway, setCustom, setHousehold, setNames, setPlaces, setDaily, showToast])
+
   const area = useMemo(() => (areaId ? (areasById[areaId] ?? null) : null), [areaId, areasById])
 
   const handleClaim = useCallback(() => {
@@ -266,7 +295,20 @@ function AppShell() {
           </div>
         ) : null}
 
-        {todayOpen && !area ? (
+        {settingsOpen && !area ? (
+          <SettingsScreen
+            log={log}
+            now={now}
+            onBack={() => setSettingsOpen(false)}
+            onExport={handleExport}
+            onBackup={handleBackup}
+            onRestore={handleRestore}
+            onReset={handleReset}
+            onScratch={handleScratch}
+            onToast={showToast}
+            sync={sync}
+          />
+        ) : todayOpen && !area ? (
           <TodayScreen
             log={log}
             now={now}
@@ -300,17 +342,16 @@ function AppShell() {
             onLog={handleLog}
             onUndo={handleUndo}
             onOpenArea={goToArea}
-            onExport={handleExport}
-            onBackup={handleBackup}
-            onRestore={handleRestore}
             onOpenEstate={() => {
               setEstateOpen(true)
               window.scrollTo({ top: 0 })
             }}
-            onReset={handleReset}
-            onToast={showToast}
             onOpenToday={() => {
               setTodayOpen(true)
+              window.scrollTo({ top: 0 })
+            }}
+            onOpenSettings={() => {
+              setSettingsOpen(true)
               window.scrollTo({ top: 0 })
             }}
             sync={sync}

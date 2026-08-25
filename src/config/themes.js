@@ -60,6 +60,8 @@ export const THEMES = {
       todayListTitle: 'On the plate',
       todayEmpty: 'Nothing on the plate',
       todayDoneTitle: 'Ticked off',
+      settingsNav: 'Settings',
+      settingsTitle: 'Settings',
 
       // --- the credits screen ---
       estateNav: 'Your windowsill',
@@ -121,6 +123,8 @@ export const THEMES = {
       todayListTitle: 'The queue',
       todayEmpty: 'The queue is empty',
       todayDoneTitle: 'Cleared',
+      settingsNav: 'Systems',
+      settingsTitle: 'Systems',
 
       estateNav: 'Your ship',
       estateNavDetail: 'Spend credits on the hull',
@@ -178,6 +182,8 @@ export const THEMES = {
       todayListTitle: 'Wants doing',
       todayEmpty: 'Nothing wants doing',
       todayDoneTitle: 'Ticked off',
+      settingsNav: 'Settings',
+      settingsTitle: 'Settings',
 
       estateNav: 'Your cats',
       estateNavDetail: 'Spend credits on the cats',

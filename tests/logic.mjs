@@ -88,10 +88,12 @@ import {
   emptyCustom,
   normalizeCustom,
   resetTaskSettings,
+  restoreStarterRooms,
+  startFromScratch,
   updateTaskSettings,
 } from '../src/lib/custom.js'
 import { composeAreas } from '../src/lib/compose.js'
-import { hardReset, resetSummary } from '../src/lib/reset.js'
+import { emptyHouse, hardReset, resetSummary, scratchSummary } from '../src/lib/reset.js'
 import { applyImport, parseImport, parseSchedule } from '../src/lib/importTasks.js'
 import { mergeCompletions } from '../src/lib/sync.js'
 import { ROTATE, isTurnOf, lastLoggedBy, mineOf, turnLabel, whoseTurn } from '../src/lib/turns.js'
@@ -687,6 +689,45 @@ export default async function run({ check }) {
   is('and what was bought', cost.bought, 1)
   is('and what it cost', cost.spent, fern.cost)
   is('an untouched app has nothing to clear', resetSummary({ completions: {} }, {}).logged, 0)
+
+  // --- starting from scratch: an empty house ---
+  //
+  // Deliberately a flag rather than seven entries in `hidden`: a hidden room is
+  // offered back by name, and somebody starting over should not land on a list
+  // of seven rooms asking to return. That wall is the thing this avoids.
+  const scratched = startFromScratch(emptyCustom)
+  is('the starter rooms are all gone', composeAreas(scratched).length, 0)
+  is('and none of them is listed as put away', scratched.hidden.length, 0)
+  is('a room you add afterwards is still yours', composeAreas({ ...scratched, areas: [{ id: 'garage', name: 'Garage' }] }).length, 1)
+  is('bringing them back brings all seven', composeAreas(restoreStarterRooms(scratched)).length, 7)
+  is('with their tasks intact', composeAreas(restoreStarterRooms(scratched)).flatMap((a) => a.tasks).length, 18)
+  is('the flag survives being written out', normalizeCustom(scratched).fromScratch, true)
+  is('and junk in that slot is not a flag', normalizeCustom({ fromScratch: 'yes' }).fromScratch, false)
+
+  // The regression that would silently undo the whole feature: an emptied house
+  // looks like a fresh install, so saveCustom() would drop the key and every
+  // starter room would come back on the next load.
+  is('an emptied house is not an empty store', JSON.stringify(scratched) === JSON.stringify(emptyCustom), false)
+
+  const empty = emptyHouse()
+  is('emptying takes the rooms', composeAreas(empty.custom).length, 0)
+  is('and every completion', Object.keys(empty.log.completions).length, 0)
+  is('and everything bought', Object.keys(empty.estate).length, 0)
+  is('and the roster goes back to one', empty.household.people.length, 1)
+  is('and the renames', Object.keys(empty.names).length, 0)
+  is('and your town', empty.places.home, null)
+  is("and today's list", empty.daily.items.length, 0)
+  is('and the trips', empty.away.windows.length, 0)
+  // The look is a preference, not data — it is not among the things this touches.
+  is('but it never touches the look', 'theme' in empty, false)
+
+  const scratchCost = scratchSummary(composeAreas(emptyCustom))
+  is('the confirmation counts the rooms', scratchCost.rooms, 7)
+  is('and the tasks in them', scratchCost.tasks, 18)
+  // It counts tasks that exist; resetSummary counts tasks with history. Merging
+  // the two gave the confirmation the wrong number, so they stay separate.
+  is('which is a different number from the one a reset states', scratchCost.tasks === resetSummary(busyLog, spentEstate).tasks, false)
+  is('an already-empty house counts nothing', scratchSummary([]).rooms, 0)
 
   // A reset has to survive the other phone, which still holds all of it and
   // would otherwise push it back — merging is a union in every other case.

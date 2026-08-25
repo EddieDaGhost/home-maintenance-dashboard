@@ -93,3 +93,18 @@ export async function newPhonePage(browser, { virgin = false, ...options } = {})
   page.on('dialog', (dialog) => dialog.accept())
   return { context, page, errors }
 }
+
+/**
+ * Everything you set up once and then leave alone lives on its own screen. The
+ * dashboard keeps History, Away and a way in here — so a suite that reaches a
+ * setting goes through this rather than each one knowing the dashboard's shape.
+ *
+ * The row is named by the theme (`settingsNav`), hence the alternation.
+ */
+export async function openSettings(page) {
+  // Idempotent, so a suite can call it before each setting it touches without
+  // tracking whether it is already there.
+  if ((await page.getByRole('heading', { name: /^(Settings|Systems)$/ }).count()) > 0) return
+  await page.getByRole('button', { name: /^(Settings|Systems)\b/ }).first().click()
+  await page.waitForTimeout(350)
+}

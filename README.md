@@ -68,7 +68,7 @@ Other commands:
 ```bash
 npm run build     # build the production version into dist/
 npm run preview   # preview that production build locally
-npm run check     # run the tests (878 checks)
+npm run check     # run the tests (920 checks)
 ```
 
 `npm run check` drives a real browser through the app — logging, persistence,
@@ -352,7 +352,9 @@ change. Nothing is written until you tap the button.
 
 ## Starting over
 
-**Setup → Start over.** Puts the scoreboard back to zero: every logged
+**Settings → Start again.** Two ways to begin again, and it asks which:
+
+**Clear the scoreboard** puts the numbers back to zero: every logged
 completion, every purchase, your streak, your points and your credit balance.
 
 What it does **not** touch is everything you set up — every room and task you
@@ -360,8 +362,15 @@ added, every task you edited (points, schedule, repeat, whose job it is), your
 household, your names, your town and your trips. You're not rebuilding the app,
 you're clearing the score.
 
-It states the exact number of entries and purchases before you commit, offers a
-backup first, and needs two taps. It cannot be undone.
+**Empty the house** does all of that *and* deletes every room and task — the
+seven the app came with and every one you've added — along with your household,
+your names and your town. You land on an empty list with two ways to fill it:
+paste a whole list in at once, or add rooms one at a time. The only thing kept
+is the look you chose. If you change your mind, the starter rooms can be brought
+back from Settings.
+
+Either way it states the exact numbers before you commit, offers a backup first,
+and needs two taps. It cannot be undone.
 
 If sharing is on it clears the household's shared copy too, and every phone in
 the household starts over — otherwise the other one would simply hand it all

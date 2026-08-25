@@ -23,7 +23,11 @@ export function composeAreas(custom) {
    */
   const dressed = (task, isCustom) => ({ ...task, ...(settings[task.id] ?? {}), isCustom })
 
-  const builtIns = BUILT_IN_AREAS.filter((area) => !hidden.has(area.id)).map((area) => {
+  // A house emptied on purpose has no starter rooms at all — not seven hidden
+  // ones. See the note on `fromScratch` in src/lib/custom.js.
+  const starter = custom.fromScratch ? [] : BUILT_IN_AREAS.filter((area) => !hidden.has(area.id))
+
+  const builtIns = starter.map((area) => {
     const appearance = custom.appearance[area.id] ?? {}
     return {
       ...area,

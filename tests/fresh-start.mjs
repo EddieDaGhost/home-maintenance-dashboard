@@ -4,6 +4,8 @@
 // what it has *stored*. So most of this suite is measuring things before and
 // after and insisting they didn't move.
 
+import { openSettings } from './harness.mjs'
+
 const LOG_KEY = 'home-maintenance-dashboard/v1'
 const AWAY_KEY = 'home-maintenance-dashboard/away/v1'
 const DAY = 86400000
@@ -34,6 +36,7 @@ const readAll = (page) =>
   )
 
 const openFresh = async (page) => {
+  await openSettings(page)
   await page.getByRole('button', { name: /^Start fresh/ }).click()
   await page.waitForTimeout(300)
 }
@@ -63,6 +66,8 @@ export default async function run({ page, check, errors, URL }) {
 
   await sheet.getByRole('button', { name: 'Start fresh from today' }).click()
   await page.waitForTimeout(500)
+  // The sheet closes onto the settings screen; the effect is on the dashboard.
+  await page.goto(URL, { waitUntil: 'networkidle' })
 
   // ---- what changed: only the wording ----
   check('nothing is described as past due any more', (await page.getByText(/days past due/).count()) === 0)
@@ -93,6 +98,7 @@ export default async function run({ page, check, errors, URL }) {
   check('the sheet says when the line was drawn', (await sheet.getByText(/Fresh since/).count()) === 1)
   await sheet.getByRole('button', { name: /Undo it/ }).click()
   await page.waitForTimeout(500)
+  await page.goto(URL, { waitUntil: 'networkidle' })
   check('undoing brings the honest picture back', (await page.getByText(/days past due/).count()) > 0)
   check('with the history still intact', (await readAll(page)).history === before.history)
 
@@ -100,6 +106,7 @@ export default async function run({ page, check, errors, URL }) {
   await openFresh(page)
   await sheet.getByRole('button', { name: 'Start fresh from today' }).click()
   await page.waitForTimeout(500)
+  await page.goto(URL, { waitUntil: 'networkidle' })
   await page.getByRole('button', { name: 'Log Flock check-in as done' }).click()
   await page.waitForTimeout(500)
   // Logging it hands that chore back to its own clock — the pardon only ever
