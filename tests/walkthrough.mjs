@@ -1,4 +1,6 @@
 // Core walkthrough: logging, persistence, NFC routing, calendar download
+import { openSettings } from './harness.mjs'
+
 export default async function run({ browser, page, check, errors, URL, tmp }) {
   await page.goto(URL, { waitUntil: 'networkidle' })
 
@@ -68,6 +70,7 @@ export default async function run({ browser, page, check, errors, URL, tmp }) {
   check('back button clears the hash', await page.evaluate(() => window.location.hash) === '')
 
   // --- calendar export actually downloads ---
+  await openSettings(page)
   const [download] = await Promise.all([
     page.waitForEvent('download'),
     page.getByRole('button', { name: /Export to iPhone Calendar/ }).click(),

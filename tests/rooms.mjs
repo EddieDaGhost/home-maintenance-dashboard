@@ -1,4 +1,6 @@
 // Custom rooms and tasks, people, history, and calendar re-export
+import { openSettings } from './harness.mjs'
+
 import { readFileSync, writeFileSync } from 'node:fs'
 
 export default async function run({ browser, page, check, errors, URL, tmp }) {
@@ -63,9 +65,15 @@ export default async function run({ browser, page, check, errors, URL, tmp }) {
   await page.waitForTimeout(500)
   check('hiding sends you home', (await page.getByRole('heading', { level: 1 }).innerText()) === 'Home Maintenance')
   check('room is gone from the list', (await page.getByText('Weekend reset').count()) === 0)
-  check('hidden room is offered back', (await page.getByRole('button', { name: 'Bring back' }).count()) === 1)
+  await openSettings(page)
+  check('a put-away room is offered back', (await page.getByRole('button', { name: /Rooms you've put away/ }).count()) === 1)
+  await page.getByRole('button', { name: /Rooms you've put away/ }).click()
+  await page.waitForTimeout(250)
+  check('and named when you look', (await page.getByRole('button', { name: 'Bring back' }).count()) === 1)
   await page.getByRole('button', { name: 'Bring back' }).click()
   await page.waitForTimeout(400)
+  check('the row goes once nothing is put away', (await page.getByRole('button', { name: /Rooms you've put away/ }).count()) === 0)
+  await page.goto(URL, { waitUntil: 'networkidle' })
   check('room comes back', (await page.getByText('Weekend reset').count()) === 1)
 
   // deleting a custom room removes it outright
@@ -77,6 +85,7 @@ export default async function run({ browser, page, check, errors, URL, tmp }) {
   // ==================== #3  CALENDAR RE-EXPORT ====================
   console.log('\n--- calendar re-export ---')
   await page.goto(URL, { waitUntil: 'networkidle' })
+  await openSettings(page)
   const [first] = await Promise.all([
     page.waitForEvent('download'),
     page.getByRole('button', { name: /Export to iPhone Calendar/ }).click(),
@@ -95,6 +104,7 @@ export default async function run({ browser, page, check, errors, URL, tmp }) {
   await page.waitForTimeout(500)
   check('custom room is deleted', (await page.getByText('Garage', { exact: true }).count()) === 0)
 
+  await openSettings(page)
   const [second] = await Promise.all([
     page.waitForEvent('download'),
     page.getByRole('button', { name: /Export to iPhone Calendar/ }).click(),
@@ -114,6 +124,7 @@ export default async function run({ browser, page, check, errors, URL, tmp }) {
 
   // ==================== #4  WHO DID IT ====================
   console.log('\n--- who did it ---')
+  await openSettings(page)
   await page.getByRole('button', { name: /Who's logging/ }).click()
   await page.waitForTimeout(300)
   const household = page.getByRole('dialog', { name: "Who's logging" })
@@ -128,6 +139,7 @@ export default async function run({ browser, page, check, errors, URL, tmp }) {
   await household.getByRole('button', { name: 'Done' }).click()
   await page.waitForTimeout(300)
 
+  await page.goto(URL, { waitUntil: 'networkidle' })
   check('avatar chip appears once shared', (await page.getByRole('button', { name: /Logging as Yasmine/ }).count()) === 1)
 
   await page.goto(`${URL}/#kitchen`, { waitUntil: 'networkidle' })
@@ -179,6 +191,8 @@ export default async function run({ browser, page, check, errors, URL, tmp }) {
 
   // ==================== BACKUP COVERS EVERYTHING NEW ====================
   console.log('\n--- backup covers the new data ---')
+  await openSettings(page)
+  await openSettings(page)
   const [backup] = await Promise.all([
     page.waitForEvent('download'),
     page.getByRole('button', { name: /Back up my data/ }).click(),
@@ -191,8 +205,10 @@ export default async function run({ browser, page, check, errors, URL, tmp }) {
 
   await page.evaluate(() => localStorage.clear())
   await page.reload({ waitUntil: 'networkidle' })
+  await openSettings(page)
   await page.locator('input[type="file"]').setInputFiles(`${tmp}/backup-v2.json`)
   await page.waitForTimeout(700)
+  await page.goto(URL, { waitUntil: 'networkidle' })
   check('restore brings the household back', (await page.getByRole('button', { name: /Logging as/ }).count()) === 1)
 
   // ==================== BOTH THEMES ====================

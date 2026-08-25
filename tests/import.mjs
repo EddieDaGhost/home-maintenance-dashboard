@@ -5,10 +5,13 @@
 // exactly what will happen before anything is written, and that a chore you
 // already have is updated rather than duplicated.
 
+import { openSettings } from './harness.mjs'
+
 const CUSTOM_KEY = 'home-maintenance-dashboard/custom/v1'
 const LOG_KEY = 'home-maintenance-dashboard/v1'
 
 const openImport = async (page) => {
+  await openSettings(page)
   await page.getByRole('button', { name: /^Import a list/ }).click()
   await page.waitForTimeout(350)
   return page.getByRole('dialog', { name: 'Import a list' })
@@ -81,6 +84,7 @@ export default async function run({ page, check, errors, URL }) {
   check('it says what it did', /3 added, 1 updated/.test(await page.getByRole('status').innerText()), await page.getByRole('status').innerText())
 
   // ---- the room and its tasks are real ----
+  await page.goto(URL, { waitUntil: 'networkidle' })
   check('the new room is on the dashboard', (await page.getByText('Garage').count()) > 0)
   await page.goto(`${URL}/#garage`, { waitUntil: 'networkidle' })
   check('with both its tasks', (await page.getByText('Sweep the floor').count()) > 0 && (await page.getByText('Tidy the bench').count()) > 0)

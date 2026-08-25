@@ -5,6 +5,8 @@
 // safe to offer at all: that it clears what you did and leaves what you set up,
 // and that it takes two deliberate taps to get there.
 
+import { openSettings } from './harness.mjs'
+
 const LOG_KEY = 'home-maintenance-dashboard/v1'
 const CUSTOM_KEY = 'home-maintenance-dashboard/custom/v1'
 const ESTATE_KEY = 'home-maintenance-dashboard/estate/v1'
@@ -19,6 +21,7 @@ const dayOffset = (n) => {
 }
 
 const openReset = async (page) => {
+  await openSettings(page)
   await page.getByRole('button', { name: /^Start over/ }).click()
   await page.waitForTimeout(350)
   return page.getByRole('dialog', { name: 'Start over' })
@@ -93,6 +96,7 @@ export default async function run({ page, check, errors, URL }) {
   check('backing out disarms it', (await sheet.getByRole('button', { name: /^Yes — clear/ }).count()) === 0)
   await page.keyboard.press('Escape')
   await page.waitForTimeout(300)
+  await page.goto(URL, { waitUntil: 'networkidle' })
   check('and nothing was cleared', (await streak()) !== '0', await streak())
 
   // Reopening must not land on a primed button.
@@ -106,6 +110,7 @@ export default async function run({ page, check, errors, URL }) {
   await page.waitForTimeout(700)
 
   check('it says so', (await page.getByRole('status').innerText()).includes('Back to zero'))
+  await page.goto(URL, { waitUntil: 'networkidle' })
   check('the streak is zero', (await streak()) === '0', await streak())
 
   const left = await page.evaluate((key) => {

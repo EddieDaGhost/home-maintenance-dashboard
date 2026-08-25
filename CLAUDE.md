@@ -125,6 +125,9 @@ src/
 ├── state/           React context providers (Names, Areas, People, Estate, Away)
 ├── theme/           ThemeProvider
 ├── components/      All UI
+│   │                Screens: Dashboard, AreaView, TodayScreen, EstateScreen,
+│   │                SettingsScreen — switched by a flag in App.jsx, never a
+│   │                URL hash (hashes are NFC area ids)
 │   └── scenes/      The credits scene, one per look, sharing parts.jsx
 └── index.css        Every color in the app, as CSS variables per theme
 ```
@@ -204,7 +207,7 @@ and no horizontal overflow — the tests assert that last one.
 ## Testing
 
 ```bash
-npm run check              # everything: 878 checks
+npm run check              # everything: 881 checks
 npm run check -- logic     # just the fast pure-logic suite (no browser)
 ```
 

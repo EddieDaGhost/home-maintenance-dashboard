@@ -1,4 +1,6 @@
 // Renaming, NFC tag setup, and backup/restore
+import { openSettings } from './harness.mjs'
+
 import { readFileSync, writeFileSync } from 'node:fs'
 
 export default async function run({ browser, page, check, errors, URL, tmp }) {
@@ -41,6 +43,7 @@ export default async function run({ browser, page, check, errors, URL, tmp }) {
   check('dashboard shows the custom name', (await page.getByText("Kids' Bathroom").count()) > 0)
 
   // ===================== CALENDAR USES CUSTOM NAMES =====================
+  await openSettings(page)
   const [icsDownload] = await Promise.all([
     page.waitForEvent('download'),
     page.getByRole('button', { name: /Export to iPhone Calendar/ }).click(),
@@ -52,7 +55,8 @@ export default async function run({ browser, page, check, errors, URL, tmp }) {
   check('calendar still lists every task', (ics.match(/BEGIN:VEVENT/g) || []).length === 18)
 
   // ===================== TAG SETUP =====================
-  await page.getByRole('button', { name: /NFC tag setup/ }).click()
+  await openSettings(page)
+  await page.getByRole('button', { name: /NFC tags/ }).click()
   await page.waitForTimeout(400)
   const tags = page.getByRole('dialog', { name: 'NFC tag setup' })
   check('tag setup opens', await tags.isVisible())
@@ -73,6 +77,7 @@ export default async function run({ browser, page, check, errors, URL, tmp }) {
   await page.waitForTimeout(300)
 
   // ===================== BACKUP =====================
+  await openSettings(page)
   const [backup] = await Promise.all([
     page.waitForEvent('download'),
     page.getByRole('button', { name: /Back up my data/ }).click(),
@@ -95,18 +100,22 @@ export default async function run({ browser, page, check, errors, URL, tmp }) {
   await page.reload({ waitUntil: 'networkidle' })
   check('data is gone before restore', (await page.getByText("Kids' Bathroom").count()) === 0)
 
+  await openSettings(page)
   await page.locator('input[type="file"]').setInputFiles(backupPath)
   await page.waitForTimeout(600)
+  await page.goto(URL, { waitUntil: 'networkidle' })
   check('names come back', (await page.getByText("Kids' Bathroom").count()) > 0)
   const restored = await page.evaluate(() => localStorage.getItem('home-maintenance-dashboard/v1'))
   check('history comes back', restored.includes('bath1-mirror'))
 
   // a file that isn't ours is rejected with a readable message, not a crash
   writeFileSync(`${tmp}/not-a-backup.json`, JSON.stringify({ hello: 'world' }))
+  await openSettings(page)
   await page.locator('input[type="file"]').setInputFiles(`${tmp}/not-a-backup.json`)
   await page.waitForTimeout(500)
   const toast = await page.getByRole('status').innerText()
   check('bad file gets a plain-English error', /doesn't look like a Home Maintenance backup/.test(toast), `("${toast}")`)
+  await page.goto(URL, { waitUntil: 'networkidle' })
   check('bad file leaves data intact', (await page.getByText("Kids' Bathroom").count()) > 0)
 
   // ===================== RESET NAMES =====================

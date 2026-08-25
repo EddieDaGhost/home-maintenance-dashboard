@@ -17,6 +17,7 @@ import Welcome from './components/Welcome.jsx'
 import Dashboard from './components/Dashboard.jsx'
 import AreaView from './components/AreaView.jsx'
 import EstateScreen from './components/EstateScreen.jsx'
+import SettingsScreen from './components/SettingsScreen.jsx'
 import TodayScreen from './components/TodayScreen.jsx'
 import SpaceBackdrop from './components/SpaceBackdrop.jsx'
 
@@ -56,6 +57,7 @@ function AppShell() {
   // Not a URL hash: hashes are NFC area ids, and #join= is already taken.
   const [estateOpen, setEstateOpen] = useState(false)
   const [todayOpen, setTodayOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [areaId, setAreaId] = useState(hashAreaId)
   const [now, setNow] = useState(() => new Date())
   const [toast, setToast] = useState(null)
@@ -153,6 +155,7 @@ function AppShell() {
     // from that room lands on the dashboard rather than somewhere unexpected.
     setEstateOpen(false)
     setTodayOpen(false)
+    setSettingsOpen(false)
     window.scrollTo({ top: 0 })
   }, [])
 
@@ -266,7 +269,19 @@ function AppShell() {
           </div>
         ) : null}
 
-        {todayOpen && !area ? (
+        {settingsOpen && !area ? (
+          <SettingsScreen
+            log={log}
+            now={now}
+            onBack={() => setSettingsOpen(false)}
+            onExport={handleExport}
+            onBackup={handleBackup}
+            onRestore={handleRestore}
+            onReset={handleReset}
+            onToast={showToast}
+            sync={sync}
+          />
+        ) : todayOpen && !area ? (
           <TodayScreen
             log={log}
             now={now}
@@ -300,17 +315,16 @@ function AppShell() {
             onLog={handleLog}
             onUndo={handleUndo}
             onOpenArea={goToArea}
-            onExport={handleExport}
-            onBackup={handleBackup}
-            onRestore={handleRestore}
             onOpenEstate={() => {
               setEstateOpen(true)
               window.scrollTo({ top: 0 })
             }}
-            onReset={handleReset}
-            onToast={showToast}
             onOpenToday={() => {
               setTodayOpen(true)
+              window.scrollTo({ top: 0 })
+            }}
+            onOpenSettings={() => {
+              setSettingsOpen(true)
               window.scrollTo({ top: 0 })
             }}
             sync={sync}
