@@ -98,6 +98,18 @@ import { applyImport, parseImport, parseSchedule } from '../src/lib/importTasks.
 import { mergeCompletions } from '../src/lib/sync.js'
 import { ROTATE, isTurnOf, lastLoggedBy, mineOf, turnLabel, whoseTurn } from '../src/lib/turns.js'
 import { THEME_LIST } from '../src/config/themes.js'
+import { NETWORK, QUESTIONS, RULES } from '../src/config/wifi.js'
+import {
+  MAX_JUMP,
+  acceptedFor,
+  isCorrect,
+  looksPasted,
+  markQuiz,
+  normalizeAnswer,
+  retypeMatches,
+  retypeProgress,
+  retypeTarget,
+} from '../src/lib/wifi.js'
 
 const ALL_TASKS = AREAS.flatMap((area) => area.tasks.map((task) => ({ ...task, area })))
 
@@ -728,6 +740,91 @@ export default async function run({ check }) {
   // the two gave the confirmation the wrong number, so they stay separate.
   is('which is a different number from the one a reset states', scratchCost.tasks === resetSummary(busyLog, spentEstate).tasks, false)
   is('an already-empty house counts nothing', scratchSummary([]).rooms, 0)
+
+  // =========================================================================
+  // The WiFi quiz
+  // =========================================================================
+
+  const RIGHT = Object.fromEntries(QUESTIONS.map((q) => [q.id, q.answer]))
+
+  is('there are nine questions', QUESTIONS.length, 9)
+  is('every one has an answer', QUESTIONS.every((q) => q.answer && q.answer.trim()), true)
+  is('and its own id', new Set(QUESTIONS.map((q) => q.id)).size, 9)
+  is('the rules are stated', RULES.length > 0, true)
+  is('including that it is open book', RULES.some((r) => /open.book/i.test(r)), true)
+  is('and that helping is frowned upon', RULES.some((r) => /frowned upon/i.test(r)), true)
+  is('the password is what it should be', NETWORK.password, 'Icantjustgiveyouthepassword!')
+
+  // Marking is forgiving about everything except being wrong.
+  is('the plain answer counts', isCorrect(QUESTIONS[0], 'Abraham Lincoln'), true)
+  is('lowercase counts', isCorrect(QUESTIONS[0], 'abraham lincoln'), true)
+  is('surname alone counts', isCorrect(QUESTIONS[0], 'Lincoln'), true)
+  is('stray spaces count', isCorrect(QUESTIONS[0], '  abraham   lincoln  '), true)
+  is('punctuation counts', isCorrect(QUESTIONS[0], 'Abraham Lincoln.'), true)
+  is('but somebody else does not', isCorrect(QUESTIONS[0], 'Ulysses S. Grant'), false)
+  is('and neither does nothing', isCorrect(QUESTIONS[0], '   '), false)
+
+  // The chemical formula: typed normally, no subscript, any case.
+  is('the formula counts', isCorrect(QUESTIONS[1], 'NaHCO3'), true)
+  is('however it is capitalised', isCorrect(QUESTIONS[1], 'nahco3'), true)
+  is('the question says numbers are typed normally', /subscript/i.test(QUESTIONS[1].note ?? ''), true)
+  is('a different compound does not', isCorrect(QUESTIONS[1], 'NaCl'), false)
+
+  is('the ocean, with or without the word', isCorrect(QUESTIONS[2], 'the Pacific Ocean'), true)
+  is('the MVP', isCorrect(QUESTIONS[3], 'steve young'), true)
+  is('the spice', isCorrect(QUESTIONS[4], 'Saffron'), true)
+  is('the animal', isCorrect(QUESTIONS[5], 'cheetah'), true)
+  is('the playwright, either way', isCorrect(QUESTIONS[6], 'William Shakespeare'), true)
+  is("Saturn's moons", isCorrect(QUESTIONS[7], '293'), true)
+  is('and not last year’s number', isCorrect(QUESTIONS[7], '146'), false)
+  is('the album', isCorrect(QUESTIONS[8], 'abbey road'), true)
+  is('every canonical answer marks itself right', QUESTIONS.every((q) => isCorrect(q, q.answer)), true)
+  is('and so does every accepted spelling', QUESTIONS.every((q) => (q.accept ?? []).every((a) => isCorrect(q, a))), true)
+  is('no two questions share an accepted answer', new Set(QUESTIONS.flatMap(acceptedFor)).size, QUESTIONS.flatMap(acceptedFor).length)
+
+  // Marking the whole thing names what is wrong, never a score.
+  is('all nine right passes', markQuiz(RIGHT).allCorrect, true)
+  is('with nothing to look at again', markQuiz(RIGHT).wrong.length, 0)
+  is('an empty sheet fails', markQuiz({}).allCorrect, false)
+  is('and names all nine', markQuiz({}).wrong.length, 9)
+  const oneOff = { ...RIGHT, [QUESTIONS[4].id]: 'paprika' }
+  is('one wrong fails the lot', markQuiz(oneOff).allCorrect, false)
+  is('and names only that one', markQuiz(oneOff).wrong.join(), QUESTIONS[4].id)
+
+  // --- the retyping step ---
+  const target = retypeTarget()
+  is('the target is every answer run together', target, 'AbrahamLincolnNaHCO3PacificSteveYoungSaffronCheetahShakespeare293AbbeyRoad')
+  is('with no spaces in it', /\s/.test(target), false)
+  is('and it is a real amount of typing', target.length > 60, true)
+  is('it is built from the canonical answers', target.startsWith('AbrahamLincoln'), true)
+  is('and ends with the last one', target.endsWith('AbbeyRoad'), true)
+
+  is('typing it exactly works', retypeMatches(target), true)
+  is('case does not matter here either', retypeMatches(target.toLowerCase()), true)
+  is('nor do stray spaces', retypeMatches(target.replace(/([A-Z])/g, ' $1')), true)
+  is('a missing answer does not pass', retypeMatches(target.replace('Saffron', '')), false)
+  is('nor does the wrong order', retypeMatches(QUESTIONS.map((q) => q.answer).reverse().join('')), false)
+  is('and neither does nothing', retypeMatches(''), false)
+
+  // It says as soon as it stops matching, rather than at character 73.
+  is('halfway through is not strayed', retypeProgress(target.slice(0, 30)).strayed, false)
+  is('but a wrong character is', retypeProgress(`${target.slice(0, 30)}zzz`).strayed, true)
+  is('the count is of real characters', retypeProgress(target.slice(0, 30)).typed, 30)
+  is('out of the whole thing', retypeProgress('').total, target.length)
+  is('and it knows when it is done', retypeProgress(target).done, true)
+  is('an empty box has not strayed', retypeProgress('').strayed, false)
+
+  // Paste is blocked on the input; this is the backstop for autofill and the
+  // keyboard swapping in a whole word.
+  is('typing one character is fine', looksPasted('abc', 'abcd'), false)
+  is('and so is a fast two', looksPasted('abc', 'abcde'), false)
+  is('a whole answer arriving at once is not', looksPasted('', 'AbrahamLincoln'), true)
+  is('nor is the whole target', looksPasted('', target), true)
+  is('deleting is always fine', looksPasted(target, ''), false)
+  is('the threshold is small on purpose', MAX_JUMP <= 3, true)
+
+  is('normalising strips everything but letters and digits', normalizeAnswer('  Ab-bey, Road! '), 'abbeyroad')
+  is('and copes with nothing at all', normalizeAnswer(null), '')
 
   // A reset has to survive the other phone, which still holds all of it and
   // would otherwise push it back — merging is a union in every other case.

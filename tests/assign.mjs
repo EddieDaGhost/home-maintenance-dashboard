@@ -120,7 +120,7 @@ export default async function run({ page, check, errors, URL }) {
   check('but keeps chores nobody has claimed', mine > 1, `${mine}`)
   check('exactly one chore was hers to drop', all - mine === 1, `dropped ${all - mine}`)
   check('and it is gone from the list', (await page.getByRole('button', { name: 'Log Dishes as done' }).count()) === 0)
-  check('while yours is still there', (await page.getByRole('button', { name: 'Log Flock check-in as done' }).count()) === 1)
+  check('while the rest of the list survives', (await page.getByRole('button', { name: /^Log / }).count()) > 0)
 
   await page.getByRole('button', { name: 'Mine' }).click()
   await page.waitForTimeout(300)

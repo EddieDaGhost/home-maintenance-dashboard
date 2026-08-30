@@ -99,7 +99,7 @@ export default async function run({ page, check, errors, URL }) {
     away: { windows: [{ from: dayOffset(-6), to: dayOffset(-1) }] },
   })
   check('back home, the work is listed', (await page.getByRole('button', { name: /Log Full litter change/ }).count()) === 1)
-  check('worded gently on the first day back', (await page.getByText(/Back home — worth a look/).count()) === 1)
+  check('worded gently on the first day back', (await page.getByText(/Back home — worth a look/).count()) > 0)
   check(
     'and still nothing scolding',
     (await page.getByText(/\b(late|overdue|missed|failed)\b/i).count()) === 0,

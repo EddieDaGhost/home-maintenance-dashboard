@@ -100,6 +100,7 @@ src/
 │   ├── themes.js    Theme definitions + every user-facing string per theme
 │   ├── catalog.js   The shop: every item credits can buy, named per theme
 │   ├── forecast.js  The two Open-Meteo endpoints (no key, no env var)
+│   ├── wifi.js      The guest network, and the quiz in front of it
 │   └── icons.js     Icons offerable in the room picker
 ├── lib/             Pure functions, no React. Test these in tests/logic.mjs.
 │   ├── date.js      Week math (Monday-first), DST-safe day differences
@@ -119,6 +120,7 @@ src/
 │   ├── places.js    Your town and your work address
 │   ├── forecast.js  Today's weather, cached so it works with no signal
 │   ├── maps.js      The directions deep link — no API, no key
+│   ├── wifi.js      Marking the quiz, and the retyping step
 │   ├── daily.js     Today's free-text list. Earns nothing, syncs nowhere.
 │   ├── backup.js    Export/import JSON
 │   └── calendar.js  .ics builder
@@ -207,7 +209,7 @@ and no horizontal overflow — the tests assert that last one.
 ## Testing
 
 ```bash
-npm run check              # everything: 920 checks
+npm run check              # everything: 1026 checks
 npm run check -- logic     # just the fast pure-logic suite (no browser)
 ```
 
@@ -371,6 +373,37 @@ on the estate screen.
   — the scene and the task list must not be able to disagree.
 - **Removing a person leaves their estate in the map**, unreachable but intact,
   matching how a removed room keeps its history.
+
+---
+
+## The WiFi page
+
+`#wifi` — the one hash that isn't a room. A sticker by the door takes a guest
+to the network name, a nine-question quiz, and then the password.
+
+- **It is answered before the welcome screen.** A guest opens it on *their own*
+  phone, which has never seen this app; sending them to "set this device up"
+  would miss the point entirely. `App.jsx` handles `WIFI_HASH` above the claim
+  gate for exactly that reason.
+- **It writes nothing.** No progress, no "you already did this" — quiz state is
+  component state and a refresh starts over. Leaving somebody else's phone
+  exactly as you found it is worth more than saving them a retype, and the
+  suite asserts localStorage is untouched from first paint to password.
+- **The password is in the bundle, and that is not a secret.** It has to be:
+  the guest isn't in your household and has none of your localStorage, so
+  `src/config/wifi.js` is the only route by which an answer can reach them.
+  Anyone who opens the page source can read it, and no client-side gate can
+  change that — the quiz is a bit of fun on the way to the password, not a lock
+  on it. The file says so at the top. Don't put a real secret there.
+- **Marking is forgiving about everything except being wrong.** Case, spacing
+  and punctuation are stripped both sides, so "the Pacific Ocean" and "pacific"
+  are one answer. Extra spellings go in `accept`.
+- **The retyping step is built from the canonical answers**, not from what was
+  typed, so two people who both got it right have the same thing to type.
+  Paste is refused on the event *and* by `looksPasted()`, which catches
+  autofill and a keyboard swapping in a whole word.
+- **Nothing here scolds either.** A wrong answer says "have another look",
+  there is no score, and the quiz uses `--attention-*` like everything else.
 
 ---
 

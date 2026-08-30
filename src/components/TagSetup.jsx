@@ -112,6 +112,11 @@ export default function TagSetup({ open, onClose }) {
         ) : null}
 
         <TagRow label="Master tag" url={`${origin}/`} hint="Fridge, or by the front door" />
+        <TagRow
+          label="The WiFi"
+          url={`${origin}/#wifi`}
+          hint="By the door — a guest can open this without setting anything up"
+        />
 
         {areas.map((area) => (
           <TagRow key={area.id} label={nameFor(area)} url={`${origin}/#${area.id}`} />

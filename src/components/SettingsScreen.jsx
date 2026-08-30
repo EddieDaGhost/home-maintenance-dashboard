@@ -14,6 +14,7 @@ import {
   Sunrise,
   Upload,
   Users,
+  Wifi,
 } from 'lucide-react'
 import { useTheme } from '../theme/ThemeProvider.jsx'
 import { useNames } from '../state/NamesProvider.jsx'
@@ -90,6 +91,7 @@ export default function SettingsScreen({
   onRestore,
   onReset,
   onScratch,
+  onOpenWifi,
   onToast,
   sync,
 }) {
@@ -170,6 +172,12 @@ export default function SettingsScreen({
             onClick={restoreStarterRooms}
           />
         ) : null}
+        <SettingsRow
+          icon={Wifi}
+          label="The WiFi"
+          detail="What a guest sees at the sticker by the door"
+          onClick={onOpenWifi}
+        />
         <SettingsRow icon={Nfc} label="NFC tags" onClick={() => setTagsOpen(true)} />
       </Group>
 

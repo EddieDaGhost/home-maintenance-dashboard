@@ -19,6 +19,7 @@ import AreaView from './components/AreaView.jsx'
 import EstateScreen from './components/EstateScreen.jsx'
 import SettingsScreen from './components/SettingsScreen.jsx'
 import TodayScreen from './components/TodayScreen.jsx'
+import WifiScreen from './components/WifiScreen.jsx'
 import SpaceBackdrop from './components/SpaceBackdrop.jsx'
 
 /** The NFC tags point at "#litter", "#kitchen", etc. Anything else = home. */
@@ -26,6 +27,15 @@ function hashAreaId() {
   if (typeof window === 'undefined') return null
   return window.location.hash.replace(/^#\/?/, '').trim().toLowerCase() || null
 }
+
+/**
+ * The one hash that isn't a room: the sticker by the door.
+ *
+ * Reserved rather than looked up in the room list, so somebody who names a room
+ * "WiFi" gets their room and this still works — and so it can be answered
+ * before the welcome screen, which is the whole point of it.
+ */
+export const WIFI_HASH = 'wifi'
 
 function AppShell() {
   const { theme, copy } = useTheme()
@@ -251,11 +261,29 @@ function AppShell() {
   }, [sync, setEstate, setAway, setCustom, setHousehold, setNames, setPlaces, setDaily, showToast])
 
   const area = useMemo(() => (areaId ? (areasById[areaId] ?? null) : null), [areaId, areasById])
+  const wifi = areaId === WIFI_HASH
 
   const handleClaim = useCallback(() => {
     setDevice(claimDevice())
     setPreviewing(false)
   }, [])
+
+  /**
+   * A guest tapping the sticker by the door is the one visitor who should get
+   * something other than the welcome screen — they're not here to set the app
+   * up, they want the WiFi. So this is answered before the claim gate, and on
+   * a phone that has never seen this app before.
+   */
+  if (wifi) {
+    return (
+      <>
+        {theme.flavor === 'space' ? <SpaceBackdrop /> : null}
+        <div className="relative z-10 mx-auto min-h-screen w-full max-w-md px-4">
+          <WifiScreen onBack={device.claimed ? goHome : null} />
+        </div>
+      </>
+    )
+  }
 
   // An unclaimed device gets an explanation, not somebody else's chore list.
   if (!device.claimed && !previewing) {
@@ -305,6 +333,7 @@ function AppShell() {
             onRestore={handleRestore}
             onReset={handleReset}
             onScratch={handleScratch}
+            onOpenWifi={() => goToArea(WIFI_HASH)}
             onToast={showToast}
             sync={sync}
           />
