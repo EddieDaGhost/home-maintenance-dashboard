@@ -209,7 +209,7 @@ and no horizontal overflow — the tests assert that last one.
 ## Testing
 
 ```bash
-npm run check              # everything: 1026 checks
+npm run check              # everything: 1027 checks
 npm run check -- logic     # just the fast pure-logic suite (no browser)
 ```
 
