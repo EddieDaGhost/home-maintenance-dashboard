@@ -23,6 +23,7 @@ const SUITES = [
   { name: 'estate', file: './estate.mjs', browser: true },
   { name: 'today', file: './today.mjs', browser: true, ownContexts: true },
   { name: 'assign', file: './assign.mjs', browser: true },
+  { name: 'wifi', file: './wifi.mjs', browser: true, ownContexts: true },
   { name: 'away', file: './away.mjs', browser: true },
   { name: 'fresh-start', file: './fresh-start.mjs', browser: true },
   { name: 'import', file: './import.mjs', browser: true },

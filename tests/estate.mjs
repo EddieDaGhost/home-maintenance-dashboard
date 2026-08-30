@@ -5,6 +5,7 @@
 // shape the app writes — and everything after that is driven for real.
 
 const LOG_KEY = 'home-maintenance-dashboard/v1'
+const AWAY_KEY = 'home-maintenance-dashboard/away/v1'
 const PEOPLE_KEY = 'home-maintenance-dashboard/people/v1'
 const ESTATE_KEY = 'home-maintenance-dashboard/estate/v1'
 const THEME_KEY = 'home-maintenance-dashboard/theme'
@@ -15,16 +16,32 @@ function dishes(count, by, from = Date.now()) {
 }
 
 /** A clean slate: given history, given roster, nothing bought. */
-async function seed(page, URL, completions, people = null) {
+/**
+ * `pardon` draws a fresh-start line as of today, so nothing untouched reads as
+ * overdue whatever weekday the suite runs on — the scene's mood would
+ * otherwise flip with the calendar. It logs nothing and moves no credits.
+ * The one test that wants something overdue turns it off.
+ */
+async function seed(page, URL, completions, people = null, { pardon = true } = {}) {
   await page.goto(URL, { waitUntil: 'domcontentloaded' })
   await page.evaluate(
-    ([logKey, peopleKey, estateKey, log, roster]) => {
+    ([logKey, peopleKey, estateKey, awayKey, log, roster, pardonAll]) => {
       localStorage.setItem(logKey, JSON.stringify({ version: 2, completions: log }))
       localStorage.removeItem(estateKey)
       if (roster) localStorage.setItem(peopleKey, JSON.stringify(roster))
       else localStorage.removeItem(peopleKey)
+      // A fresh-start line drawn today, so nothing untouched reads as overdue
+      // whatever weekday this happens to run on. It logs nothing and moves no
+      // credits, so the balances below are unaffected — see src/lib/away.js.
+      if (pardonAll) {
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+        localStorage.setItem(awayKey, JSON.stringify({ windows: [], freshStartAt: today.getTime() }))
+      } else {
+        localStorage.removeItem(awayKey)
+      }
     },
-    [LOG_KEY, PEOPLE_KEY, ESTATE_KEY, completions, people],
+    [LOG_KEY, PEOPLE_KEY, ESTATE_KEY, AWAY_KEY, completions, people, pardon],
   )
   await page.goto(URL, { waitUntil: 'networkidle' })
 }
@@ -146,10 +163,13 @@ export default async function run({ page, check, errors, URL }) {
   )
 
   // ---- falling behind, and the way back ----
-  await seed(page, URL, {
-    'kitchen-dishes': dishes(30, 'me'),
-    'chickens-checkin': [Date.now() - 5 * 86400000],
-  })
+  await seed(
+    page,
+    URL,
+    { 'kitchen-dishes': dishes(30, 'me'), 'chickens-checkin': [Date.now() - 5 * 86400000] },
+    null,
+    { pardon: false },
+  )
   await openEstate(page)
   check('an overdue task makes the scene quiet', (await page.getByText(/Low evening light/).count()) === 1)
   check(

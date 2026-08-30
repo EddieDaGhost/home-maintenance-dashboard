@@ -61,11 +61,12 @@ export default async function run({ browser, page, check, errors, URL, tmp }) {
   const tags = page.getByRole('dialog', { name: 'NFC tag setup' })
   check('tag setup opens', await tags.isVisible())
   const urls = await tags.locator('p.font-mono').allInnerTexts()
-  check('lists master + 7 areas', urls.length === 8, `${urls.length} rows`)
+  check('lists master, the WiFi and 7 areas', urls.length === 9, `${urls.length} rows`)
   check('uses the address you are on', urls.every((u) => u.startsWith(URL)), urls[0])
-  check('area hashes are correct', urls.slice(1).join(' ') === [
+  check('the WiFi tag comes right after the master one', urls[1] === `${URL}/#wifi`, urls[1])
+  check('area hashes are correct', urls.slice(2).join(' ') === [
     'litter', 'bathroom-1', 'bathroom-2', 'bathroom-3', 'kitchen', 'laundry', 'chickens',
-  ].map((id) => `${URL}/#${id}`).join(' '), urls[2])
+  ].map((id) => `${URL}/#${id}`).join(' '), urls[3])
   check('renamed room is labelled with its new name', (await tags.getByText("Kids' Bathroom").count()) > 0)
 
   await tags.getByRole('button', { name: /Copy the Kids' Bathroom tag address/ }).click()

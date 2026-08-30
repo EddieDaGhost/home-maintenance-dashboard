@@ -68,7 +68,7 @@ Other commands:
 ```bash
 npm run build     # build the production version into dist/
 npm run preview   # preview that production build locally
-npm run check     # run the tests (920 checks)
+npm run check     # run the tests (1026 checks)
 ```
 
 `npm run check` drives a real browser through the app — logging, persistence,
@@ -320,6 +320,27 @@ feed"). Those typed items are just a list: they earn no points, they never
 touch your streak, nothing about them is ever called late, and they stay on the
 device you wrote them on. Tick one off and it drops to the bottom; it clears
 itself the next day.
+
+---
+
+## The WiFi
+
+Put a sticker by the door pointing at `https://homemaintenance.app/#wifi`. A
+guest taps it and gets the network name, a short quiz, and — once they've
+earned it — the password.
+
+It works on a phone that has never opened this app: no setup, no welcome
+screen, and nothing is stored on their device at all.
+
+The quiz is nine questions, open book, with no score and no time limit. Get
+them all right and there's one last thing: type every answer again, run
+together with no spaces, one character at a time. Pasting is refused.
+
+**Edit `src/config/wifi.js`** to change the network name, the password or the
+questions, then redeploy. ⚠️ Whatever you put there is compiled into the page
+and can be read by anyone who opens the source — the quiz is a bit of fun on
+the way to the password, not a lock on it. Don't put a password there you'd
+mind a stranger seeing.
 
 ---
 

@@ -106,7 +106,10 @@ export default async function run({ page, check, errors, URL }) {
   await openFresh(page)
   await sheet.getByRole('button', { name: 'Start fresh from today' }).click()
   await page.waitForTimeout(500)
-  await page.goto(URL, { waitUntil: 'networkidle' })
+  // Logged from inside the room, not the dashboard: that queue is a five-item
+  // shortlist, so whether this chore is on it depends on what day the suite
+  // happens to run.
+  await page.goto(`${URL}/#chickens`, { waitUntil: 'networkidle' })
   await page.getByRole('button', { name: 'Log Flock check-in as done' }).click()
   await page.waitForTimeout(500)
   // Logging it hands that chore back to its own clock — the pardon only ever
