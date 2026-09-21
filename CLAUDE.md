@@ -169,10 +169,11 @@ load-bearing one:
    breaks the tap that matters most. `SpaceBackdrop.jsx` is the precedent.
 2. **The art is parameterized.** The finish slot recolours the vessel at
    runtime, mood dims the whole scene, and companions rescale the same shape.
-   Pre-rendered images would have to bake every combination — 4 vessels × 5
-   finishes × 2 moods × 3 themes is 120 files for the main character alone. The
-   three scene files are ~40KB of code and cover all of it. Whenever "should
-   this be an image?" comes up again, that's the answer.
+   Pre-rendered images would have to bake every combination — 6 vessels × 5
+   finishes × 2 moods × 3 themes is 180 files for the main character alone, and
+   that number goes up every time the shop does. The three scene files are ~50KB
+   of code and cover all of it. Whenever "should this be an image?" comes up
+   again, that's the answer.
 
 **Draw with `scenes/parts.jsx`, not from scratch.** `Solid`, `Blob` and `Ground`
 give a shape its outline, its top light and its contact shadow. Three rules
@@ -184,6 +185,13 @@ learned the hard way:
   the first pass, and that alone made the whole scene look pasted on.
 - **Never hardcode a colour in a vessel.** It has to come from the equipped
   finish or the shop's recolouring silently stops working.
+
+- **A shape that curls has to be built from a centreline.** Two hand-matched
+  curves make a wedge, and a wedge reads as a spine however you bend the ends —
+  the drifter's arms were a sea urchin until `ribbon()` in `Ship.jsx` offset a
+  line that actually bends. Same for anything sitting on a curved edge: walk the
+  ellipse and step out along its normal, the way the flytrap's teeth do, or it
+  lands nowhere near the rim as soon as the shape is rotated.
 
 **Detail scales with price.** The 50-credit succulent is a plain rosette; the
 320-credit orchid has five blooms, a bud, aerial roots and strap leaves. If the

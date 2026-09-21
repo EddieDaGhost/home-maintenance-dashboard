@@ -229,7 +229,7 @@ export default async function run({ check }) {
   // item with new art fails this check, which is the reminder to go and draw it
   // in Windowsill, Ship and Cats rather than shipping an item that draws nothing.
   const DRAWN = [
-    'succulent', 'fern', 'monstera', 'orchid',
+    'succulent', 'fern', 'monstera', 'shark', 'orchid', 'drifter',
     'terracotta', 'sage', 'cobalt', 'blush', 'copper',
     'herbs', 'curtain',
     'rain', 'snow', 'glow',
