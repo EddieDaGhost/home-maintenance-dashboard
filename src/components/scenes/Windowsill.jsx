@@ -203,7 +203,187 @@ function Succulent({ x, y, tint }) {
   )
 }
 
-const PLANTS = { succulent: Succulent, fern: Fern, monstera: Monstera, orchid: Orchid }
+// One lobe of a flytrap, and the teeth standing off its inner rim.
+const LOBE = { rx: 4.6, ry: 9.6, dx: 4, dy: -9.6 }
+
+/**
+ * Teeth along a lobe's inner rim, pointing into the gap. They are generated off
+ * the ellipse rather than placed by hand for one reason: the lobes are rotated
+ * open, so a hand-placed rim ends up nowhere near the edge it is supposed to be
+ * sitting on. Walking the ellipse and stepping out along its normal puts every
+ * tooth on the rim whatever the lobe is doing.
+ */
+const lobeTeeth = (side) =>
+  Array.from({ length: 8 }, (_, i) => {
+    const t = (i + 0.5) / 8
+    const a = (((side < 0 ? -104 + t * 104 : 180 + t * 104) * Math.PI) / 180)
+    const cos = Math.cos(a)
+    const sin = Math.sin(a)
+    const px = side * LOBE.dx + LOBE.rx * cos
+    const py = LOBE.dy + LOBE.ry * sin
+    // Outward normal, and the tangent the tooth's base sits along.
+    const nx = cos / LOBE.rx
+    const ny = sin / LOBE.ry
+    const n = Math.hypot(nx, ny) || 1
+    const tx = -sin * LOBE.rx
+    const ty = cos * LOBE.ry
+    const tl = Math.hypot(tx, ty) || 1
+    const len = 1.8 + Math.sin(t * Math.PI) * 2.2
+    const at = (v) => v.toFixed(2)
+    return (
+      `M${at(px - (tx / tl) * 0.95)} ${at(py - (ty / tl) * 0.95)} ` +
+      `L${at(px + (nx / n) * len)} ${at(py + (ny / n) * len)} ` +
+      `L${at(px + (tx / tl) * 0.95)} ${at(py + (ty / tl) * 0.95)} Z`
+    )
+  }).join(' ')
+
+const TEETH_LEFT = lobeTeeth(-1)
+const TEETH_RIGHT = lobeTeeth(1)
+
+/**
+ * 220 credits: a flytrap. Three traps on flat leaf paddles, plus a small one
+ * still growing. They are drawn **open** — shut, the two lobes meet and hide
+ * both the red inside and the teeth, which is to say they stop looking like a
+ * flytrap and start looking like a bush. The gap is the whole item.
+ */
+function FlyTrap({ x, y, tint, mood }) {
+  const maw = mood === MOOD.QUIET ? '#8d5e63' : '#c25d5a'
+
+  const lobe = (side, fill) => (
+    <g transform={`rotate(${side * 15})`}>
+      <Blob cx={side * LOBE.dx} cy={LOBE.dy} rx={LOBE.rx} ry={LOBE.ry} fill={fill} strokeWidth={0.7} />
+      <path
+        d={side < 0 ? TEETH_LEFT : TEETH_RIGHT}
+        fill={tintUp(fill, 0.5)}
+        stroke={shade(fill, 0.34)}
+        strokeWidth="0.3"
+      />
+    </g>
+  )
+
+  const trap = (tx, ty, rot, size, fill) => (
+    <g key={`${tx}-${ty}`} transform={`translate(${tx} ${ty}) rotate(${rot}) scale(${size})`}>
+      {/* The red interior, sized to the gap the open lobes leave and no wider —
+          any bigger and it stops being a lining and starts being a flag. */}
+      <path d="M0 -1 C-4 -4 -5 -9 -4.2 -13 L4.2 -13 C5 -9 4 -4 0 -1 Z" fill={maw} />
+      {lobe(-1, fill)}
+      {lobe(1, shade(fill, 0.16))}
+    </g>
+  )
+
+  return (
+    <g transform={`translate(${x} ${y})`}>
+      {/* The flat paddles the traps sit on the end of. */}
+      <Solid d="M0 2 C-11 0 -19 -6 -21 -13 C-14 -17 -5 -10 0 -3 Z" fill={tint.mid} strokeWidth={0.8} />
+      <Solid d="M0 2 C11 0 19 -5 21 -11 C14 -16 5 -9 0 -3 Z" fill={tint.dark} strokeWidth={0.8} />
+      <path
+        d="M0 0 C-8 -8 -13 -14 -16 -21 M0 0 C6 -9 11 -16 14 -23 M0 0 C-1 -12 -2 -21 -2 -30 M0 0 C9 -3 15 -6 19 -10"
+        stroke={tint.dark}
+        strokeWidth="2.2"
+        fill="none"
+        strokeLinecap="round"
+      />
+      {trap(-16, -21, -34, 1.05, tint.mid)}
+      {trap(14, -23, 30, 1.1, tint.light)}
+      {trap(-2, -30, -4, 1.25, tint.mid)}
+      {trap(20, -11, 66, 0.7, tint.light)}
+    </g>
+  )
+}
+
+/**
+ * 420 credits, and the top of the slot: a spider plant in full production. A
+ * fountain of striped blades, three runners arching out over the rim with a
+ * plantlet on the end of each, a flower on one of them, and the thick white
+ * roots that always end up over the side.
+ *
+ * The runners have to clear the pot — it is drawn after the plant — so they
+ * swing wider than the rim before they drop.
+ */
+function SpiderPlant({ x, y, tint }) {
+  const blade = (rot, len, fill) => (
+    <g key={`${rot}-${len}`} transform={`rotate(${rot})`}>
+      <Solid
+        d={`M-3.2 2 C-5 ${-len * 0.45} -3 ${-len * 0.82} 1.5 ${-len} C5 ${-len * 0.8} 4 ${-len * 0.45} 3.2 2 Z`}
+        fill={fill}
+        outline={false}
+      />
+      {/* The pale stripe. A spider plant without variegation is just grass. */}
+      <path
+        d={`M0 0 C-1.4 ${-len * 0.45} -0.4 ${-len * 0.8} 1.2 ${-len + 3}`}
+        stroke={tintUp(fill, 0.55)}
+        strokeWidth="1.2"
+        fill="none"
+        opacity="0.85"
+      />
+    </g>
+  )
+
+  const pup = (px, py, size) => (
+    <g key={`${px}-${py}`} transform={`translate(${px} ${py}) scale(${size})`}>
+      {[-62, -30, 0, 30, 62].map((a) => (
+        <Blob key={a} cx={0} cy={-5} rx={1.9} ry={5.4} fill={tint.light} rotate={a} outline={false} />
+      ))}
+      <Blob cx={0} cy={-1} rx={2.4} ry={2.2} fill={tint.mid} outline={false} />
+    </g>
+  )
+
+  return (
+    <g transform={`translate(${x} ${y})`}>
+      {/* Roots over the rim, drawn first so the leaves sit in front. */}
+      <path
+        d="M-8 2 C-14 6 -18 11 -16 16 M6 2 C12 7 15 12 12 17"
+        stroke={tintUp(tint.mid, 0.45)}
+        strokeWidth="2.2"
+        fill="none"
+        strokeLinecap="round"
+        opacity="0.85"
+      />
+      {[
+        [-84, 26, tint.dark],
+        [-62, 40, tint.mid],
+        [-40, 50, tint.light],
+        [-18, 56, tint.mid],
+        [2, 58, tint.dark],
+        [22, 54, tint.light],
+        [44, 46, tint.mid],
+        [66, 36, tint.dark],
+        [86, 24, tint.mid],
+      ].map(([rot, len, fill]) => blade(rot, len, fill))}
+
+      {/* The runners go on LAST and arch well clear of the crown. Drawn under
+          the leaves they vanish completely, and the plantlets end up looking
+          like three unrelated tufts sitting on the rim. */}
+      <g fill="none" stroke={tint.dark} strokeWidth="1.6" strokeLinecap="round">
+        <path d="M-2 -20 C-16 -38 -34 -30 -40 -10" />
+        <path d="M2 -22 C18 -42 40 -32 45 -10" />
+        <path d="M3 -16 C18 -22 30 -8 31 8" />
+      </g>
+      {pup(-40, -10, 1.15)}
+      {pup(45, -10, 1.25)}
+      {pup(31, 8, 0.9)}
+      {/* One runner is flowering, which is what a happy one does. */}
+      <g>
+        {[0, 72, 144, 216, 288].map((a) => (
+          <Blob key={a} cx={-27} cy={-29} rx={1.5} ry={3.2} fill="#f7f4ea" rotate={a} outline={false} />
+        ))}
+        <circle cx="-27" cy="-26" r="1.3" fill="#e6d39a" />
+      </g>
+    </g>
+  )
+}
+
+const PLANTS = {
+  succulent: Succulent,
+  fern: Fern,
+  monstera: Monstera,
+  shark: FlyTrap,
+  orchid: Orchid,
+  drifter: SpiderPlant,
+}
+
+/** A bigger plant needs a bigger pot, or it reads as about to fall over. */
+const POT_WIDTH = { monstera: 54, drifter: 50 }
 
 function Plant({ art, x, y, tint, mood }) {
   const Shape = PLANTS[art] ?? Sprout
@@ -519,7 +699,7 @@ export default function Windowsill({ equipped = {}, companions = [], mood = MOOD
 
       {/* The main plant */}
       <Plant art={vesselArt} x={152} y={148} tint={tint} mood={mood} />
-      <Pot x={152} y={148} width={vesselArt === 'monstera' ? 54 : 42} color={potColor} />
+      <Pot x={152} y={148} width={POT_WIDTH[vesselArt] ?? 42} color={potColor} />
 
       {/* Everything else you've bought */}
       {companions.slice(0, spots.length).map((companion, i) => (
