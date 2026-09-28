@@ -229,7 +229,7 @@ export default async function run({ check }) {
   // item with new art fails this check, which is the reminder to go and draw it
   // in Windowsill, Ship and Cats rather than shipping an item that draws nothing.
   const DRAWN = [
-    'succulent', 'fern', 'monstera', 'orchid',
+    'succulent', 'fern', 'monstera', 'shark', 'orchid', 'drifter',
     'terracotta', 'sage', 'cobalt', 'blush', 'copper',
     'herbs', 'curtain',
     'rain', 'snow', 'glow',
@@ -753,7 +753,10 @@ export default async function run({ check }) {
   is('the rules are stated', RULES.length > 0, true)
   is('including that it is open book', RULES.some((r) => /open.book/i.test(r)), true)
   is('and that helping is frowned upon', RULES.some((r) => /frowned upon/i.test(r)), true)
-  is('the password is what it should be', NETWORK.password, 'Icantjustgiveyouthepassword!')
+  // Not asserted by value: repeating the password here would put a second copy
+  // of it in the repo for no benefit. What matters is that both are set.
+  is('there is a network name', Boolean(NETWORK.ssid?.trim()), true)
+  is('and a password to earn', Boolean(NETWORK.password?.trim()), true)
 
   // Marking is forgiving about everything except being wrong.
   is('the plain answer counts', isCorrect(QUESTIONS[0], 'Abraham Lincoln'), true)

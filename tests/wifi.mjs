@@ -6,6 +6,9 @@
 // refuses a paste.
 
 import { newPhonePage, openSettings } from './harness.mjs'
+// Read from the config rather than repeated here: one copy of the password in
+// the repo is one too many already, and two would drift.
+import { NETWORK } from '../src/config/wifi.js'
 
 const ANSWERS = [
   'Abraham Lincoln',
@@ -20,7 +23,7 @@ const ANSWERS = [
 ]
 
 const TARGET = ANSWERS.map((a) => a.replace(/\s+/g, '')).join('')
-const PASSWORD = 'Icantjustgiveyouthepassword!'
+const PASSWORD = NETWORK.password
 
 const fillQuiz = async (page, answers) => {
   const boxes = page.locator('input[type="text"]')
@@ -39,7 +42,7 @@ export default async function run({ browser, check, URL }) {
     await page.goto(`${URL}/#wifi`, { waitUntil: 'networkidle' })
 
     check('the sticker opens the WiFi page, not the welcome screen', (await page.getByRole('heading', { level: 1 }).innerText()) === 'The WiFi')
-    check('the network name is on show straight away', (await page.getByText('Home', { exact: true }).count()) > 0)
+    check('the network name is on show straight away', (await page.getByText(NETWORK.ssid, { exact: true }).count()) > 0)
     check('the password is not', (await page.getByText(PASSWORD).count()) === 0)
     check('it says the rules are open book', (await page.getByText(/open-book/i).count()) === 1)
     check('that helping is frowned upon', (await page.getByText(/frowned upon/i).count()) === 1)

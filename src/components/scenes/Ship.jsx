@@ -1,17 +1,45 @@
 import { SLOTS } from '../../config/catalog.js'
 import { MOOD } from '../../lib/credits.js'
-import { SceneDefs, shade, tintUp } from './parts.jsx'
+import { Blob, SceneDefs, Solid, shade, tintUp } from './parts.jsx'
 
 // The Starship scene: your ship at its mooring, and whether the lights are on.
 //
 // Same inputs as the windowsill (see Windowsill.jsx) and the same rule: quiet
 // means running dark on standby, never damaged. Nothing here is ever broken,
 // scorched, leaking, or in need of repair.
+//
+// These are ships with timber, canvas and stonework on them rather than wedges
+// of grey metal. That is a look, not a shortcut: every plank, sail and dome is
+// still one path built out of `parts.jsx`, and every one of them takes its
+// colour from the equipped finish. Hardcode a colour in a hull and the shop
+// stops recolouring it — see the note on materials below.
 
 const HULL_DEFAULT = '#7f93ad'
 
+// Materials, as opposed to livery. Glass is glass and lamplight is lamplight
+// whatever you painted the hull, so these three are allowed to be fixed. They
+// are the ONLY fixed colours on any vessel: everything that is *the ship* is
+// derived from `hull` with shade()/tintUp(), or the finish slot silently does
+// nothing on the item you just spent 420 credits on.
+const GLASS = '#bfe7ff'
+const LEAF = '#e9cb8d'
+const LAMP = '#ffe1a8'
+
 function hullShade(color, mood) {
   return mood === MOOD.QUIET ? '#5d6b7e' : color
+}
+
+/** The whole palette of a ship, derived from one colour. */
+function palette(hull) {
+  return {
+    hull,
+    deck: shade(hull, 0.22),
+    keel: shade(hull, 0.42),
+    trim: shade(hull, 0.55),
+    pale: tintUp(hull, 0.58),
+    canvas: tintUp(hull, 0.76),
+    cloth: tintUp(hull, 0.44),
+  }
 }
 
 /**
@@ -27,104 +55,469 @@ function Engines({ x, spread }) {
   )
 }
 
-/** One silhouette per hull: a single pointed shape, so nothing reads as a sofa. */
-function Hull({ d, cockpit, hull, panels = [], lights = [] }) {
+/**
+ * Portholes: a ring of hull-coloured trim with lit glass inside. Lights along
+ * the spine were what the old hulls used; a row of windows says "there are
+ * people in there", which is the whole difference between these and a wedge.
+ */
+function Portholes({ at, p, r = 2.4 }) {
   return (
     <g>
-      <path d={d} fill={hull} stroke={shade(hull, 0.4)} strokeWidth="1.1" strokeLinejoin="round" />
-      {/* A lit top edge and a shaded underside give the flat shape some depth. */}
-      <path d={d} fill="url(#ship-sheen)" />
-      {panels.map(([x, y, width, height]) => (
-        <rect key={`${x}-${y}`} x={x} y={y} width={width} height={height} rx="3" fill="#0b1626" fillOpacity="0.22" />
+      {at.map(([x, y]) => (
+        <g key={`${x}-${y}`}>
+          <circle cx={x} cy={y} r={r + 1} fill={p.trim} />
+          <circle cx={x} cy={y} r={r} fill={GLASS} opacity="0.9" />
+          <circle cx={x - r * 0.3} cy={y - r * 0.35} r={r * 0.4} fill="#ffffff" opacity="0.7" />
+        </g>
       ))}
-      {/* Running lights along the spine — the expensive hulls get more of them. */}
-      {lights.map(([x, y]) => (
-        <circle key={`${x}-${y}`} cx={x} cy={y} r="1.5" fill="#bfe7ff" opacity="0.9" />
-      ))}
-      <ellipse cx={cockpit[0]} cy={cockpit[1]} rx="9.5" ry="6" fill={shade(hull, 0.55)} />
-      <ellipse cx={cockpit[0]} cy={cockpit[1] - 0.5} rx="8" ry="4.6" fill="#bfe7ff" />
-      <ellipse cx={cockpit[0] - 2} cy={cockpit[1] - 1.6} rx="4" ry="1.8" fill={tintUp('#bfe7ff', 0.7)} opacity="0.85" />
     </g>
   )
 }
 
-/** The starter ship, before anything has been requisitioned. */
-function Shuttle({ hull }) {
+/**
+ * Canvas, bellied out by the wind. A flat triangle reads as a paper dart, so
+ * every sail is a curve — and it gets seams, because one unbroken shape at this
+ * size looks like a sheet of card.
+ */
+function Sail({ d, seams = '', p }) {
   return (
-    <g transform="translate(160 100)">
-      <Engines x={-46} spread={9} />
-      <Hull d="M-46 -16 L16 -21 L54 0 L16 21 L-46 16 Z" cockpit={[26, 0]} hull={hull} />
+    <g>
+      <Solid d={d} fill={p.canvas} strokeWidth={0.8} />
+      {seams ? <path d={seams} stroke={shade(p.canvas, 0.2)} strokeWidth="0.6" fill="none" opacity="0.6" /> : null}
     </g>
   )
 }
 
-function Scout({ hull }) {
+/** Thin lines from the mast down to the hull. Without them a mast is a stick
+    balanced on a roof. */
+function Rigging({ d, p }) {
+  return <path d={d} stroke={p.keel} strokeWidth="0.7" fill="none" opacity="0.8" strokeLinecap="round" />
+}
+
+/** A deck rail: the top line plus its stanchions, drawn in one go. */
+function Rail({ from, to, y, p, posts = 5 }) {
+  const step = (to - from) / (posts - 1)
+  return (
+    <g stroke={p.trim} strokeWidth="0.9" opacity="0.9" strokeLinecap="round">
+      <path d={`M${from} ${y} L${to} ${y}`} />
+      {Array.from({ length: posts }, (_, i) => (
+        <path key={i} d={`M${from + i * step} ${y} v4.5`} />
+      ))}
+    </g>
+  )
+}
+
+/** A dome on its drum, with a finial on top. The palace ship is made of these. */
+function Dome({ cx, cy, rx, ry, p, finial = 0 }) {
+  return (
+    <g>
+      <Solid d={`M${cx - rx} ${cy} A${rx} ${ry} 0 0 1 ${cx + rx} ${cy} Z`} fill={p.pale} strokeWidth={0.9} />
+      <path d={`M${cx - rx - 1.5} ${cy} L${cx + rx + 1.5} ${cy}`} stroke={LEAF} strokeWidth="1.4" opacity="0.85" />
+      {finial ? (
+        <g>
+          <path d={`M${cx} ${cy - ry} v${-finial}`} stroke={LEAF} strokeWidth="1.3" />
+          <circle cx={cx} cy={cy - ry - finial} r="1.8" fill={LEAF} />
+        </g>
+      ) : null}
+    </g>
+  )
+}
+
+/**
+ * A tapering ribbon built from a centreline, rather than from two hand-matched
+ * curves. This exists because the first pass at the drifter's arms was a wedge
+ * from body to point per arm, and six of those radiating from one place reads
+ * as a sea urchin. Offsetting a curve that actually bends is what makes an arm
+ * look like it is hanging rather than sticking out.
+ */
+function ribbon(points, width) {
+  const left = []
+  const right = []
+  for (let i = 0; i < points.length; i += 1) {
+    const [x, y] = points[i]
+    const [px, py] = points[Math.max(0, i - 1)]
+    const [nx, ny] = points[Math.min(points.length - 1, i + 1)]
+    const dx = nx - px
+    const dy = ny - py
+    const len = Math.hypot(dx, dy) || 1
+    const half = (width * (1 - i / (points.length - 1)) ** 0.8) / 2
+    left.push([x - (dy / len) * half, y + (dx / len) * half])
+    right.push([x + (dy / len) * half, y - (dx / len) * half])
+  }
+  const run = (list) => list.map(([x, y], i) => `${i ? 'L' : ''}${x.toFixed(1)} ${y.toFixed(1)}`).join(' ')
+  return `M${run(left)} ${run(right.reverse())} Z`
+}
+
+/**
+ * One arm's centreline: out at `angle`, curling by `curl` as it goes, with a
+ * slow wave along it so no two are the same line at a different rotation.
+ */
+function armLine(angle, length, curl, phase, steps = 18) {
+  return Array.from({ length: steps }, (_, i) => {
+    const t = i / (steps - 1)
+    const a = ((angle + curl * t * t) * Math.PI) / 180
+    const wob = Math.sin(t * Math.PI * 1.6 + phase) * 5 * t
+    return [Math.cos(a) * t * length - Math.sin(a) * wob, Math.sin(a) * t * length + Math.cos(a) * wob]
+  })
+}
+
+/** The starter ship, before anything has been requisitioned: a bare launch. */
+function Shuttle({ p }) {
   return (
     <g transform="translate(160 100)">
-      <Engines x={-50} spread={9} />
-      {/* Swept fins, drawn behind the hull so they read as attached. */}
-      <path d="M-46 -12 L-34 -34 L-6 -22 Z" fill={hull} opacity="0.7" />
-      <path d="M-46 12 L-34 34 L-6 22 Z" fill={hull} opacity="0.7" />
-      <Hull
-        d="M-50 -14 L14 -20 L60 0 L14 20 L-50 14 Z"
-        cockpit={[30, 0]}
-        hull={hull}
-        panels={[[-38, -9, 30, 18]]}
-        lights={[[-4, -13], [10, -15]]}
+      <Engines x={-34} spread={8} />
+      <Solid d="M-34 -10 C-18 -16 6 -17 24 -9 C32 -6 32 4 24 8 C6 16 -18 15 -34 9 Z" fill={p.hull} />
+      <Solid d="M-32 -9 C-16 -14 6 -15 22 -8 L22 -5 C6 -12 -16 -11 -32 -6 Z" fill={p.deck} strokeWidth={0.7} />
+      <Portholes at={[[-18, 2], [-4, 3]]} p={p} r={2.2} />
+      <Blob cx={14} cy={-2} rx={7} ry={4.6} fill={GLASS} outline={false} />
+      <Solid d="M-32 -8 L-42 -20 L-26 -11 Z" fill={p.keel} strokeWidth={0.7} opacity={0.85} />
+    </g>
+  )
+}
+
+/**
+ * The 50-credit first purchase: one seat, one sail, and an engine that has seen
+ * some use. Deliberately the plainest hull in the slot — the cheap end has to
+ * look cheap standing next to the palace ship.
+ */
+function PodRunner({ p }) {
+  return (
+    <g transform="translate(160 100)">
+      <Engines x={-28} spread={6} />
+      {/* Mast and its one sail, behind the hull so the deck overlaps the foot.
+          The sail sits off the mast rather than on it, or the mast vanishes. */}
+      <path d="M-4 -8 V-32" stroke={p.keel} strokeWidth="1.6" strokeLinecap="round" />
+      <Sail d="M-1 -29 C11 -25 14 -15 5 -9 L-1 -9 Z" seams="M-1 -22 C5 -20 8 -16 9 -13" p={p} />
+      <Solid d="M-28 -8 C-16 -13 2 -14 16 -8 C24 -5 24 4 16 7 C2 14 -16 13 -28 8 Z" fill={p.hull} />
+      <Solid d="M-26 -7 C-14 -11 2 -12 14 -7 L14 -4.5 C2 -9.5 -14 -8.5 -26 -4.5 Z" fill={p.deck} strokeWidth={0.6} />
+      <Portholes at={[[-14, 2]]} p={p} r={2.1} />
+      <Blob cx={8} cy={-1} rx={6} ry={4} fill={GLASS} outline={false} />
+      <Solid d="M-26 -6 L-36 -17 L-22 -9 Z" fill={p.keel} strokeWidth={0.7} opacity={0.85} />
+    </g>
+  )
+}
+
+/**
+ * 80 credits: the sailing scout — a timber hull under canvas, with a jib, a
+ * rudder fin and windows you can see the crew through.
+ */
+function Scout({ p }) {
+  return (
+    <g transform="translate(160 100)">
+      <Engines x={-48} spread={9} />
+      {/* Rudder, behind everything. */}
+      <Solid d="M-44 -8 L-58 -24 L-38 -10 Z" fill={p.keel} strokeWidth={0.8} opacity={0.85} />
+      {/* Mast, sails and rigging go down before the hull so the gunwale covers
+          the foot of the mast — otherwise it reads as standing in front. */}
+      <path d="M-6 -10 V-46" stroke={p.keel} strokeWidth="1.8" strokeLinecap="round" />
+      <Rigging d="M-6 -45 L-40 -10 M-6 -45 L38 -6 M-6 -28 L-22 -10" p={p} />
+      {/* Main aft, jib forward. They have to be different SHAPES, not just
+          different shades: two bellied curves either side of the mast merge
+          into one white mushroom and the ship reads as having a single sail. */}
+      <Sail d="M-8 -44 C-27 -38 -32 -20 -23 -12 L-8 -12 Z" seams="M-8 -34 C-17 -31 -22 -25 -23 -19" p={p} />
+      <Solid d="M-4 -43 C7 -34 17 -22 21 -12 L-3 -12 Z" fill={p.cloth} strokeWidth={0.8} />
+      {/* Hull: flat deck, curved belly, prow lifting at the bow. */}
+      <Solid
+        d="M-46 -9 L28 -9 C42 -8 53 -4 60 3 C50 11 24 17 -6 17 C-24 17 -38 13 -46 7 Z"
+        fill={p.hull}
       />
+      {/* The gunwale — a painted band along the top of the planking. */}
+      <Solid
+        d="M-46 -12 L30 -12 C45 -11 56 -6 63 2 L59 3.5 C52 -3 42 -7 28 -8 L-46 -8 Z"
+        fill={p.deck}
+        strokeWidth={0.8}
+      />
+      <Portholes at={[[-34, 2], [-21, 4], [-8, 5], [5, 4]]} p={p} />
+      <Blob cx={34} cy={0} rx={9} ry={5} fill={GLASS} outline={false} />
+      {/* Bowsprit. */}
+      <path d="M58 1 L74 -4" stroke={p.keel} strokeWidth="1.6" strokeLinecap="round" />
     </g>
   )
 }
 
-function Freighter({ hull }) {
+/**
+ * 180 credits: the freighter, which in this fleet is a working village that
+ * flies — cabins with pitched roofs along the deck, a promenade rail, and an
+ * observatory dome over the bow.
+ */
+function Freighter({ p }) {
+  const cabin = (x, w, h) => (
+    <g key={x}>
+      <Solid d={`M${x} -13 L${x + w} -13 L${x + w} ${-13 - h} L${x} ${-13 - h} Z`} fill={p.pale} strokeWidth={0.8} />
+      <Solid
+        d={`M${x - 2.5} ${-13 - h} L${x + w + 2.5} ${-13 - h} L${x + w / 2} ${-19 - h} Z`}
+        fill={p.deck}
+        strokeWidth={0.8}
+      />
+      <rect x={x + w / 2 - 1.8} y={-11 - h} width="3.6" height="4" rx="1" fill={GLASS} opacity="0.85" />
+    </g>
+  )
+
   return (
     <g transform="translate(158 100)">
-      <Engines x={-70} spread={13} />
-      <Hull
-        d="M-70 -27 L20 -31 L74 0 L20 31 L-70 27 Z"
-        cockpit={[46, 0]}
-        hull={hull}
-        panels={[
-          [-58, -17, 24, 34],
-          [-28, -19, 24, 38],
-          [2, -19, 22, 38],
-        ]}
-        lights={[[-46, -24], [-16, -26], [14, -26], [-46, 24], [-16, 26], [14, 26]]}
+      <Engines x={-76} spread={13} />
+      <Solid d="M-70 -10 L-88 -30 L-62 -12 Z" fill={p.keel} strokeWidth={0.8} opacity={0.85} />
+      {/* One mast, stepped right at the stern. Anywhere further forward and the
+          sail leans on a cabin roof and reads as fallen over. */}
+      <path d="M-64 -15 V-56" stroke={p.keel} strokeWidth="1.8" strokeLinecap="round" />
+      {/* The sail's foot clears the cabin roofs. Lower than this and it leans on
+          the first one and the whole thing reads as a crane, not a mast. */}
+      <Sail d="M-63 -54 C-46 -49 -43 -38 -54 -33 L-63 -33 Z" seams="M-63 -46 C-54 -43 -49 -39 -48 -35" p={p} />
+      <Rigging d="M-64 -55 L-72 -16 M-64 -55 L-47 -32" p={p} />
+
+      <Solid
+        d="M-72 -12 L34 -12 C54 -10 70 -3 80 5 C64 17 28 24 -12 24 C-40 24 -60 19 -72 11 Z"
+        fill={p.hull}
       />
+      <Solid
+        d="M-72 -15 L36 -15 C57 -13 73 -6 84 4 L80 6 C70 -3 54 -9 34 -11 L-72 -11 Z"
+        fill={p.deck}
+        strokeWidth={0.8}
+      />
+      {/* The promenade: the thing that says people walk about up there. */}
+      <Rail from={-68} to={26} y={-17} p={p} posts={8} />
+      {[cabin(-62, 20, 11), cabin(-36, 22, 13), cabin(-8, 18, 10)].map((node) => node)}
+      {/* Observatory over the bow. */}
+      <Dome cx={40} cy={-13} rx={14} ry={12} p={p} finial={5} />
+      <path d="M28 -13 h24" stroke={p.trim} strokeWidth="2" />
+      <Blob cx={40} cy={-15} rx={8} ry={6.5} fill={GLASS} outline={false} />
+      <Portholes at={[[-58, 4], [-42, 6], [-26, 8], [-10, 9], [6, 9], [22, 7]]} p={p} />
+      <Blob cx={56} cy={2} rx={10} ry={5.5} fill={GLASS} outline={false} />
     </g>
   )
 }
 
-function Cruiser({ hull }) {
+/**
+ * 320 credits: the palace ship. Domes, a colonnade, minarets and gold leaf on a
+ * long sweeping hull. Detail scales with price — this one has to be obviously
+ * more expensive than the freighter from across the room.
+ */
+function Cruiser({ p }) {
+  // The colonnade. Filled with trim it reads as a row of headstones, so the
+  // arches are lit windows with a pillar between each — an arcade you can see
+  // people walking along, which is the whole point of putting one on a ship.
+  const arch = (x) => (
+    <g key={x}>
+      <path
+        d={`M${x} -6 L${x} -12 A3.2 4.2 0 0 1 ${x + 6.4} -12 L${x + 6.4} -6 Z`}
+        fill={GLASS}
+        opacity="0.85"
+      />
+      <path d={`M${x + 6.9} -6 v-6`} stroke={p.trim} strokeWidth="1.6" opacity="0.9" />
+    </g>
+  )
+  const minaret = (x, h) => (
+    <g key={x}>
+      <Solid d={`M${x - 2.6} -14 L${x + 2.6} -14 L${x + 2} ${-14 - h} L${x - 2} ${-14 - h} Z`} fill={p.pale} strokeWidth={0.7} />
+      <path d={`M${x - 3.4} ${-11 - h} h6.8`} stroke={LEAF} strokeWidth="1" opacity="0.9" />
+      <Dome cx={x} cy={-14 - h} rx={3.6} ry={4.2} p={p} finial={4} />
+    </g>
+  )
+
   return (
     <g transform="translate(160 100)">
       {/* A wider burn than anything else in the slot — at 320 credits the
           difference should be visible without reading the label. */}
-      <Engines x={-74} spread={15} />
-      <path d="M-64 -16 L-46 -42 L-4 -24 Z" fill={hull} opacity="0.65" />
-      <path d="M-64 16 L-46 42 L-4 24 Z" fill={hull} opacity="0.65" />
-      <Hull
-        d="M-74 -12 L-26 -22 L40 -14 L84 0 L40 14 L-26 22 L-74 12 Z"
-        cockpit={[52, 0]}
-        hull={hull}
-        panels={[[-20, -10, 40, 20], [-52, -7, 24, 14]]}
-        lights={[[-40, -14], [-14, -18], [12, -14], [-40, 14], [-14, 18], [12, 14], [34, -9], [34, 9]]}
+      <Engines x={-80} spread={15} />
+      <Solid d="M-72 -8 L-92 -30 L-62 -11 Z" fill={p.keel} strokeWidth={0.8} opacity={0.8} />
+      <Solid d="M-72 8 L-90 28 L-62 11 Z" fill={p.keel} strokeWidth={0.8} opacity={0.8} />
+
+      {/* A pennant off the central finial. Drawn as a tapering shape rather than
+          a stroke — an even-width stroke reads as a grey sausage in mid-air. */}
+      <Solid
+        d="M6 -59 C-12 -54 -30 -61 -52 -56 L-42 -52 L-52 -48 C-30 -45 -12 -44 6 -48 Z"
+        fill={p.cloth}
+        strokeWidth={0.7}
       />
+
+      {minaret(-40, 18)}
+      {minaret(50, 15)}
+      <Dome cx={-16} cy={-16} rx={11} ry={10} p={p} finial={4} />
+      <Dome cx={28} cy={-16} rx={10} ry={9} p={p} finial={4} />
+      {/* The drum under the main dome, with its own windows. */}
+      <Solid d="M-6 -16 L18 -16 L18 -30 L-6 -30 Z" fill={p.pale} strokeWidth={0.8} />
+      <Dome cx={6} cy={-30} rx={16} ry={16} p={p} finial={10} />
+      <Portholes at={[[0, -23], [12, -23]]} p={p} r={2} />
+
+      <Solid
+        d="M-76 -6 C-42 -14 0 -18 38 -16 C66 -14 88 -6 100 2 C78 13 34 20 -12 19 C-44 18 -66 11 -76 3 Z"
+        fill={p.hull}
+      />
+      {/* The gold waterline, the single most expensive-looking line here. */}
+      <path
+        d="M-74 -7 C-40 -15 0 -19 38 -17 C66 -15 88 -7 99 1"
+        stroke={LEAF}
+        strokeWidth="1.6"
+        fill="none"
+        opacity="0.9"
+      />
+      <g>{[-52, -42, -32, -22, 34, 44, 54].map((x) => arch(x))}</g>
+      <Portholes at={[[-58, 4], [-44, 6], [-30, 7], [-16, 8], [-2, 8], [12, 8], [26, 7], [40, 5]]} p={p} r={2.1} />
+      {/* The prow canopy: one long window, not a bubble. */}
+      <Solid d="M56 -4 C70 -3 84 1 92 4 C82 8 68 9 58 8 Z" fill={GLASS} strokeWidth={0.7} />
+      <path d="M64 -3 v10 M74 -1 v9" stroke={p.trim} strokeWidth="0.9" opacity="0.7" />
     </g>
   )
 }
 
-/** The 50-credit first purchase: one seat and an engine. */
-function PodRunner({ hull }) {
+/**
+ * 220 credits: a shark, converted. Toothed prow, gill slits, a dorsal fin and
+ * pectoral wings — the one hull in the slot that is looking back at you.
+ */
+function Hammerhead({ p }) {
+  // Teeth hang from the mouth line, inside the snout. Stood on top of it they
+  // march off past the nose and the ship looks like it is eating the void.
+  const teeth = Array.from({ length: 6 }, (_, i) => {
+    const x = 36 + i * 5.2
+    const drop = 4.6 - Math.abs(i - 2.5) * 0.5
+    return `M${x} ${2.6 + i * 0.35} l2.6 ${drop} l2.6 ${-drop} Z`
+  }).join(' ')
+
   return (
     <g transform="translate(160 100)">
-      <Engines x={-26} spread={6} />
-      <Hull d="M-26 -12 L6 -14 L34 0 L6 14 L-26 12 Z" cockpit={[14, 0]} hull={hull} />
+      <Engines x={-60} spread={11} />
+      {/* Tail, then the fins, then the body over the top of them. */}
+      <Solid d="M-56 -4 L-80 -26 L-72 0 L-80 22 L-56 6 Z" fill={p.deck} strokeWidth={0.9} />
+      <Solid d="M-8 -20 L8 -44 L28 -17 Z" fill={p.deck} strokeWidth={0.9} />
+      <Solid d="M-6 10 L-30 34 L16 17 Z" fill={p.deck} strokeWidth={0.9} opacity={0.95} />
+
+      <Solid
+        d="M-58 -5 C-40 -22 -2 -28 32 -19 C50 -14 64 -6 70 1 C58 10 22 18 -18 16 C-38 15 -52 10 -58 5 Z"
+        fill={p.hull}
+      />
+      {/* The pale belly — a shark is two colours and this is the one that says so. */}
+      <Solid
+        d="M-54 6 C-24 15 16 14 66 3 C58 9 24 18 -18 16 C-36 15 -48 11 -54 6 Z"
+        fill={p.canvas}
+        strokeWidth={0.7}
+      />
+      {/* The mouth, and the teeth hanging off it. */}
+      <path d="M33 2 C45 5 58 5 68 1" stroke={p.trim} strokeWidth="1.8" fill="none" strokeLinecap="round" />
+      <path d={teeth} fill={tintUp(p.canvas, 0.6)} />
+      {/* Gills. */}
+      <g stroke={p.trim} strokeWidth="1.3" fill="none" opacity="0.7" strokeLinecap="round">
+        <path d="M-30 -10 q-3 7 -1 14 M-23 -12 q-3 8 -1 15 M-16 -13 q-3 8 -1 16 M-9 -13 q-3 9 -1 16" />
+      </g>
+      {/* The bit that makes it a ship rather than a fish: somebody is flying it. */}
+      <Solid d="M-2 -18 C6 -24 18 -25 26 -21 C18 -16 6 -15 -2 -16 Z" fill={GLASS} strokeWidth={0.7} />
+      <path d="M8 -22.5 v6 M17 -22.5 v6" stroke={p.trim} strokeWidth="0.9" opacity="0.6" />
+      <Portholes at={[[-44, 2], [-37, 5]]} p={p} r={2} />
+      {/* The eye. Open, friendly, and never a slit — nothing in this app menaces. */}
+      <circle cx="38" cy="-9" r="5" fill={GLASS} />
+      <circle cx="39" cy="-9" r="2.5" fill={shade(p.hull, 0.7)} />
+      <circle cx="36.6" cy="-10.4" r="1.1" fill="#ffffff" opacity="0.9" />
     </g>
   )
 }
 
-const HULLS = { succulent: PodRunner, fern: Scout, monstera: Freighter, orchid: Cruiser }
+/**
+ * 420 credits, and the top of the slot: part vessel, part something that swims.
+ * A mantle with three canopies under it, cream wings, and six arms trailing
+ * behind with the suckers drawn in. If this doesn't obviously out-detail the
+ * palace ship, the slot is broken — see CLAUDE.md.
+ */
+function Drifter({ p }) {
+  // Six arms, each a curling ribbon. The suckers are sampled off the same
+  // centreline, so they follow the curl instead of being sprinkled near it.
+  // Each one leaves the mantle at its own point. Started from a single origin
+  // they cross into one dark knot at the base and the ship grows a beard.
+  // The curl has to push each arm AWAY from the middle of the fan. Curling them
+  // all toward it — which is what happens if the sign is the same on both sides
+  // — folds the whole lot into one bunch pointing the same way.
+  const arms = [
+    { at: [-10, -20], w: 13, line: armLine(206, 58, 28, 0.4) },
+    { at: [-17, -13], w: 15, line: armLine(194, 72, 20, 1.7) },
+    { at: [-21, -4], w: 16, line: armLine(182, 82, 8, 0.9) },
+    { at: [-19, 5], w: 15, line: armLine(170, 76, -14, 2.3) },
+    { at: [-13, 12], w: 13, line: armLine(158, 62, -26, 1.2) },
+    { at: [-4, 17], w: 11, line: armLine(146, 50, -30, 2.1) },
+  ]
+
+  return (
+    <g transform="translate(164 98)">
+      <Engines x={-30} spread={12} />
+      {arms.map((arm, i) => (
+        <g key={i} transform={`translate(${arm.at[0]} ${arm.at[1]})`}>
+          <Solid d={ribbon(arm.line, arm.w)} fill={i % 2 ? p.hull : p.deck} strokeWidth={0.8} />
+          {[4, 8, 12].map((n) => (
+            <circle key={n} cx={arm.line[n][0]} cy={arm.line[n][1]} r={2.4 - n * 0.09} fill={p.canvas} opacity="0.85" />
+          ))}
+        </g>
+      ))}
+
+      {/* Wings, out to either side and behind the mantle. Ribbed, or a pale
+          shape sticking out from behind a dark one just reads as a mistake. */}
+      {[
+        { d: 'M-4 6 C-28 16 -42 34 -22 38 C-4 36 10 22 14 10 Z', ribs: 'M-6 10 C-16 20 -22 28 -20 34 M2 10 C-4 20 -8 28 -8 34' },
+        { d: 'M-2 -10 C-26 -22 -40 -42 -20 -44 C-2 -40 12 -24 16 -12 Z', ribs: 'M-4 -14 C-14 -24 -20 -32 -18 -40 M4 -14 C-2 -24 -6 -32 -6 -40' },
+      ].map((wing) => (
+        <g key={wing.d}>
+          <Solid d={wing.d} fill={p.canvas} strokeWidth={0.8} />
+          <path d={wing.ribs} stroke={shade(p.canvas, 0.22)} strokeWidth="0.9" fill="none" opacity="0.7" />
+        </g>
+      ))}
+
+      {/* The mantle. */}
+      <Blob cx={16} cy={-4} rx={44} ry={26} fill={p.hull} strokeWidth={1.1} />
+      {/* A scalloped frill along its lower edge, which is most of what makes it
+          read as a creature rather than an egg. */}
+      <path
+        d="M-24 6 q6 9 12 0 q6 9 12 0 q6 9 12 0 q6 9 12 0 q6 9 12 0 q6 9 12 0"
+        fill={p.deck}
+        opacity="0.9"
+      />
+      <path
+        d="M-26 3 C-8 15 34 16 58 2"
+        stroke={p.trim}
+        strokeWidth="1.2"
+        fill="none"
+        opacity="0.6"
+      />
+      {/* A crest along the top, echoing the frill below it. */}
+      <path
+        d="M-8 -24 q7 -8 13 -1 q7 -9 13 -1 q7 -8 13 0"
+        fill="none"
+        stroke={p.pale}
+        strokeWidth="2"
+        opacity="0.75"
+        strokeLinecap="round"
+      />
+      {/* Markings: rings, which read at this size where flat spots did not. */}
+      {[[4, -12, 5], [24, -8, 4], [42, -2, 3]].map(([x, y, r]) => (
+        <g key={x}>
+          <circle cx={x} cy={y} r={r} fill={p.pale} opacity="0.4" />
+          <circle cx={x} cy={y} r={r + 1.6} fill="none" stroke={p.pale} strokeWidth="1.1" opacity="0.55" />
+        </g>
+      ))}
+
+      {/* Three canopies, which is where the crew actually sit. */}
+      <Blob cx={-4} cy={-18} rx={11} ry={9} fill={GLASS} outline={false} />
+      <Blob cx={20} cy={-21} rx={9} ry={7.5} fill={GLASS} outline={false} />
+      <Blob cx={40} cy={-14} rx={7} ry={6} fill={GLASS} outline={false} />
+      <g fill={p.trim} opacity="0.55">
+        <rect x="-5" y="-27" width="2" height="18" rx="1" />
+        <rect x="19" y="-29" width="2" height="16" rx="1" />
+        <rect x="39" y="-20" width="1.6" height="12" rx="0.8" />
+      </g>
+      {/* Lamps under the mantle — a deep-sea thing, and it reads at a glance. */}
+      {[[-14, 10], [4, 14], [24, 14], [44, 8]].map(([x, y]) => (
+        <g key={x}>
+          <circle cx={x} cy={y} r="5.5" fill={LAMP} opacity="0.22" />
+          <circle cx={x} cy={y} r="2" fill={LAMP} />
+        </g>
+      ))}
+    </g>
+  )
+}
+
+const HULLS = {
+  succulent: PodRunner,
+  fern: Scout,
+  monstera: Freighter,
+  shark: Hammerhead,
+  orchid: Cruiser,
+  drifter: Drifter,
+}
 
 /** Docking lights: the guide strips along the bay. */
 function DockingLights({ dim }) {
@@ -258,13 +651,21 @@ function Weather({ art, dim }) {
   return null
 }
 
-/** A tender flying alongside for every companion bought. */
-function Tender({ x, y, hull, glow }) {
+/** A tender flying alongside for every companion bought — the same little
+    sailed launch as everything else in the fleet, at half size. */
+function Tender({ x, y, p, glow }) {
   return (
-    <g transform={`translate(${x} ${y}) scale(0.42)`}>
-      <path d="M-30 0 L-10 -12 L26 -10 L36 0 L26 10 L-10 12 Z" fill={hull} />
-      <ellipse cx="16" cy="0" rx="7" ry="5" fill="#bfe7ff" opacity="0.9" />
-      <path d="M-30 -5 L-46 0 L-30 5 Z" fill={glow} />
+    <g transform={`translate(${x} ${y}) scale(0.48)`}>
+      <path d="M-4 -8 V-26" stroke={p.keel} strokeWidth="2" strokeLinecap="round" />
+      <path d="M-3 -25 C9 -21 12 -13 4 -8 L-3 -8 Z" fill={p.canvas} stroke={shade(p.canvas, 0.3)} strokeWidth="0.8" />
+      <path
+        d="M-26 -7 C-14 -12 2 -13 15 -7 C22 -4 22 4 15 7 C2 13 -14 12 -26 7 Z"
+        fill={p.hull}
+        stroke={shade(p.hull, 0.4)}
+        strokeWidth="1"
+      />
+      <ellipse cx="8" cy="-1" rx="6" ry="4" fill={GLASS} opacity="0.9" />
+      <path d="M-26 -5 L-40 0 L-26 5 Z" fill={glow} />
     </g>
   )
 }
@@ -272,6 +673,7 @@ function Tender({ x, y, hull, glow }) {
 export default function Ship({ equipped = {}, companions = [], mood = MOOD.LIVELY }) {
   const dim = mood === MOOD.QUIET
   const hull = hullShade(equipped[SLOTS.FINISH]?.color ?? HULL_DEFAULT, mood)
+  const p = palette(hull)
   const glow = dim ? '#3f5670' : '#5eead4'
   const Vessel = HULLS[equipped[SLOTS.VESSEL]?.art] ?? Shuttle
   const sceneArt = equipped[SLOTS.SCENE]?.art
@@ -315,12 +717,8 @@ export default function Ship({ equipped = {}, companions = [], mood = MOOD.LIVEL
           <stop offset="0%" stopColor="#fde68a" stopOpacity="0.75" />
           <stop offset="100%" stopColor="#fde68a" stopOpacity="0" />
         </radialGradient>
-        {/* Lit from above: a highlight along the top of any hull, shade beneath. */}
-        <linearGradient id="ship-sheen" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.22" />
-          <stop offset="45%" stopColor="#ffffff" stopOpacity="0" />
-          <stop offset="100%" stopColor="#000000" stopOpacity="0.28" />
-        </linearGradient>
+        {/* The top light over every plate comes from `p-lit` in SceneDefs now,
+            which is the same one the windowsill and the cats use. */}
       </defs>
 
       <rect width="320" height="200" fill="url(#ship-void)" />
@@ -346,10 +744,10 @@ export default function Ship({ equipped = {}, companions = [], mood = MOOD.LIVEL
       <Weather art={weatherArt} dim={dim} />
 
       {companions.slice(0, spots.length).map((companion, i) => (
-        <Tender key={companion.id} x={spots[i][0]} y={spots[i][1]} hull={hull} glow={glow} />
+        <Tender key={companion.id} x={spots[i][0]} y={spots[i][1]} p={p} glow={glow} />
       ))}
 
-      <Vessel hull={hull} />
+      <Vessel p={p} />
 
       {FlairShape ? <FlairShape dim={dim} /> : null}
 

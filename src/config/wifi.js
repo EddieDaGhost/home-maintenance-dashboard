@@ -20,8 +20,8 @@
 
 export const NETWORK = {
   /** Exactly as it appears in the phone's WiFi list. */
-  ssid: 'Home',
-  password: 'Icantjustgiveyouthepassword!',
+  ssid: 'NachoWiFi',
+  password: 'pacostacos111',
   /** Shown under the password once it's revealed. Optional. */
   note: 'Same network for everything — there is no separate guest one.',
 }

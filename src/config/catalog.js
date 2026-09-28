@@ -44,7 +44,7 @@ export const CATALOG = [
     art: 'succulent',
     labels: label(
       { name: 'Succulent', note: 'Nearly impossible to disappoint.' },
-      { name: 'Pod runner', note: 'One seat, no cargo, goes anywhere.' },
+      { name: 'Pod runner', note: 'One sail, one seat, goes anywhere.' },
       { name: 'Kitten', note: 'Small. Extremely loud.' },
     ),
   },
@@ -55,7 +55,7 @@ export const CATALOG = [
     art: 'fern',
     labels: label(
       { name: 'Boston fern', note: 'Fills out fast and forgives neglect.' },
-      { name: 'Scout hull', note: 'Small, quick, easy to keep flying.' },
+      { name: 'Scout hull', note: 'Timber and canvas, and quick with it.' },
       { name: 'Tabby', note: 'Chatty, opinionated, always underfoot.' },
     ),
   },
@@ -66,8 +66,19 @@ export const CATALOG = [
     art: 'monstera',
     labels: label(
       { name: 'Monstera', note: 'Big leaves, takes up the whole sill.' },
-      { name: 'Freighter', note: 'Broad in the beam, room for everything.' },
+      { name: 'Freighter', note: 'Cabins on the deck, room for everybody.' },
       { name: 'Maine Coon', note: 'Enormous. Astonishingly heavy.' },
+    ),
+  },
+  {
+    id: 'vessel-shark',
+    slot: SLOTS.VESSEL,
+    cost: 220,
+    art: 'shark',
+    labels: label(
+      { name: 'Venus flytrap', note: 'Feed it nothing. It will be fine.' },
+      { name: 'Hammerhead', note: 'Grins the entire way there.' },
+      { name: 'Bengal', note: 'Athletic, spotted, and on the counter.' },
     ),
   },
   {
@@ -77,8 +88,19 @@ export const CATALOG = [
     art: 'orchid',
     labels: label(
       { name: 'Orchid', note: 'Fussy, and worth it when it blooms.' },
-      { name: 'Cruiser', note: 'Elegant lines, obviously expensive.' },
+      { name: 'Cruiser', note: 'Domes, gold leaf, obviously expensive.' },
       { name: 'Siamese', note: 'Elegant, vocal, deeply judgemental.' },
+    ),
+  },
+  {
+    id: 'vessel-drifter',
+    slot: SLOTS.VESSEL,
+    cost: 420,
+    art: 'drifter',
+    labels: label(
+      { name: 'Spider plant', note: 'Throws out babies in every direction.' },
+      { name: 'Drifter', note: 'Half ship, half something that swims.' },
+      { name: 'Ragdoll', note: 'Goes completely limp. Every time.' },
     ),
   },
 

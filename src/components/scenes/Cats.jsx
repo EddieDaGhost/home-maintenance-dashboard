@@ -16,23 +16,31 @@ const COAT_DEFAULT = '#a08a76'
  * of radius 12 at the origin, with the body below it, so a breed only has to
  * change colours and a couple of extra shapes.
  *
- * `points` is a Siamese: darker ears, muzzle and paws. `ruff` is the Maine
- * Coon's chest floof. `stripes` is a tabby.
+ * `points` is a Siamese: darker ears, muzzle and paws — and, with them, the
+ * blue eyes that go with the pattern. `ruff` is the Maine Coon's chest floof.
+ * `stripes` is a tabby, `spots` a Bengal, and `plume` the Ragdoll's tail.
  */
 const BREEDS = {
   succulent: { stripes: true, scale: 0.72 },
   fern: { stripes: true, scale: 1 },
   monstera: { ruff: true, scale: 1.16 },
+  shark: { spots: true, scale: 1.02 },
   orchid: { points: true, scale: 0.95 },
+  // The 420-credit one, so it gets everything: floof, points and a plume.
+  drifter: { ruff: true, points: true, plume: true, scale: 1.2 },
   // Companions and the starter cat: a plain small one.
   default: { stripes: true, scale: 0.9 },
 }
+
+/** Bengal rosettes: rings rather than dots, or it reads as a Dalmatian. Placed
+    by hand so none of them lands on the face. */
+const ROSETTES = [[-10, 17], [2, 21], [-14, 29], [7, 30], [-4, 37], [13, 25]]
 
 function Ears({ fill }) {
   return <path d="M-11 -6 L-13 -19 L-2 -12 Z M11 -6 L13 -19 L2 -12 Z" fill={fill} />
 }
 
-function Face({ asleep }) {
+function Face({ asleep, iris }) {
   if (asleep) {
     return (
       <g stroke="#2c2118" strokeWidth="1.4" fill="none" strokeLinecap="round" opacity="0.75">
@@ -43,8 +51,13 @@ function Face({ asleep }) {
   }
   return (
     <g>
-      <ellipse cx="-4.5" cy="-2" rx="1.8" ry="2.6" fill="#2c2118" />
-      <ellipse cx="4.5" cy="-2" rx="1.8" ry="2.6" fill="#2c2118" />
+      {[-4.5, 4.5].map((ex) => (
+        <g key={ex}>
+          <ellipse cx={ex} cy="-2" rx="1.8" ry="2.6" fill={iris ?? '#2c2118'} />
+          {/* A coloured iris needs a pupil drawn on it, or it reads as a bead. */}
+          {iris ? <ellipse cx={ex} cy="-2" rx="0.8" ry="2.2" fill="#2c2118" /> : null}
+        </g>
+      ))}
       <path d="M0 4 l-2.5 -2.5 h5 Z" fill="#c98b8b" />
       <path d="M0 4 v2.5" stroke="#2c2118" strokeWidth="1" opacity="0.5" />
     </g>
@@ -57,13 +70,23 @@ function SittingCat({ coat, mark, breed }) {
     <g>
       <Ground x={0} y={44} w={52} />
       {/* Tail first, so it sits behind the body. */}
-      <path
-        d="M15 40 C38 42 42 22 30 14"
-        stroke={coat}
-        strokeWidth="7"
-        fill="none"
-        strokeLinecap="round"
-      />
+      {breed.plume ? (
+        // A plume widens along its length. A fat stroke with a round blob on
+        // the end reads as a lollipop, which is what the first pass looked like.
+        <g>
+          <path d="M15 40 C40 42 46 21 33 11" stroke={coat} strokeWidth="8" fill="none" strokeLinecap="round" />
+          <Blob cx={35} cy={17} rx={6.5} ry={10} fill={coat} rotate={-24} outline={false} />
+          <Blob cx={33} cy={12} rx={4.6} ry={7.5} fill={tintUp(coat, 0.13)} rotate={-24} outline={false} />
+        </g>
+      ) : (
+        <path
+          d="M15 40 C38 42 42 22 30 14"
+          stroke={coat}
+          strokeWidth="7"
+          fill="none"
+          strokeLinecap="round"
+        />
+      )}
       {/* Body: narrow at the shoulders, wide at the base, and the haunch
           rounding out at the bottom — that curve is what says "sitting". */}
       <Solid
@@ -74,6 +97,15 @@ function SittingCat({ coat, mark, breed }) {
       {breed.stripes ? (
         <g stroke={mark} strokeWidth="2.2" strokeLinecap="round" opacity="0.55">
           <path d="M-13 22 h8 M-15 30 h9 M-16 37 h9" />
+        </g>
+      ) : null}
+      {breed.spots ? (
+        <g stroke={mark} strokeWidth="1.6" fill="none" opacity="0.6">
+          {ROSETTES.map(([sx, sy]) => (
+            <ellipse key={`${sx}-${sy}`} cx={sx} cy={sy} rx="3.2" ry="2.4" />
+          ))}
+          {/* Rings down the tail, which is where they are most obvious. */}
+          <path d="M31 19 q4 -2 5 2 M35 28 q4 -1 4 3" strokeWidth="1.8" strokeLinecap="round" />
         </g>
       ) : null}
       {/* Front paws, tucked forward under the chest. */}
@@ -91,7 +123,14 @@ function SittingCat({ coat, mark, breed }) {
           <path d="M-5.5 -6.5 v-3 M0 -8 v-3 M5.5 -6.5 v-3" />
         </g>
       ) : null}
-      <Face asleep={false} />
+      {breed.spots ? (
+        <g stroke={mark} strokeWidth="1.3" fill="none" opacity="0.55">
+          <ellipse cx="-7" cy="-7" rx="2.4" ry="1.8" />
+          <ellipse cx="6.5" cy="-7.5" rx="2.4" ry="1.8" />
+          <path d="M-3 -10.5 h6" strokeLinecap="round" />
+        </g>
+      ) : null}
+      <Face asleep={false} iris={breed.points ? '#5b8fc9' : undefined} />
     </g>
   )
 }
@@ -102,10 +141,21 @@ function CurledCat({ coat, mark, breed }) {
     <g>
       <Ground x={2} y={42} w={58} />
       <Blob cx={2} cy={30} rx={26} ry={13} fill={coat} />
-      <path d="M24 32 C42 34 40 46 22 42" stroke={coat} strokeWidth="6" fill="none" strokeLinecap="round" />
+      {breed.plume ? (
+        <path d="M24 32 C45 34 43 48 20 43" stroke={coat} strokeWidth="10" fill="none" strokeLinecap="round" />
+      ) : (
+        <path d="M24 32 C42 34 40 46 22 42" stroke={coat} strokeWidth="6" fill="none" strokeLinecap="round" />
+      )}
       {breed.stripes ? (
         <g stroke={mark} strokeWidth="2" strokeLinecap="round" opacity="0.5">
           <path d="M4 20 q2 6 0 12 M14 21 q2 6 0 11" />
+        </g>
+      ) : null}
+      {breed.spots ? (
+        <g stroke={mark} strokeWidth="1.5" fill="none" opacity="0.55">
+          <ellipse cx="2" cy="25" rx="3" ry="2.2" />
+          <ellipse cx="14" cy="28" rx="3" ry="2.2" />
+          <ellipse cx="-8" cy="30" rx="3" ry="2.2" />
         </g>
       ) : null}
       <g transform="translate(-17 24) scale(0.88)">
