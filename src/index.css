@@ -291,6 +291,35 @@ select.field {
   outline-offset: 1px;
 }
 
+/* ---------------------------------------------------------------------------
+   Keyboard focus.
+
+   The app is made almost entirely of buttons, and until this existed none of
+   them showed where the keyboard was: the only rule was `.field:focus` above,
+   so tabbing to a Log button left the browser's 1px default outline, which is
+   invisible against `--accent` on a dark primary button and nearly so on a
+   panel.
+
+   `:focus-visible` rather than `:focus` is the load-bearing part. `:focus`
+   would leave a ring behind after every tap on a phone, which reads as broken
+   — the browser only matches `:focus-visible` when the focus came from a
+   keyboard, so a thumb never sees it.
+
+   The ring is drawn in `--accent`, so it follows the theme like everything
+   else, with a hard `--surface` gap so it stays legible on a tinted area card.
+   ------------------------------------------------------------------------ */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: calc(var(--radius) - 0.25rem);
+}
+
+/* Starship's accent is a cyan that can vanish against its own glow, so the
+   ring there gets a dark halo to sit in. */
+[data-theme='starship'] :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  box-shadow: 0 0 0 4px var(--bg);
+}
+
 /* ===========================================================================
    STARSHIP SET DRESSING
    Pure CSS and a handful of divs — no images, nothing to download.

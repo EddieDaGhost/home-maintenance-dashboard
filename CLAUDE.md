@@ -163,7 +163,9 @@ one costs nothing, and a new one is a component in `src/components/scenes/` plus
 a `labels` entry per item in `catalog.js`.
 
 **Scenes are inline SVG, never image files.** Two reasons, and the second is the
-load-bearing one:
+load-bearing one. (The **home-screen icons in `public/` are the one exception**,
+and not really an exception: see the note under Deployment. Nothing else in the
+app is a raster file, and nothing else should become one.)
 
 1. The service worker precaches the shell, and anything that waits on a download
    breaks the tap that matters most. `SpaceBackdrop.jsx` is the precedent.
@@ -212,12 +214,31 @@ the app. Keep that property.
 room. Tap targets ≥ 44px, inputs at 16px font (smaller makes iOS zoom the page),
 and no horizontal overflow — the tests assert that last one.
 
+**Mobile first is not mobile only.** Two things that only a keyboard or a
+screen reader ever sees, both of which were broken and are now asserted in
+`tests/a11y.mjs`:
+
+- **`Sheet.jsx` is the only modal, so it is the only place modality is
+  implemented.** `aria-modal="true"` is a promise the browser does not keep for
+  you. All twelve sheets go through that one component, which moves focus in on
+  open, traps Tab and Shift+Tab, and hands focus back to the trigger on close.
+  Before that, opening a sheet left focus on the button behind it and twenty
+  presses of Tab walked the page underneath without once entering the dialog.
+  The backdrop is a `div`, deliberately: as a `<button aria-label="Close">` it
+  was a full-screen tab stop ahead of the dialog and a second "Close" for a
+  screen reader to announce.
+- **Focus rings use `:focus-visible`, never `:focus`.** `:focus` paints a ring
+  after every thumb tap, which reads as broken on the device this app is for.
+  The ring is `var(--accent)` with `outline-offset: 2px`, so it sits *outside*
+  the control — which is what keeps it visible on a primary button, whose fill
+  is that same `--accent`.
+
 ---
 
 ## Testing
 
 ```bash
-npm run check              # everything: 1027 checks
+npm run check              # everything: 1050 checks
 npm run check -- logic     # just the fast pure-logic suite (no browser)
 ```
 
@@ -245,6 +266,18 @@ TEST_URL=https://homemaintenance.app npm run check
 - **The build emits a service worker** (`dist/sw.js`) that precaches the app.
   A new deploy is picked up on the next load: `index.html` is fetched
   network-first, hashed assets are cache-first, old caches are cleaned up.
+- **The home-screen icons are generated, not hand-made.** `node
+  scripts/make-icons.mjs` rasterises one glyph into `public/`. They are the only
+  image files in the app, and they have to be: **iOS ignores the web manifest
+  for Add to Home Screen and will not take an SVG**, so without
+  `apple-touch-icon.png` and the `<link>` in `index.html` it puts a *screenshot
+  of the page* on the home screen — on the app whose whole pitch is "add it to
+  your home screen and tap the stickers". `any` and `maskable` are separate
+  manifest entries on purpose: one entry marked `"any maskable"` tells a
+  launcher it may crop, and the art it pointed at had rounded corners, so
+  Android cropped the corners off a shape that already had them. Maskable art is
+  full-bleed with the glyph inside the middle 80%. `png` is in the service
+  worker's `globPatterns` so they survive offline.
 - **Domain:** `homemaintenance.app` (registered at Porkbun, DNS pointed at
   Vercel). `.app` is HSTS-preloaded, so **every NFC tag URL must be `https://`**.
 - **Don't write NFC tags against a `*.vercel.app` URL.** Those generated URLs sit
