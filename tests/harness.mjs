@@ -24,7 +24,8 @@ const CHROME_LOCATIONS = [
   'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
 ]
 
-function findBrowser() {
+/** Exported so scripts/make-icons.mjs can borrow the same browser hunt. */
+export function findBrowser() {
   if (process.env.CHROME_PATH) return process.env.CHROME_PATH
   if (process.env.PLAYWRIGHT_BROWSERS_PATH) {
     const bundled = `${process.env.PLAYWRIGHT_BROWSERS_PATH}/chromium`

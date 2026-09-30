@@ -18,6 +18,7 @@ const SUITES = [
   { name: 'welcome', file: './welcome.mjs', browser: true, virgin: true },
   { name: 'walkthrough', file: './walkthrough.mjs', browser: true },
   { name: 'themes', file: './themes.mjs', browser: true },
+  { name: 'a11y', file: './a11y.mjs', browser: true },
   { name: 'naming', file: './naming.mjs', browser: true, clipboard: true },
   { name: 'rooms', file: './rooms.mjs', browser: true },
   { name: 'estate', file: './estate.mjs', browser: true },
