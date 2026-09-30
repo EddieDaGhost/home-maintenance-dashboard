@@ -34,6 +34,7 @@ import { openItems } from '../lib/daily.js'
 import { mineOf } from '../lib/turns.js'
 import ProgressBar from './ProgressBar.jsx'
 import TaskCard from './TaskCard.jsx'
+import DailyNote from './DailyNote.jsx'
 import EditAreaSheet from './EditAreaSheet.jsx'
 import ThemePicker from './ThemePicker.jsx'
 import AboutSheet from './AboutSheet.jsx'
@@ -143,6 +144,9 @@ export default function Dashboard({
   onOpenEstate,
   onOpenToday,
   onOpenSettings,
+  notesOn = true,
+  noteShuffle = 0,
+  onShuffleNote,
   sync,
   readOnly = false,
 }) {
@@ -227,6 +231,10 @@ export default function Dashboard({
           </button>
         </div>
       </header>
+
+      {/* Under the greeting rather than further down: it reads as part of being
+          said hello to, and it is the one thing here that asks nothing of you. */}
+      {notesOn ? <DailyNote now={now} shuffle={noteShuffle} onShuffle={onShuffleNote} /> : null}
 
       <section className="flex gap-2.5">
         <StatTile icon={Flame} label={copy.streakLabel} value={streak} tone="#f97316" />

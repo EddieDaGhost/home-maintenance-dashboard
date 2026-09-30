@@ -12,7 +12,7 @@ import {
   tasksNeedingAttention,
 } from '../src/lib/stats.js'
 import { buildCalendar } from '../src/lib/calendar.js'
-import { weekIndex } from '../src/lib/date.js'
+import { addDays, weekIndex } from '../src/lib/date.js'
 import {
   ALL_SLOTS,
   CATALOG,
@@ -99,6 +99,8 @@ import { mergeCompletions } from '../src/lib/sync.js'
 import { ROTATE, isTurnOf, lastLoggedBy, mineOf, turnLabel, whoseTurn } from '../src/lib/turns.js'
 import { THEME_LIST } from '../src/config/themes.js'
 import { NETWORK, QUESTIONS, RULES } from '../src/config/wifi.js'
+import { NOTES } from '../src/config/notes.js'
+import { defaultNotes, noteFor, normalizeNotes, pickIndex } from '../src/lib/notes.js'
 import {
   MAX_JUMP,
   acceptedFor,
@@ -1109,6 +1111,79 @@ export default async function run({ check }) {
   const restoredOld = parseBackup(JSON.stringify(older))
   is('an older backup has no places', restoredOld.places.home, null)
   is('and an empty list', restoredOld.daily.items.length, 0)
+
+  // =========================================================================
+  // The note on the dashboard
+  // =========================================================================
+
+  // --- the copy keeps the design rules ---
+  const looks = Object.keys(NOTES)
+  is('there is a set of notes for every look', looks.length, THEME_LIST.length)
+  is(
+    'every look has enough for a month without repeating',
+    looks.every((id) => NOTES[id].length >= 28),
+    true,
+    looks.map((id) => `${id}:${NOTES[id].length}`).join(' '),
+  )
+  is(
+    'no note is empty or a duplicate of another in its look',
+    looks.every((id) => {
+      const list = NOTES[id]
+      return list.every((n) => typeof n === 'string' && n.trim().length > 0) && new Set(list).size === list.length
+    }),
+    true,
+  )
+
+  // Design rule 2: the app has no failure state, so its one piece of unprompted
+  // encouragement may not imply one. This is the check that stops a
+  // well-meaning "don't forget the bins!" being added later.
+  const SCOLDS = /\b(late|overdue|missed|behind|failed|failure|lazy|should|must|don'?t forget|catch up|slack)\b/i
+  const scolding = looks.flatMap((id) => NOTES[id].filter((n) => SCOLDS.test(n)).map((n) => `${id}: ${n}`))
+  is('not one note scolds', scolding.length, 0, scolding.join(' | '))
+
+  // Design rule 5: points are encouragement, never a target — so nothing here
+  // may turn into one by mentioning the score.
+  const SCORES = /\b(streak|points?|pts|credits?|goal|target|score)\b/i
+  const scoring = looks.flatMap((id) => NOTES[id].filter((n) => SCORES.test(n)).map((n) => `${id}: ${n}`))
+  is('and not one of them mentions the score', scoring.length, 0, scoring.join(' | '))
+
+  // --- picking one ---
+  // The load-bearing property: the dashboard re-renders every minute, so the
+  // same day has to give the same note or it changes while you read it.
+  const noon = new Date(2026, 4, 12, 12, 0, 0)
+  const nearMidnight = new Date(2026, 4, 12, 23, 59, 0)
+  is('the same day gives the same note', noteFor('home', noon), noteFor('home', nearMidnight))
+  is('a different day gives a different one', noteFor('home', noon) === noteFor('home', addDays(noon, 1)), false)
+
+  // Stepping by a prime means every note comes up before any of them repeats.
+  const count = NOTES.home.length
+  const cycle = new Set(Array.from({ length: count }, (_, i) => pickIndex(count, i)))
+  is('a full cycle visits every note exactly once', cycle.size, count)
+  is(
+    'and no two days running are ever the same note',
+    Array.from({ length: 400 }, (_, i) => pickIndex(count, i) !== pickIndex(count, i + 1)).every(Boolean),
+    true,
+  )
+  // Dates before the anchor go negative, and a negative modulo would index off
+  // the front of the array.
+  is('a date before the anchor still lands in the list', pickIndex(count, -9) >= 0, true, `${pickIndex(count, -9)}`)
+  is('an empty list picks nothing rather than throwing', pickIndex(0, 5), -1)
+
+  // Tapping for another walks the list the same way waiting a day does.
+  is('tapping gives a different note', noteFor('home', noon) === noteFor('home', noon, 1), false)
+  is('and tapping again moves on again', noteFor('home', noon, 1) === noteFor('home', noon, 2), false)
+
+  // Each look speaks in its own voice, which is the whole reason they are
+  // separate lists rather than one shared one.
+  is('the looks do not share a note', noteFor('home', noon) === noteFor('cats', noon), false)
+  is('an unknown look falls back rather than blanking', noteFor('nope', noon).length > 0, true)
+
+  // --- the preference ---
+  is('notes are on unless you say otherwise', defaultNotes.on, true)
+  is('nonsense in the key reads as the default', normalizeNotes('{}').on, true)
+  is('a missing key too', normalizeNotes(null).on, true)
+  is('off is respected', normalizeNotes({ on: false }).on, false)
+  is('and only an explicit false turns it off', normalizeNotes({ on: 'nope' }).on, true)
 }
 
 /** Enough items to test the cap without writing sixty lines. */
