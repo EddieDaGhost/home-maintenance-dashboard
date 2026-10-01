@@ -101,6 +101,7 @@ src/
 │   ├── catalog.js   The shop: every item credits can buy, named per theme
 │   ├── forecast.js  The two Open-Meteo endpoints (no key, no env var)
 │   ├── wifi.js      The guest network, and the quiz in front of it
+│   ├── notes.js     The kind word on the dashboard, one list per theme
 │   └── icons.js     Icons offerable in the room picker
 ├── lib/             Pure functions, no React. Test these in tests/logic.mjs.
 │   ├── date.js      Week math (Monday-first), DST-safe day differences
@@ -121,6 +122,7 @@ src/
 │   ├── forecast.js  Today's weather, cached so it works with no signal
 │   ├── maps.js      The directions deep link — no API, no key
 │   ├── wifi.js      Marking the quiz, and the retyping step
+│   ├── notes.js     Which note you get today, and whether you get one
 │   ├── daily.js     Today's free-text list. Earns nothing, syncs nowhere.
 │   ├── backup.js    Export/import JSON
 │   └── calendar.js  .ics builder
@@ -238,7 +240,7 @@ screen reader ever sees, both of which were broken and are now asserted in
 ## Testing
 
 ```bash
-npm run check              # everything: 1050 checks
+npm run check              # everything: 1096 checks
 npm run check -- logic     # just the fast pure-logic suite (no browser)
 ```
 
@@ -445,6 +447,50 @@ to the network name, a nine-question quiz, and then the password.
   autofill and a keyboard swapping in a whole word.
 - **Nothing here scolds either.** A wrong answer says "have another look",
   there is no score, and the quiz uses `--attention-*` like everything else.
+
+---
+
+## The note on the dashboard
+
+One kind line under the greeting, in the voice of whichever look you're in, and
+a tap gets you another. `src/config/notes.js` holds the words, `src/lib/notes.js`
+the picking and the preference, `DailyNote.jsx` the card.
+
+- **It is not a notification, and the suite makes sure it cannot become one.**
+  This is the closest the app has ever come to speaking first, so design rule 1
+  is asserted against the shipped JavaScript rather than against behaviour:
+  `tests/note.mjs` fetches every script the page loads, plus `sw.js`, and fails
+  if the words `Notification`, `requestPermission`, `pushManager` or
+  `showNotification` appear in any of them. "It didn't notify me during the
+  test" is a much weaker claim than "it can't".
+- **A note never reads the log.** Every one of them is true whether you logged
+  twelve things today or nothing in a fortnight. A note that reacted to your
+  history would sooner or later need an opinion about a bad week, and design
+  rule 2 says the app doesn't get to have one. This is also why there is no
+  "you're on a roll!" variant, tempting as it is.
+- **The copy is held to the rules by a test, not by good intentions.** The logic
+  suite runs every string past a regex: nothing may say late, overdue, missed,
+  behind, failed, lazy, should, must, don't forget, catch up or slack, and
+  nothing may mention the streak, points, credits, a goal or a score. Three of
+  the first draft's own notes were caught by it and reworded — including "Slow
+  is a pace, not a failure", which is *reassuring* about failure and still had
+  to go. Keep the guard blunt; a rule you can argue with is not a rule.
+- **The pick is a pure function of the day, never `Math.random()`.** The
+  dashboard re-renders every sixty seconds (the clock tick in `App.jsx`), so a
+  random pick would reshuffle the note about once a minute while you were
+  reading it. Stepping through the list by a prime gives two things a hash
+  doesn't: consecutive days can never collide, and you see all 28 before any
+  repeat. Tapping moves by the same step, so it walks the list exactly like
+  waiting does.
+- **The preference is per-device, like the look.** It is deliberately *not* in
+  the sync document: settings are last-write-wins and shared by the household,
+  so one person turning notes off would turn them off for the other — and
+  whether you want a cheerful line on your phone is about as personal as a
+  preference gets. `emptyHouse()` keeps it for the same reason it keeps the look.
+  On is the default, so only "off" writes a key.
+- **Ninety strings would have buried `themes.js`.** They live in their own
+  config keyed by theme, the way `labels` in `catalog.js` does, and for the same
+  reason. A new look needs an entry here or the logic suite fails it.
 
 ---
 

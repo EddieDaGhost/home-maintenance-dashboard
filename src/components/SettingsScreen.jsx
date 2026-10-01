@@ -11,6 +11,7 @@ import {
   ListPlus,
   Nfc,
   RotateCcw,
+  Sparkles,
   Sunrise,
   Upload,
   Users,
@@ -61,6 +62,48 @@ function SettingsRow({ icon: Icon, label, detail, tone, onClick }) {
   )
 }
 
+/**
+ * A row that turns something on and off in place, rather than opening a sheet.
+ *
+ * `role="switch"` with `aria-checked`, not a checkbox: it takes effect on the
+ * tap, with nothing to confirm and no form around it. The track and knob are
+ * drawn rather than native so they follow the theme's `--accent` like
+ * everything else.
+ */
+function ToggleRow({ icon: Icon, label, detail, on, onChange }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      onClick={() => onChange(!on)}
+      className="flex w-full items-center gap-3 px-4 py-3 text-left transition active:scale-[0.99]"
+    >
+      <Icon className="h-5 w-5 shrink-0" style={{ color: 'var(--ink-2)' }} />
+      <span className="min-w-0 flex-1">
+        <span className="block font-semibold" style={{ color: 'var(--ink)' }}>
+          {label}
+        </span>
+        {detail ? (
+          <span className="block text-xs" style={{ color: 'var(--ink-3)' }}>
+            {detail}
+          </span>
+        ) : null}
+      </span>
+      <span
+        aria-hidden="true"
+        className="relative h-6 w-10 shrink-0 rounded-full transition"
+        style={{ background: on ? 'var(--accent)' : 'var(--line)' }}
+      >
+        <span
+          className="absolute top-0.5 h-5 w-5 rounded-full transition-all"
+          style={{ left: on ? '1.125rem' : '0.125rem', background: on ? 'var(--accent-ink)' : 'var(--surface)' }}
+        />
+      </span>
+    </button>
+  )
+}
+
 function Group({ title, children }) {
   return (
     <section>
@@ -93,6 +136,8 @@ export default function SettingsScreen({
   onScratch,
   onOpenWifi,
   onToast,
+  notesOn,
+  onToggleNotes,
   sync,
 }) {
   const { theme, copy } = useTheme()
@@ -224,6 +269,17 @@ export default function SettingsScreen({
           label="Look"
           detail={theme.name}
           onClick={() => setPickerOpen(true)}
+        />
+        {/* The detail line says where it appears on purpose: the one thing
+            somebody might reasonably worry about is whether turning this on
+            means the app starts messaging them. It does not, and it never
+            will — see design rule 1. */}
+        <ToggleRow
+          icon={Sparkles}
+          label="A kind word"
+          detail="One note a day on the dashboard. Nothing is ever sent to you."
+          on={notesOn}
+          onChange={onToggleNotes}
         />
         <SettingsRow icon={Info} label="What this app is" onClick={() => setAboutOpen(true)} />
       </Group>

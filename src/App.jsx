@@ -11,6 +11,7 @@ import { PlacesProvider, usePlaces } from './state/PlacesProvider.jsx'
 import { downloadBackup, parseBackup } from './lib/backup.js'
 import { emptyHouse, hardReset } from './lib/reset.js'
 import { claimDevice, loadDevice, looksSetUp } from './lib/device.js'
+import { loadNotes, saveNotes } from './lib/notes.js'
 import { parseJoinHash } from './lib/sync.js'
 import { useSync } from './state/useSync.js'
 import Welcome from './components/Welcome.jsx'
@@ -69,6 +70,12 @@ function AppShell() {
   const [todayOpen, setTodayOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [areaId, setAreaId] = useState(hashAreaId)
+  // The dashboard note. A per-device preference like the look, so it is not in
+  // the sync document or the backup — see the note at the top of lib/notes.js.
+  // `noteShuffle` counts taps on the note and is deliberately not persisted:
+  // the day's note is what you come back to.
+  const [notes, setNotes] = useState(loadNotes)
+  const [noteShuffle, setNoteShuffle] = useState(0)
   const [now, setNow] = useState(() => new Date())
   const [toast, setToast] = useState(null)
   const toastTimer = useRef(null)
@@ -122,6 +129,10 @@ function AppShell() {
   useEffect(() => {
     saveLog(log)
   }, [log])
+
+  useEffect(() => {
+    saveNotes(notes)
+  }, [notes])
 
   // A device with data on it already belongs to someone — never greet them as a
   // visitor just because the welcome screen didn't exist when they set up.
@@ -335,6 +346,8 @@ function AppShell() {
             onScratch={handleScratch}
             onOpenWifi={() => goToArea(WIFI_HASH)}
             onToast={showToast}
+            notesOn={notes.on}
+            onToggleNotes={() => setNotes((current) => ({ ...current, on: !current.on }))}
             sync={sync}
           />
         ) : todayOpen && !area ? (
@@ -383,6 +396,9 @@ function AppShell() {
               setSettingsOpen(true)
               window.scrollTo({ top: 0 })
             }}
+            notesOn={notes.on}
+            noteShuffle={noteShuffle}
+            onShuffleNote={() => setNoteShuffle((n) => n + 1)}
             sync={sync}
             readOnly={readOnly}
           />
